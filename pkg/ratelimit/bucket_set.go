@@ -19,8 +19,10 @@ type BucketSet struct {
 }
 
 // compiledBucket is one bucket after validation: everything Charge needs besides its predicates.
+// burst is the token bucket's size (requests when unset); the sliding window does not read it.
 type compiledBucket struct {
 	action   string
+	burst    int64
 	final    bool
 	key      []compiledKeyPart
 	name     string
@@ -37,14 +39,19 @@ type compiledKeyPart struct {
 	pattern    *regexp.Regexp
 }
 
-// NewBucketSet validates every row and compiles predicates and key patterns once.
-// Inner errors are index-prefixed bucket %d. A row with no predicate matches every request.
-func NewBucketSet(rules []BucketRule) (*BucketSet, error) {
+// NewBucketSet validates every row for the owner's algorithm (empty means AlgorithmSlidingWindow) and
+// compiles predicates and key patterns once. Inner errors are index-prefixed bucket %d. A row with no
+// predicate matches every request.
+func NewBucketSet(rules []BucketRule, algorithm string) (*BucketSet, error) {
+	if err := ValidateAlgorithm(algorithm); err != nil {
+		return nil, fmt.Errorf("rateLimitAlgorithm: %w", err)
+	}
+	algorithm = EffectiveAlgorithm(algorithm)
 	set := &BucketSet{buckets: make([]compiledBucket, 0, len(rules))}
 	predicateRows := make([]httprule.Rule, 0, len(rules))
 	seenNames := make(map[string]struct{}, len(rules))
 	for i, rule := range rules {
-		compiled, err := compileBucket(rule, seenNames)
+		compiled, err := compileBucket(rule, algorithm, seenNames)
 		if err != nil {
 			return nil, fmt.Errorf("bucket %d: %w", i, err)
 		}
@@ -67,8 +74,40 @@ func (set *BucketSet) HasCaptchaBucket() bool {
 	return set != nil && set.hasCaptchaBucket
 }
 
-// compileBucket validates one row. seen holds the names of the rows before it.
-func compileBucket(rule BucketRule, seen map[string]struct{}) (compiledBucket, error) {
+// limits is the Limit of every bucket in list order: what a counter that keeps one limiter per bucket builds.
+func (set *BucketSet) limits() []Limit {
+	limits := make([]Limit, 0, len(set.buckets))
+	for i := range set.buckets {
+		limits = append(limits, set.buckets[i].limit())
+	}
+	return limits
+}
+
+// limit is what this bucket admits, as the counter reads it.
+func (bucket *compiledBucket) limit() Limit {
+	return Limit{Bucket: bucket.name, Burst: bucket.burst, Requests: bucket.requests, Window: bucket.window}
+}
+
+// EffectiveAlgorithm maps an empty rateLimitAlgorithm to AlgorithmSlidingWindow, the default.
+func EffectiveAlgorithm(algorithm string) string {
+	if trimmed := strings.TrimSpace(algorithm); trimmed != "" {
+		return trimmed
+	}
+	return AlgorithmSlidingWindow
+}
+
+// ValidateAlgorithm accepts slidingWindow, tokenBucket, and empty (the default slidingWindow).
+func ValidateAlgorithm(algorithm string) error {
+	switch EffectiveAlgorithm(algorithm) {
+	case AlgorithmSlidingWindow, AlgorithmTokenBucket:
+		return nil
+	default:
+		return fmt.Errorf("must be %q or %q", AlgorithmSlidingWindow, AlgorithmTokenBucket)
+	}
+}
+
+// compileBucket validates one row for algorithm. seen holds the names of the rows before it.
+func compileBucket(rule BucketRule, algorithm string, seen map[string]struct{}) (compiledBucket, error) {
 	name, err := httprule.CompileRowName(rule.Name, seen)
 	if err != nil {
 		return compiledBucket{}, err
@@ -77,8 +116,8 @@ func compileBucket(rule BucketRule, seen map[string]struct{}) (compiledBucket, e
 	if _, predicateErr := httprule.NewWithCatchAll([]httprule.Rule{rule.Rule}); predicateErr != nil {
 		return compiledBucket{}, errors.Unwrap(predicateErr)
 	}
-	if algorithmErr := validateAlgorithm(rule.Algorithm, rule.Burst); algorithmErr != nil {
-		return compiledBucket{}, algorithmErr
+	if strings.TrimSpace(rule.Algorithm) != "" {
+		return compiledBucket{}, errors.New("algorithm: is not a bucket setting; set rateLimitAlgorithm on the rate-limit owner")
 	}
 	action, err := compileBucketAction(rule.Action)
 	if err != nil {
@@ -91,12 +130,17 @@ func compileBucket(rule BucketRule, seen map[string]struct{}) (compiledBucket, e
 	if err != nil {
 		return compiledBucket{}, err
 	}
+	burst, err := compileBurst(rule.Burst, int64(rule.Requests), window, algorithm)
+	if err != nil {
+		return compiledBucket{}, err
+	}
 	key, err := compileKeyParts(rule.Key)
 	if err != nil {
 		return compiledBucket{}, err
 	}
 	return compiledBucket{
 		action:   action,
+		burst:    burst,
 		final:    rule.Final,
 		key:      key,
 		name:     name,
@@ -105,19 +149,27 @@ func compileBucket(rule BucketRule, seen map[string]struct{}) (compiledBucket, e
 	}, nil
 }
 
-// validateAlgorithm accepts empty or slidingWindow, and rejects a burst, which only a token bucket would read.
-func validateAlgorithm(algorithm string, burst int) error {
-	switch strings.TrimSpace(algorithm) {
-	case "", AlgorithmSlidingWindow:
-	case "tokenBucket":
-		return errors.New("algorithm: tokenBucket is not supported in this version")
-	default:
-		return fmt.Errorf("algorithm: must be %q", AlgorithmSlidingWindow)
+// compileBurst returns the token bucket's size: requests when burst is unset (0), otherwise burst, which
+// must be at least 1 and is read only by the token bucket, whose full refill must fit maxTokenBucketRefill.
+func compileBurst(burst int, requests int64, window time.Duration, algorithm string) (int64, error) {
+	if burst < 0 {
+		return 0, errors.New("burst: must be at least 1")
 	}
+	if burst != 0 && algorithm != AlgorithmTokenBucket {
+		return 0, fmt.Errorf("burst: only read when rateLimitAlgorithm is %q", AlgorithmTokenBucket)
+	}
+	compiled := requests
 	if burst != 0 {
-		return errors.New("burst: is not supported in this version")
+		compiled = int64(burst)
 	}
-	return nil
+	if algorithm != AlgorithmTokenBucket {
+		return compiled, nil
+	}
+	refill := tokenBucketRefillSeconds(Limit{Burst: compiled, Requests: requests, Window: window})
+	if refill > maxTokenBucketRefill.Seconds() {
+		return 0, fmt.Errorf("burst: a full refill (burst x window / requests) must be at most %s", maxTokenBucketRefill)
+	}
+	return compiled, nil
 }
 
 // compileBucketAction maps empty to ratelimit and rejects anything but ratelimit, captcha, and log

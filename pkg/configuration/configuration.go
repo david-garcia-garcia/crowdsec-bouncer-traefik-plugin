@@ -171,6 +171,7 @@ type Config struct {
 	ModsecInstanceName                  string                       `json:"modsecInstanceName,omitempty"`
 	ModsecUnhealthyBackOffPeriodSecs    int64                        `json:"modsecUnhealthyBackOffPeriodSecs,omitempty"`
 	ModsecURL                           string                       `json:"modsecUrl,omitempty"`
+	RateLimitAlgorithm                  string                       `json:"rateLimitAlgorithm,omitempty"`
 	RateLimitBuckets                    []ratelimit.BucketRule       `json:"rateLimitBuckets,omitempty"`
 	RateLimitEnabled                    bool                         `json:"rateLimitEnabled,omitempty"`
 	RateLimitFailureAction              string                       `json:"rateLimitFailureAction,omitempty"`
@@ -317,6 +318,7 @@ func New() *Config {
 		ModsecEnabled:                       false,
 		ModsecHTTPTimeoutSeconds:            10,
 		ModsecUnhealthyBackOffPeriodSecs:    0,
+		RateLimitAlgorithm:                  ratelimit.AlgorithmSlidingWindow,
 		RateLimitBuckets:                    []ratelimit.BucketRule{},
 		RateLimitEnabled:                    false,
 		RateLimitFailureAction:              FailureActionPassthrough,
@@ -492,7 +494,8 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 }
 
 // validateRateLimit checks every rate-limit setting of the owner (rateLimitEnabled): store, Redis host,
-// password file, sync rate, failure action, status, and the bucket list (compiled, then discarded).
+// password file, algorithm, sync rate, failure action, status, and the bucket list (compiled for the
+// algorithm, then discarded).
 func validateRateLimit(config *Config) error {
 	if config.RateLimitStore != RateLimitStoreRedis {
 		return fmt.Errorf("RateLimitStore: must be %q (%q is not supported in this version)", RateLimitStoreRedis, config.RateLimitStore)
@@ -502,6 +505,9 @@ func validateRateLimit(config *Config) error {
 	}
 	if _, err := GetVariable(config, "RateLimitRedisPassword"); err != nil {
 		return err
+	}
+	if err := ratelimit.ValidateAlgorithm(config.RateLimitAlgorithm); err != nil {
+		return fmt.Errorf("RateLimitAlgorithm: %w", err)
 	}
 	if _, err := RateLimitSyncRateDuration(config); err != nil {
 		return err
@@ -516,7 +522,7 @@ func validateRateLimit(config *Config) error {
 	if len(config.RateLimitBuckets) == 0 {
 		return errors.New("RateLimitBuckets: cannot be empty when RateLimitEnabled is true")
 	}
-	if _, err := ratelimit.NewBucketSet(config.RateLimitBuckets); err != nil {
+	if _, err := ratelimit.NewBucketSet(config.RateLimitBuckets, config.RateLimitAlgorithm); err != nil {
 		return fmt.Errorf("RateLimitBuckets: %w", err)
 	}
 	return nil

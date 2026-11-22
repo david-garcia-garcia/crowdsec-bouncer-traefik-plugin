@@ -40,7 +40,7 @@ type testRateLimitCounter struct {
 }
 
 // Take counts one hit on key and reports whether the count is within limit.
-func (counter *testRateLimitCounter) Take(ctx context.Context, key string, limit int64, _ time.Duration) (ratelimit.Status, error) {
+func (counter *testRateLimitCounter) Take(ctx context.Context, key string, limit ratelimit.Limit) (ratelimit.Status, error) {
 	counter.takes.Add(1)
 	if counter.block {
 		<-ctx.Done()
@@ -50,7 +50,7 @@ func (counter *testRateLimitCounter) Take(ctx context.Context, key string, limit
 		return ratelimit.Status{}, counter.err
 	}
 	counter.counts[key]++
-	status := ratelimit.Status{Allowed: counter.counts[key] <= limit, Limit: limit, Estimated: float64(counter.counts[key])}
+	status := ratelimit.Status{Allowed: counter.counts[key] <= limit.Requests}
 	if !status.Allowed {
 		status.RetryAfter = testRateLimitRetryAfter
 	}

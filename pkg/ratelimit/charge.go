@@ -59,8 +59,9 @@ func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareNam
 		if !found {
 			continue
 		}
-		// Count, then compare: an answered hit still counts, so a client that keeps sending stays limited.
-		status, err := counter.Take(ctx, key, bucket.requests, bucket.window)
+		// Count, then compare. The sliding window counts an answered hit too, so a client that keeps
+		// sending stays limited; the token bucket takes no token for it.
+		status, err := counter.Take(ctx, key, bucket.limit())
 		if err != nil {
 			verdict.Err = fmt.Errorf("bucket %s: %w", bucket.name, err)
 			return verdict

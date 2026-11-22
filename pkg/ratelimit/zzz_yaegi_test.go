@@ -7,11 +7,12 @@ import (
 )
 
 // TestYaegi_OpenChargeClose runs the rate-limit leg under Yaegi v0.16.1, the way Traefik loads it:
-// Open (reclaim, simpleredis, vendored windowcounter) with buckets and a policy in exact and buffered
-// mode against a dead address (exact mode returns the counter error, buffered mode keeps the local
-// limit), the Client's buckets, policy, and incarnation, a nil Client's empty incarnation, a Charge on
-// an interpreted counter whose ratelimit bucket must answer, stacked captcha and ratelimit buckets with
-// and without a cleared gate, and Close.
+// Open (reclaim, simpleredis, vendored windowcounter and tokenbucket) with buckets and a policy, for the
+// sliding window in exact and buffered mode and for the token bucket, against a dead address (exact mode
+// and the token bucket return the counter error, buffered mode keeps the local limit), the Client's
+// buckets, policy, and incarnation, a nil Client's empty incarnation, a Charge on an interpreted counter
+// whose ratelimit bucket must answer, the interpreted counter seeing each bucket's burst, stacked captcha
+// and ratelimit buckets with and without a cleared gate, and Close.
 func TestYaegi_OpenChargeClose(t *testing.T) {
 	yaegitest.Run(t, yaegitest.GoPath(t), yaegiRateLimitProgram)
 }
@@ -31,13 +32,15 @@ import (
 )
 
 type inMemoryCounter struct {
-	hits map[string]int64
+	hits      map[string]int64
+	lastBurst int64
 }
 
-func (counter *inMemoryCounter) Take(ctx context.Context, key string, limit int64, window time.Duration) (ratelimit.Status, error) {
+func (counter *inMemoryCounter) Take(ctx context.Context, key string, limit ratelimit.Limit) (ratelimit.Status, error) {
 	counter.hits[key]++
-	allowed := counter.hits[key] <= limit
-	status := ratelimit.Status{Allowed: allowed, Limit: limit, Estimated: float64(counter.hits[key])}
+	counter.lastBurst = limit.Burst
+	allowed := counter.hits[key] <= limit.Requests
+	status := ratelimit.Status{Allowed: allowed}
 	if !allowed {
 		status.RetryAfter = 2500 * time.Millisecond
 	}
@@ -63,8 +66,13 @@ func main() {
 		exitWithFailure("a nil Client must have an empty incarnation")
 	}
 	var set *ratelimit.BucketSet
-	for _, syncRate := range []time.Duration{0, 200 * time.Millisecond} {
+	algorithms := []string{ratelimit.AlgorithmSlidingWindow, ratelimit.AlgorithmSlidingWindow, ratelimit.AlgorithmTokenBucket}
+	syncRates := []time.Duration{0, 200 * time.Millisecond, 200 * time.Millisecond}
+	for i := range algorithms {
+		syncRate := syncRates[i]
+		algorithm := algorithms[i]
 		client, err := ratelimit.Open(context.Background(), "yaegi", ratelimit.Settings{
+			Algorithm:    algorithm,
 			Buckets:      buckets,
 			InstanceName: "shared",
 			Policy:       policy,
@@ -84,7 +92,11 @@ func main() {
 			verdicts[i] = set.Charge(ctx, counter, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, false)
 			cancel()
 		}
-		if syncRate == 0 {
+		if algorithm == ratelimit.AlgorithmTokenBucket {
+			if verdicts[0].Err == nil || verdicts[1].Err == nil {
+				exitWithFailure("token-bucket Charge against a dead address must return the counter error")
+			}
+		} else if syncRate == 0 {
 			if verdicts[0].Err == nil {
 				exitWithFailure("exact Charge against a dead address must return the counter error")
 			}
@@ -93,8 +105,12 @@ func main() {
 		}
 		client.Close()
 	}
-	var fake ratelimit.Counter = &inMemoryCounter{hits: map[string]int64{}}
+	burstCounter := &inMemoryCounter{hits: map[string]int64{}}
+	var fake ratelimit.Counter = burstCounter
 	first := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, false)
+	if burstCounter.lastBurst != 1 {
+		exitWithFailure("the counter must see the bucket's burst (requests when unset)")
+	}
 	second := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, false)
 	if first.RateLimit.Name != "" || second.RateLimit.Name != "per-ip" || second.RateLimit.RetryAfter != 3*time.Second {
 		exitWithFailure("interpreted counter: want the second request answered by per-ip")
@@ -105,7 +121,7 @@ func main() {
 	stacked, err := ratelimit.NewBucketSet([]ratelimit.BucketRule{
 		{Name: "soft", Action: ratelimit.ActionCaptcha, Requests: 1, Window: "1m", Key: []ratelimit.KeyPart{{From: ratelimit.KeyFromIP}}},
 		{Name: "hard", Action: ratelimit.ActionRateLimit, Requests: 2, Window: "1m", Key: []ratelimit.KeyPart{{From: ratelimit.KeyFromIP}}},
-	})
+	}, ratelimit.AlgorithmSlidingWindow)
 	if err != nil || !stacked.HasCaptchaBucket() {
 		exitWithFailure("stacked buckets must compile and report a captcha bucket")
 	}

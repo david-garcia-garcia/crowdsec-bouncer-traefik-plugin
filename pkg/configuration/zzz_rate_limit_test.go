@@ -77,7 +77,15 @@ func Test_ValidateParams_rateLimit(t *testing.T) {
 		{name: "pattern without a capture group", config: with(func(c *Config) {
 			c.RateLimitBuckets[0].Key = []ratelimit.KeyPart{{From: ratelimit.KeyFromPath, Pattern: "^/t/[^/]+/"}}
 		}), wantErr: []string{"RateLimitBuckets", "capture group"}},
-		{name: "token bucket", config: with(func(c *Config) { c.RateLimitBuckets[0].Algorithm = "tokenBucket" }), wantErr: []string{"RateLimitBuckets", "tokenBucket"}},
+		{name: "bucket algorithm points at the limiter setting", config: with(func(c *Config) { c.RateLimitBuckets[0].Algorithm = "tokenBucket" }), wantErr: []string{"RateLimitBuckets", "bucket 0", "rateLimitAlgorithm"}},
+		{name: "token bucket limiter", config: with(func(c *Config) { c.RateLimitAlgorithm = "tokenBucket" })},
+		{name: "empty algorithm is the default", config: with(func(c *Config) { c.RateLimitAlgorithm = "" })},
+		{name: "unknown algorithm", config: with(func(c *Config) { c.RateLimitAlgorithm = "leakyBucket" }), wantErr: []string{"RateLimitAlgorithm", `"slidingWindow"`, `"tokenBucket"`}},
+		{name: "token bucket with burst", config: with(func(c *Config) {
+			c.RateLimitAlgorithm = "tokenBucket"
+			c.RateLimitBuckets[0].Burst = 20
+		})},
+		{name: "burst with the sliding window", config: with(func(c *Config) { c.RateLimitBuckets[0].Burst = 20 }), wantErr: []string{"RateLimitBuckets", "bucket 0", "burst", "rateLimitAlgorithm"}},
 		{name: "captcha action", config: with(func(c *Config) { c.RateLimitBuckets[0].Action = "captcha" })},
 		{name: "deny action", config: with(func(c *Config) { c.RateLimitBuckets[0].Action = "deny" }), wantErr: []string{"RateLimitBuckets", "bucket 0", `"ratelimit"`, `"captcha"`, `"log"`}},
 	}
@@ -112,6 +120,7 @@ func Test_ValidateParams_disabledRateLimitIgnoresLeftovers(t *testing.T) {
 	cfg.RateLimitStatusCode = 0
 	cfg.RateLimitStore = "memory"
 	cfg.RateLimitFailureAction = "allow"
+	cfg.RateLimitAlgorithm = "leakyBucket"
 	if err := ValidateParams(cfg, logger.New("INFO", "")); err != nil {
 		t.Fatalf("disabled leg must ignore leftovers: %v", err)
 	}

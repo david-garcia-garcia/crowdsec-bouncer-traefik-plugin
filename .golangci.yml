@@ -58,6 +58,7 @@ linters-settings:
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule
           - github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit
           - github.com/david-garcia-garcia/traefik-middleware-utilities/windowcounter
+          - github.com/david-garcia-garcia/traefik-middleware-utilities/tokenbucket
       Test:
         files:
           - $test

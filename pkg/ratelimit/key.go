@@ -108,7 +108,8 @@ func (part *compiledKeyPart) rawValue(source *keySource) string {
 }
 
 // redisCounterKey is rl:<middleware>:<bucket>:<first 16 hex of SHA-256 of the parts joined by NUL>.
-// The counter appends the window start. Raw part values never reach Redis.
+// Each counter appends its own suffix: the sliding window the window start, the token bucket ":tb".
+// Raw part values never reach Redis.
 func redisCounterKey(middlewareName, bucketName string, values []string) string {
 	sum := sha256.Sum256([]byte(strings.Join(values, keyPartSeparator)))
 	return redisKeyPrefix + middlewareName + ":" + bucketName + ":" + hex.EncodeToString(sum[:])[:keyHashHexLen]

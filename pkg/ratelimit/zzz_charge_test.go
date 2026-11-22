@@ -29,13 +29,13 @@ func newTestCounter() *testCounter {
 }
 
 // Take counts one hit on key and reports whether the count is within limit.
-func (counter *testCounter) Take(_ context.Context, key string, limit int64, _ time.Duration) (Status, error) {
+func (counter *testCounter) Take(_ context.Context, key string, limit Limit) (Status, error) {
 	counter.takes = append(counter.takes, key)
 	if counter.failBucket != "" && strings.Contains(key, ":"+counter.failBucket+":") {
 		return Status{}, errors.New("redis: unreachable")
 	}
 	counter.counts[key]++
-	status := Status{Allowed: counter.counts[key] <= limit, Limit: limit, Estimated: float64(counter.counts[key])}
+	status := Status{Allowed: counter.counts[key] <= limit.Requests}
 	if !status.Allowed {
 		status.RetryAfter = counter.retryAfter
 	}
@@ -293,5 +293,78 @@ func TestCharge_counterErrorAfterAKeptCaptchaBucket(t *testing.T) {
 	verdict = chargeTest(set, counter, http.MethodGet, "/", "198.51.100.1")
 	if verdict.Err == nil || !strings.Contains(verdict.Err.Error(), "bucket hard") || verdict.RateLimit.Name != "" {
 		t.Fatalf("third request: verdict=%+v want the error of bucket hard", verdict)
+	}
+}
+
+// testTokenBucketCounter is an in-memory token bucket per key with a frozen clock: every key starts with
+// limit.Burst tokens, a Take takes one, and a Take that finds none is denied without taking one, with
+// RetryAfter = one token's refill (Window / Requests) minus elapsed (here 300ms).
+type testTokenBucketCounter struct {
+	tokens map[string]int64
+}
+
+// Take takes one token of key, seeding the key with limit.Burst on first use.
+func (counter *testTokenBucketCounter) Take(_ context.Context, key string, limit Limit) (Status, error) {
+	tokens, seen := counter.tokens[key]
+	if !seen {
+		tokens = limit.Burst
+	}
+	if tokens < 1 {
+		counter.tokens[key] = tokens
+		return Status{RetryAfter: limit.Window/time.Duration(limit.Requests) - 300*time.Millisecond}, nil
+	}
+	counter.tokens[key] = tokens - 1
+	return Status{Allowed: true}, nil
+}
+
+// TestCharge_tokenBucketBurstThenRetryAfter proves Charge hands the counter each bucket's burst: burst 3
+// admits 3 at once and the fourth is answered with the refill time rounded up (9.7s -> 10s); a denied hit
+// takes no token, so the answer repeats with the same Retry-After.
+func TestCharge_tokenBucketBurstThenRetryAfter(t *testing.T) {
+	set, err := NewBucketSet([]BucketRule{
+		{Name: "per-ip", Requests: 1, Window: "10s", Burst: 3, Key: []KeyPart{{From: KeyFromIP}}},
+	}, AlgorithmTokenBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counter := &testTokenBucketCounter{tokens: map[string]int64{}}
+	for attempt := 1; attempt <= 3; attempt++ {
+		if verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.80"); verdict.RateLimit.Name != "" {
+			t.Fatalf("request %d of burst 3 answered: %+v", attempt, verdict)
+		}
+	}
+	for attempt := 4; attempt <= 5; attempt++ {
+		verdict := chargeTest(set, counter, http.MethodGet, "/", "198.51.100.80")
+		if verdict.RateLimit.Name != "per-ip" || verdict.RateLimit.RetryAfter != 10*time.Second {
+			t.Fatalf("request %d verdict=%+v, want per-ip with Retry-After 10s", attempt, verdict)
+		}
+	}
+}
+
+// TestCharge_tokenBucketDefaultBurstAndActions proves the default burst is requests and that the
+// actions keep their meaning under tokenBucket: a captcha bucket is kept, a stacked ratelimit bucket
+// answers, a log bucket is recorded.
+func TestCharge_tokenBucketDefaultBurstAndActions(t *testing.T) {
+	set, err := NewBucketSet([]BucketRule{
+		{Name: "dry-run", Action: ActionLog, Requests: 1, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+		{Name: "soft", Action: ActionCaptcha, Requests: 2, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+		{Name: "hard", Action: ActionRateLimit, Requests: 3, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
+	}, AlgorithmTokenBucket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	counter := &testTokenBucketCounter{tokens: map[string]int64{}}
+	var verdicts [4]Verdict
+	for i := range verdicts {
+		verdicts[i] = chargeTest(set, counter, http.MethodGet, "/", "198.51.100.81")
+	}
+	if len(verdicts[0].Exceeded) != 0 || len(verdicts[1].Exceeded) != 1 || verdicts[1].Exceeded[0].Name != "dry-run" {
+		t.Fatalf("log bucket: %+v / %+v", verdicts[0], verdicts[1])
+	}
+	if verdicts[1].Captcha.Name != "" || verdicts[2].Captcha.Name != "soft" || verdicts[2].RateLimit.Name != "" {
+		t.Fatalf("captcha bucket of burst 2: request 3 must keep soft: %+v", verdicts[2])
+	}
+	if verdicts[3].RateLimit.Name != "hard" || verdicts[3].RateLimit.RetryAfter != 20*time.Second {
+		t.Fatalf("ratelimit bucket of burst 3: request 4 must be answered by hard after 19.7s -> 20s: %+v", verdicts[3])
 	}
 }

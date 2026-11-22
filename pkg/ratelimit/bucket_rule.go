@@ -1,5 +1,6 @@
 // Package ratelimit is the rate-limit leg: bucket rows (which requests count, what each counter is per,
-// and what happens over the limit) and the Redis-backed sliding-window counter they are charged to.
+// and what happens over the limit) and the Redis-backed counter they are charged to, a sliding window or
+// a token bucket per the owner's rateLimitAlgorithm.
 package ratelimit
 
 import "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
@@ -24,14 +25,19 @@ const (
 	ActionRateLimit = "ratelimit"
 )
 
-// AlgorithmSlidingWindow is the only counting algorithm in this version, and the default.
-const AlgorithmSlidingWindow = "slidingWindow"
+// Counting algorithms of the whole limiter (rateLimitAlgorithm). AlgorithmSlidingWindow is the default:
+// requests per rolling window, every hit counted. AlgorithmTokenBucket refills requests per window and
+// holds up to burst tokens.
+const (
+	AlgorithmSlidingWindow = "slidingWindow"
+	AlgorithmTokenBucket   = "tokenBucket"
+)
 
 // BucketRule is one authoring row of rateLimitBuckets: a unique name, the request predicates of an
 // action rule (flat on the row, squashed like httprule.ActionRule), the key parts, and the limit.
 // Window is a Go duration string because Traefik's plugin config decode has no duration hook.
-// Algorithm and Burst exist only so NewBucketSet can reject values this version does not support,
-// instead of Traefik dropping them silently.
+// Burst is the token bucket's size (requests when unset). Algorithm exists only so NewBucketSet can
+// reject it with a pointer to rateLimitAlgorithm, instead of Traefik dropping it silently.
 type BucketRule struct {
 	Action        string    `json:"action,omitempty"`
 	Algorithm     string    `json:"algorithm,omitempty"`

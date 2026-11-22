@@ -33,7 +33,7 @@ func redisOnlyTestSettings(redis RedisSettings) Settings {
 }
 
 // TestOpen_sharesOneClientPerMiddlewareAndSettings proves equal keys reuse the Client, a changed
-// Redis setting, bucket row, policy setting, or middleware name opens another, and a changed
+// Redis setting, algorithm, bucket row, policy setting, or middleware name opens another, and a changed
 // instance name keeps it.
 func TestOpen_sharesOneClientPerMiddlewareAndSettings(t *testing.T) {
 	reclaim.ResetForTestWith(0)
@@ -57,6 +57,7 @@ func TestOpen_sharesOneClientPerMiddlewareAndSettings(t *testing.T) {
 	}
 	changes := map[string]func(*Settings, *string){
 		"syncRate":        func(settings *Settings, _ *string) { settings.Redis.SyncRate = 0 },
+		"algorithm":       func(settings *Settings, _ *string) { settings.Algorithm = AlgorithmTokenBucket },
 		"host":            func(settings *Settings, _ *string) { settings.Redis.Host = "127.0.0.1:2" },
 		"password":        func(settings *Settings, _ *string) { settings.Redis.Password = "secret" },
 		"database":        func(settings *Settings, _ *string) { settings.Redis.Database = "1" },
@@ -104,13 +105,89 @@ func TestOpen_carriesBucketsAndPolicy(t *testing.T) {
 		t.Fatal("an opened Client must have an incarnation")
 	}
 	started := sink.String()
-	for _, attr := range []string{`"msg":"` + msgInstanceStarted + `"`, `"leg":"ratelimit"`, `"instanceName":"shared"`, `"incarnation":"` + client.Incarnation() + `"`} {
+	for _, attr := range []string{`"msg":"` + msgInstanceStarted + `"`, `"leg":"ratelimit"`, `"instanceName":"shared"`, `"incarnation":"` + client.Incarnation() + `"`, `"algorithm":"slidingWindow"`} {
 		if !strings.Contains(started, attr) {
 			t.Fatalf("started line lacks %s: %s", attr, started)
 		}
 	}
 	if got := (*Client)(nil).Incarnation(); got != "" {
 		t.Fatalf("nil Client incarnation %q, want empty", got)
+	}
+}
+
+// TestOwnershipKey_algorithmAndBurst proves an empty algorithm keys as slidingWindow, and that under
+// tokenBucket a burst edit is a new key.
+func TestOwnershipKey_algorithmAndBurst(t *testing.T) {
+	empty := deadRedisTestSettings(0)
+	sliding := deadRedisTestSettings(0)
+	sliding.Algorithm = AlgorithmSlidingWindow
+	if OwnershipKey("edge", empty) != OwnershipKey("edge", sliding) {
+		t.Fatal("an empty algorithm must key as slidingWindow")
+	}
+	tokenBucket := deadRedisTestSettings(0)
+	tokenBucket.Algorithm = AlgorithmTokenBucket
+	burst := deadRedisTestSettings(0)
+	burst.Algorithm = AlgorithmTokenBucket
+	burst.Buckets[0].Burst = 9
+	if OwnershipKey("edge", tokenBucket) == OwnershipKey("edge", sliding) || OwnershipKey("edge", burst) == OwnershipKey("edge", tokenBucket) {
+		t.Fatal("the algorithm and a burst edit must each change the key")
+	}
+}
+
+// TestOpen_tokenBucketClient proves a tokenBucket owner builds no sliding-window limiter, logs its
+// algorithm, answers a Redis outage with an error even with a buffered sync rate (no local count),
+// sleeps and wakes without a limiter, and closes twice.
+func TestOpen_tokenBucketClient(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	sink := &lockedLogSink{}
+	log := slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	settings := deadRedisTestSettings(200 * time.Millisecond)
+	settings.Algorithm = AlgorithmTokenBucket
+	settings.Buckets[0].Burst = 8
+	client, err := Open(context.Background(), "edge", settings, log)
+	if err != nil {
+		t.Fatalf("Open against a dead address must succeed: %v", err)
+	}
+	if client.limiter != nil {
+		t.Fatal("a tokenBucket Client must not build the sliding-window limiter")
+	}
+	counter, isTokenBucket := client.counter.(*tokenBucketCounter)
+	if !isTokenBucket || counter.buckets["per-ip"] == nil {
+		t.Fatalf("counter=%T, want one token bucket for per-ip", client.counter)
+	}
+	if started := sink.String(); !strings.Contains(started, `"algorithm":"tokenBucket"`) {
+		t.Fatalf("started line lacks the algorithm: %s", started)
+	}
+	assertTakeFailsWithinBudget(t, client)
+	if _, missingErr := client.Take(context.Background(), "rl:edge:other:x", Limit{Bucket: "other", Burst: 1, Requests: 1, Window: time.Second}); missingErr == nil {
+		t.Fatal("a Take for a bucket the owner does not have must fail")
+	}
+	client.Sleep()
+	client.Wake()
+	client.Close()
+	client.Close()
+}
+
+// TestTokenBucketTTL_coversAFullRefill proves the TTL is the full refill rounded up to whole seconds, at
+// least 1s, and that the rate is requests per window.
+func TestTokenBucketTTL_coversAFullRefill(t *testing.T) {
+	tests := []struct {
+		limit Limit
+		want  time.Duration
+	}{
+		{limit: Limit{Burst: 5, Requests: 5, Window: time.Minute}, want: time.Minute},
+		{limit: Limit{Burst: 3, Requests: 1, Window: 5 * time.Second}, want: 15 * time.Second},
+		{limit: Limit{Burst: 10, Requests: 7, Window: time.Minute}, want: 86 * time.Second},
+		{limit: Limit{Burst: 1, Requests: 100, Window: time.Second}, want: time.Second},
+	}
+	for _, tt := range tests {
+		if got := tokenBucketTTL(tt.limit); got != tt.want {
+			t.Fatalf("tokenBucketTTL(%+v)=%s want %s", tt.limit, got, tt.want)
+		}
+	}
+	if got := tokenBucketRate(Limit{Requests: 6, Window: time.Minute}); got != 0.1 {
+		t.Fatalf("rate=%v want 0.1 per second", got)
 	}
 }
 
@@ -152,7 +229,7 @@ func TestOpen_deadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
 	for hit := 1; hit <= 3; hit++ {
 		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 		started := time.Now()
-		status, takeErr := client.Take(ctx, key, 2, time.Minute)
+		status, takeErr := client.Take(ctx, key, Limit{Bucket: "per-ip", Burst: 2, Requests: 2, Window: time.Minute})
 		cancel()
 		if takeErr != nil {
 			t.Fatalf("hit %d: buffered Take must not fail on a Redis outage: %v", hit, takeErr)
@@ -222,7 +299,7 @@ func assertTakeFailsWithinBudget(t *testing.T, client *Client) {
 	ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 	defer cancel()
 	started := time.Now()
-	_, err := client.Take(ctx, "rl:edge:b:"+t.Name(), 5, time.Minute)
+	_, err := client.Take(ctx, "rl:edge:per-ip:"+t.Name(), Limit{Bucket: "per-ip", Burst: 5, Requests: 5, Window: time.Minute})
 	if err == nil {
 		t.Fatal("Take must fail")
 	}

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 )
 
 const (
@@ -23,6 +24,16 @@ const (
 	// realRedisLimit is the requests per window every case allows.
 	realRedisLimit = 5
 )
+
+// realRedisTestLimit is the sliding-window Limit every Take of the sliding-window cases charges.
+func realRedisTestLimit() Limit {
+	return Limit{Bucket: "b", Burst: realRedisLimit, Requests: realRedisLimit, Window: realRedisWindow}
+}
+
+// newRealRedisSlidingWindowClient builds a sliding-window Client on addr with syncRate, outside the reclaim table.
+func newRealRedisSlidingWindowClient(addr string, syncRate time.Duration) (*Client, error) {
+	return newClient(RedisSettings{Host: addr, SyncRate: syncRate}, AlgorithmSlidingWindow, nil, slog.Default())
+}
 
 // TestMain waits for Dragonfly (or Redis) at REALREDIS_ADDR before the suite.
 func TestMain(m *testing.M) {
@@ -46,11 +57,11 @@ func realRedisAddr() string {
 func waitRealRedis(addr string, budget time.Duration) error {
 	deadline := time.Now().Add(budget)
 	for {
-		client, err := newClient(RedisSettings{Host: addr}, slog.Default())
+		client, err := newRealRedisSlidingWindowClient(addr, 0)
 		if err != nil {
 			return err
 		}
-		_, last := client.Take(context.Background(), "rl:wait", 1_000_000, realRedisWindow)
+		_, last := client.Take(context.Background(), "rl:wait", Limit{Bucket: "wait", Burst: 1_000_000, Requests: 1_000_000, Window: realRedisWindow})
 		client.Close()
 		if last == nil {
 			return nil
@@ -65,7 +76,7 @@ func waitRealRedis(addr string, budget time.Duration) error {
 // newRealRedisTestClient opens a Client on the real server with syncRate, closed at test end.
 func newRealRedisTestClient(t *testing.T, syncRate time.Duration) *Client {
 	t.Helper()
-	client, err := newClient(RedisSettings{Host: realRedisAddr(), SyncRate: syncRate}, slog.Default())
+	client, err := newRealRedisSlidingWindowClient(realRedisAddr(), syncRate)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +107,7 @@ func takeRealRedisTest(t *testing.T, client *Client, key string) bool {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 	defer cancel()
-	status, err := client.Take(ctx, key, realRedisLimit, realRedisWindow)
+	status, err := client.Take(ctx, key, realRedisTestLimit())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,14 +165,14 @@ func TestRealRedis_twoClientsShareACounter(t *testing.T) {
 
 // TestRealRedis_deadAddressReturnsAnError proves an unreachable server is an error, not a verdict, in exact mode.
 func TestRealRedis_deadAddressReturnsAnError(t *testing.T) {
-	client, err := newClient(RedisSettings{Host: "127.0.0.1:1"}, slog.Default())
+	client, err := newRealRedisSlidingWindowClient("127.0.0.1:1", 0)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 	defer cancel()
-	if _, err := client.Take(ctx, realRedisTestKey(t), realRedisLimit, realRedisWindow); err == nil {
+	if _, err := client.Take(ctx, realRedisTestKey(t), realRedisTestLimit()); err == nil {
 		t.Fatal("dead address must return an error")
 	}
 }
@@ -210,5 +221,68 @@ func TestRealRedis_bucketEditKeepsTheCount(t *testing.T) {
 		if wantLimited := hit == 6; (verdict.RateLimit.Name == "login") != wantLimited {
 			t.Fatalf("hit %d after the edit: ratelimit bucket %q, want limited=%v (count kept from before the edit)", hit, verdict.RateLimit.Name, wantLimited)
 		}
+	}
+}
+
+// realRedisKeyProbeScript returns the type and TTL of KEYS[1] and whether KEYS[2] exists.
+const realRedisKeyProbeScript = `local kind = redis.call('type', KEYS[1])
+return {kind['ok'], tostring(redis.call('ttl', KEYS[1])), tostring(redis.call('exists', KEYS[2]))}`
+
+// TestRealRedis_tokenBucketBurstRetryAfterAndRefill proves a tokenBucket owner on Dragonfly: burst 3 at
+// requests 1 per 2s admits 3 at once, answers the fourth with Retry-After 2s, takes no token for the
+// answered hits, admits one more after the refill, and keeps its state in one hash under <key>:tb with a
+// TTL of one full refill (6s), never under the sliding window's <key>:<window start>.
+func TestRealRedis_tokenBucketBurstRetryAfterAndRefill(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	middlewareName := fmt.Sprintf("tb-%d", time.Now().UnixNano())
+	clientIP := "198.51.100.10"
+	client, err := Open(context.Background(), middlewareName, Settings{
+		Algorithm: AlgorithmTokenBucket,
+		Buckets:   []BucketRule{{Name: "tb", Requests: 1, Window: "2s", Burst: 3, Key: []KeyPart{{From: KeyFromIP}}}},
+		Policy:    Policy{FailureAction: "ban", ResponseHeaders: true, StatusCode: 429},
+		Redis:     RedisSettings{Host: realRedisAddr(), SyncRate: 200 * time.Millisecond},
+	}, slog.Default())
+	if err != nil {
+		t.Fatal(err)
+	}
+	charge := func() Verdict {
+		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
+		defer cancel()
+		return client.Buckets().Charge(ctx, client, middlewareName, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), net.ParseIP(clientIP), false)
+	}
+	// Burst: three at once, then the refill answers.
+	for hit := 1; hit <= 3; hit++ {
+		if verdict := charge(); verdict.Err != nil || verdict.RateLimit.Name != "" {
+			t.Fatalf("hit %d of burst 3: %+v", hit, verdict)
+		}
+	}
+	for hit := 4; hit <= 5; hit++ {
+		verdict := charge()
+		if verdict.Err != nil || verdict.RateLimit.Name != "tb" || verdict.RateLimit.RetryAfter != 2*time.Second {
+			t.Fatalf("hit %d: %+v, want tb with Retry-After 2s", hit, verdict)
+		}
+	}
+	// Key layout: one hash under :tb with a TTL of one full refill, and no sliding-window key.
+	key := redisCounterKey(middlewareName, "tb", []string{clientIP})
+	windowStart := time.Now().Unix() / 2 * 2
+	probe, err := client.redis.Eval(context.Background(), realRedisKeyProbeScript, simpleredis.ScriptSHA1Hex(realRedisKeyProbeScript),
+		[]string{key + ":tb", fmt.Sprintf("%s:%d", key, windowStart)}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(probe) != 3 || string(probe[0]) != "hash" || string(probe[2]) != "0" {
+		t.Fatalf("probe=%q, want a hash under :tb and no sliding-window key", probe)
+	}
+	if ttl := string(probe[1]); ttl != "6" && ttl != "5" {
+		t.Fatalf("ttl=%s, want one full refill (6s)", ttl)
+	}
+	// Refill: the answered hits took no token, so one token is back after 2s.
+	time.Sleep(2100 * time.Millisecond)
+	if verdict := charge(); verdict.Err != nil || verdict.RateLimit.Name != "" {
+		t.Fatalf("after the refill: %+v, want allowed", verdict)
+	}
+	if verdict := charge(); verdict.RateLimit.Name != "tb" {
+		t.Fatalf("second hit after one refill: %+v, want tb", verdict)
 	}
 }

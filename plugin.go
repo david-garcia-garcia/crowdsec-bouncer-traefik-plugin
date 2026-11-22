@@ -160,11 +160,12 @@ func prepareRateLimit(config *configuration.Config, _ *slog.Logger, traefikName 
 	return err
 }
 
-// rateLimitSettings is what the owner's config puts on its rate-limit Client: Redis, buckets, policy,
-// and instance name. Call it after prepareRateLimit, which resolved the password and parsed the sync rate.
+// rateLimitSettings is what the owner's config puts on its rate-limit Client: algorithm, Redis, buckets,
+// policy, and instance name. Call it after prepareRateLimit, which resolved the password and parsed the sync rate.
 func rateLimitSettings(config *configuration.Config) ratelimit.Settings {
 	syncRate, _ := configuration.RateLimitSyncRateDuration(config) // prepareRateLimit returned its error
 	return ratelimit.Settings{
+		Algorithm:    config.RateLimitAlgorithm,
 		Buckets:      config.RateLimitBuckets,
 		InstanceName: config.RateLimitInstanceName,
 		Policy: ratelimit.Policy{

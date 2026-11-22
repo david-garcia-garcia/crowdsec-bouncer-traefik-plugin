@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 )
@@ -15,7 +16,7 @@ func validTestBucket(name string) BucketRule {
 // mustNewTestBucketSet compiles rules or fails the test.
 func mustNewTestBucketSet(t *testing.T, rules []BucketRule) *BucketSet {
 	t.Helper()
-	set, err := NewBucketSet(rules)
+	set, err := NewBucketSet(rules, AlgorithmSlidingWindow)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -30,9 +31,10 @@ func TestNewBucketSet_rejectsEachRowError(t *testing.T) {
 		return []BucketRule{bucket}
 	}
 	tests := []struct {
-		name    string
-		rules   []BucketRule
-		wantErr string
+		name      string
+		rules     []BucketRule
+		algorithm string // empty is the default slidingWindow
+		wantErr   string
 	}{
 		{name: "empty name", rules: with(func(b *BucketRule) { b.Name = " " }), wantErr: "bucket 0: name: empty"},
 		{name: "colon in name", rules: with(func(b *BucketRule) { b.Name = "a:b" }), wantErr: "bucket 0: name: contains colon"},
@@ -48,9 +50,15 @@ func TestNewBucketSet_rejectsEachRowError(t *testing.T) {
 		{name: "window empty", rules: with(func(b *BucketRule) { b.Window = "" }), wantErr: "bucket 0: window:"},
 		{name: "action deny", rules: with(func(b *BucketRule) { b.Action = "deny" }), wantErr: `bucket 0: action: must be one of "ratelimit", "captcha", or "log"`},
 		{name: "action unknown", rules: with(func(b *BucketRule) { b.Action = "block" }), wantErr: `bucket 0: action: must be one of "ratelimit", "captcha", or "log"`},
-		{name: "algorithm tokenBucket", rules: with(func(b *BucketRule) { b.Algorithm = "tokenBucket" }), wantErr: "bucket 0: algorithm: tokenBucket is not supported in this version"},
-		{name: "algorithm unknown", rules: with(func(b *BucketRule) { b.Algorithm = "fixed" }), wantErr: "bucket 0: algorithm: must be"},
-		{name: "burst set", rules: with(func(b *BucketRule) { b.Burst = 10 }), wantErr: "bucket 0: burst: is not supported in this version"},
+		{name: "row algorithm tokenBucket", rules: with(func(b *BucketRule) { b.Algorithm = AlgorithmTokenBucket }), wantErr: "bucket 0: algorithm: is not a bucket setting; set rateLimitAlgorithm"},
+		{name: "row algorithm slidingWindow", rules: with(func(b *BucketRule) { b.Algorithm = AlgorithmSlidingWindow }), wantErr: "bucket 0: algorithm: is not a bucket setting; set rateLimitAlgorithm"},
+		{name: "row algorithm under tokenBucket", rules: with(func(b *BucketRule) { b.Algorithm = AlgorithmTokenBucket }), algorithm: AlgorithmTokenBucket, wantErr: "bucket 0: algorithm: is not a bucket setting"},
+		{name: "burst with slidingWindow", rules: with(func(b *BucketRule) { b.Burst = 10 }), wantErr: `bucket 0: burst: only read when rateLimitAlgorithm is "tokenBucket"`},
+		{name: "negative burst", rules: with(func(b *BucketRule) { b.Burst = -1 }), algorithm: AlgorithmTokenBucket, wantErr: "bucket 0: burst: must be at least 1"},
+		{name: "negative burst with slidingWindow", rules: with(func(b *BucketRule) { b.Burst = -1 }), wantErr: "bucket 0: burst: must be at least 1"},
+		{name: "refill over a year", rules: with(func(b *BucketRule) { b.Requests = 1; b.Window = "8761h" }), algorithm: AlgorithmTokenBucket, wantErr: "bucket 0: burst: a full refill (burst x window / requests) must be at most 8760h"},
+		{name: "burst refill over a year", rules: with(func(b *BucketRule) { b.Requests = 1; b.Window = "1h"; b.Burst = 8761 }), algorithm: AlgorithmTokenBucket, wantErr: "bucket 0: burst: a full refill"},
+		{name: "unknown limiter algorithm", rules: []BucketRule{validTestBucket("b")}, algorithm: "leakyBucket", wantErr: `rateLimitAlgorithm: must be "slidingWindow" or "tokenBucket"`},
 		{name: "unknown from", rules: with(func(b *BucketRule) { b.Key = []KeyPart{{From: "body"}} }), wantErr: `bucket 0: key 0: from: unknown "body"`},
 		{name: "header without name", rules: with(func(b *BucketRule) { b.Key = []KeyPart{{From: KeyFromHeader}} }), wantErr: "bucket 0: key 0: name: required"},
 		{name: "cookie without name", rules: with(func(b *BucketRule) { b.Key = []KeyPart{{From: KeyFromCookie}} }), wantErr: "bucket 0: key 0: name: required"},
@@ -65,7 +73,7 @@ func TestNewBucketSet_rejectsEachRowError(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewBucketSet(tt.rules)
+			_, err := NewBucketSet(tt.rules, tt.algorithm)
 			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("err=%v want %q", err, tt.wantErr)
 			}
@@ -73,13 +81,13 @@ func TestNewBucketSet_rejectsEachRowError(t *testing.T) {
 	}
 }
 
-// TestNewBucketSet_acceptsCatchAllAndDefaults proves a row with no predicate passes, and that action and
-// algorithm default to ratelimit and slidingWindow.
+// TestNewBucketSet_acceptsCatchAllAndDefaults proves a row with no predicate passes, that action defaults
+// to ratelimit, and that burst defaults to requests.
 func TestNewBucketSet_acceptsCatchAllAndDefaults(t *testing.T) {
 	set := mustNewTestBucketSet(t, []BucketRule{
 		{Name: "per-ip", Requests: 300, Window: "1m", Key: []KeyPart{{From: KeyFromIP}}},
 		{
-			Name: "login", Requests: 5, Window: "60s", Action: ActionLog, Algorithm: AlgorithmSlidingWindow, Final: true,
+			Name: "login", Requests: 5, Window: "60s", Action: ActionLog, Final: true,
 			Rule: httprule.Rule{Method: "^POST$", Path: "^/login$"},
 			Key:  []KeyPart{{From: KeyFromIP, IPv4Prefix: 24, IPv6Prefix: 64}, {From: KeyFromPath, Pattern: "^/t/([^/]+)/"}},
 		},
@@ -87,13 +95,13 @@ func TestNewBucketSet_acceptsCatchAllAndDefaults(t *testing.T) {
 	if len(set.buckets) != 2 {
 		t.Fatalf("buckets=%d", len(set.buckets))
 	}
-	if got := set.buckets[0]; got.action != ActionRateLimit || got.requests != 300 || got.window.Seconds() != 60 || got.final {
+	if got := set.buckets[0]; got.action != ActionRateLimit || got.requests != 300 || got.burst != 300 || got.window.Seconds() != 60 || got.final {
 		t.Fatalf("bucket 0=%+v", got)
 	}
 	if got := set.buckets[1]; got.action != ActionLog || !got.final || len(got.key) != 2 || got.key[1].pattern == nil {
 		t.Fatalf("bucket 1=%+v", got)
 	}
-	if _, err := NewBucketSet(nil); err != nil {
+	if _, err := NewBucketSet(nil, ""); err != nil {
 		t.Fatalf("empty list err=%v", err)
 	}
 	if set.HasCaptchaBucket() {
@@ -118,5 +126,32 @@ func TestNewBucketSet_acceptsEachAction(t *testing.T) {
 	var nilSet *BucketSet
 	if nilSet.HasCaptchaBucket() {
 		t.Fatal("a nil set must not report a captcha bucket")
+	}
+}
+
+// TestNewBucketSet_tokenBucketBurst proves the token bucket reads burst (default requests), that every
+// bucket's Limit carries it, and that an empty algorithm is the sliding window.
+func TestNewBucketSet_tokenBucketBurst(t *testing.T) {
+	withBurst := validTestBucket("burst")
+	withBurst.Burst = 12
+	set, err := NewBucketSet([]BucketRule{validTestBucket("default"), withBurst}, " "+AlgorithmTokenBucket+" ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := set.limits()
+	want := []Limit{
+		{Bucket: "default", Burst: 5, Requests: 5, Window: time.Minute},
+		{Bucket: "burst", Burst: 12, Requests: 5, Window: time.Minute},
+	}
+	if len(limits) != len(want) || limits[0] != want[0] || limits[1] != want[1] {
+		t.Fatalf("limits=%+v want %+v", limits, want)
+	}
+	if got := EffectiveAlgorithm(" "); got != AlgorithmSlidingWindow {
+		t.Fatalf("EffectiveAlgorithm(empty)=%q", got)
+	}
+	for _, algorithm := range []string{"", AlgorithmSlidingWindow, AlgorithmTokenBucket} {
+		if err := ValidateAlgorithm(algorithm); err != nil {
+			t.Fatalf("ValidateAlgorithm(%q)=%v", algorithm, err)
+		}
 	}
 }

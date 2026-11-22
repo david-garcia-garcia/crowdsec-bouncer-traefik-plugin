@@ -209,7 +209,7 @@ func TestNew_RateLimitDisabledOpensNothing(t *testing.T) {
 }
 
 // TestNew_RateLimitSharesOneCounter proves two New calls with the same middleware name and settings
-// share one counter, and that a changed sync rate opens another.
+// share one counter, and that a changed sync rate or algorithm opens another.
 func TestNew_RateLimitSharesOneCounter(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
@@ -235,6 +235,35 @@ func TestNew_RateLimitSharesOneCounter(t *testing.T) {
 	}
 	if other, _, ok := reclaim.Peek(rateLimitTestOwnershipKey(t, exact, "rl-shared")); !ok || other == first {
 		t.Fatal("a changed sync rate must open a new counter")
+	}
+	tokenBucket := cfgRateLimitDeadRedis()
+	tokenBucket.RateLimitAlgorithm = ratelimit.AlgorithmTokenBucket
+	if _, err := New(context.Background(), testNextOK(), tokenBucket, "rl-shared"); err != nil {
+		t.Fatal(err)
+	}
+	if other, _, ok := reclaim.Peek(rateLimitTestOwnershipKey(t, tokenBucket, "rl-shared")); !ok || other == first {
+		t.Fatal("a changed algorithm must open a new counter")
+	}
+}
+
+// TestNew_RateLimitTokenBucketDeadRedisAppliesFailureAction proves a tokenBucket owner has no buffered
+// local count: with the default sync rate an unreachable Redis answers the first request with the failure
+// action (ban:ratelimit-failure), where the sliding window would keep counting locally.
+func TestNew_RateLimitTokenBucketDeadRedisAppliesFailureAction(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	cfg := cfgRateLimitDeadRedis()
+	cfg.RateLimitAlgorithm = ratelimit.AlgorithmTokenBucket
+	cfg.RateLimitFailureAction = configuration.FailureActionBan
+	handler, err := New(context.Background(), testNextOK(), cfg, "rl-token-bucket")
+	if err != nil {
+		t.Fatalf("an unreachable Redis must not fail New: %v", err)
+	}
+	rw := httptest.NewRecorder()
+	handler.ServeHTTP(rw, reqForIP("203.0.113.47"))
+	if rw.Code != http.StatusForbidden || rw.Header().Get("X-Remediation") != "ban:ratelimit-failure" {
+		t.Fatalf("status %d header %q, want 403 ban:ratelimit-failure", rw.Code, rw.Header().Get("X-Remediation"))
 	}
 }
 
