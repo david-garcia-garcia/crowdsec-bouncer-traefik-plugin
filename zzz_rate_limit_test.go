@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
@@ -364,8 +365,11 @@ func countRateLimitOwnerLines(t *testing.T, logFilePath, msg, level string) int 
 // subscriber logs WARN "crowdsec bouncer rate limit owner unavailable" once when its owner is dropped and
 // INFO "crowdsec bouncer rate limit owner available" once when it returns, never per request. A subscriber
 // that starts before its owner warns once under Yaegi (Watch delivers the typed nil) and not in compiled
-// Go (Watch skips it); either way the first bind logs one INFO per WARN before it.
+// Go (Watch skips it); either way the first bind logs one INFO per WARN before it. The WARN is pending per
+// router name: a reload that rebuilds app-a while the owner is gone adds no WARN, and one INFO answers it.
 func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
+	bouncer.ResetRateLimitOwnerWarningsForTest()
+	t.Cleanup(bouncer.ResetRateLimitOwnerWarningsForTest)
 	logFilePath := newTestLogFile(t)
 	const warnMsg = "crowdsec bouncer rate limit owner unavailable"
 	const infoMsg = "crowdsec bouncer rate limit owner available"
@@ -407,7 +411,16 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 		t.Fatalf("owner dropped: WARN lines=%d want %d", got, warnedBeforeOwner+1)
 	}
 
-	// The owner returns: one INFO, and the limit answers again.
+	// A reload rebuilds app-a while the owner is gone: under Yaegi its first delivery is the typed nil, which
+	// is the same outage, so no second WARN.
+	if _, err := New(context.Background(), testNextOK(), subscriberConfig, "app-a"); err != nil {
+		t.Fatal(err)
+	}
+	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
+		t.Fatalf("app-a rebuilt without the owner: WARN lines=%d want %d", got, warnedBeforeOwner+1)
+	}
+
+	// The owner returns: one INFO although both app-a instances bind, and the limit answers again.
 	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
 		t.Fatal(err)
 	}

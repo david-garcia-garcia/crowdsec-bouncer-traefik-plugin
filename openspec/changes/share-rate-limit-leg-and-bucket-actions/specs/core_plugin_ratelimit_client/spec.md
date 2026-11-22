@@ -176,3 +176,22 @@ A rate-limit subscriber SHALL log WARN `crowdsec bouncer rate limit owner unavai
 - **THEN** it logs WARN `crowdsec bouncer rate limit owner unavailable` once
 - **AND** when the owner publishes, it logs INFO `crowdsec bouncer rate limit owner available` once
 - **AND** compiled Go, which does not deliver that first empty value, logs neither line
+
+### Requirement: The owner-unavailable WARN is pending per middleware name across reloads
+The owner-unavailable WARN SHALL stay pending per Traefik middleware name for the process lifetime, not per router instance. While it is pending, no instance of that name SHALL log a second WARN for the same rate-limit instance name, and the first bind of any instance of that name SHALL log the INFO that answers it. A rebuild on another instance name or without the rate limit follows the scenarios below.
+
+#### Scenario: Reload rebuilds the subscriber during the outage
+- **WHEN** subscriber `app-a` of instance `shared` has logged WARN `crowdsec bouncer rate limit owner unavailable` and a Traefik reload builds a new `app-a` instance while `shared` is still unpublished
+- **THEN** the new instance logs no second WARN, also under Traefik's interpreter where its first delivery is the empty value
+- **AND** when a reload publishes `shared` again and builds `app-a` after the owner, the new instance's first bind logs INFO `crowdsec bouncer rate limit owner available` once with the bound client's `incarnation`
+- **AND** a later bind of any other `app-a` instance logs neither line, and the next loss of `shared` logs WARN again
+
+#### Scenario: Reload moves the subscriber to another instance name
+- **WHEN** `app-a` has a WARN pending for `shared` and a reload builds `app-a` on instance `other`, also unpublished
+- **THEN** WARN `crowdsec bouncer rate limit owner unavailable` with `instanceName` `other` is logged once
+- **AND** when `other` publishes, INFO `crowdsec bouncer rate limit owner available` with `instanceName` `other` is logged once, and a later `app-a` bound to `shared` logs no INFO
+
+#### Scenario: Reload drops the rate limit from the subscriber
+- **WHEN** `app-a` has a WARN pending and a reload builds `app-a` without `rateLimitInstanceName`
+- **THEN** no line is logged and the pending WARN is dropped
+- **AND** a later `app-a` that binds a rate-limit client logs no INFO

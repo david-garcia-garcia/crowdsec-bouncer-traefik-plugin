@@ -40,7 +40,6 @@ type Bouncer struct {
 	name                     string
 	next                     http.Handler
 	rateLimitLeg             legBinding // *ratelimit.Client: the owner's counter, buckets, and policy
-	rateLimitOwnerWarned     bool       // the owner-unavailable WARN is the last owner line logged; guarded by bindingMu
 	remediationCustomHeader  string
 	remediationStatusCode    int
 	trustedHops              *ip.PoolStrategy // hops allowed to set the forwarded client header
@@ -120,6 +119,10 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		trustedHops:              &ip.PoolStrategy{Checker: hopChecker},
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
+	}
+	// A router rebuilt without the rate limit drops the owner-unavailable WARN its name still has pending.
+	if !subscriptions.RateLimit {
+		pendingRateLimitOwnerWarnings.forget(name)
 	}
 	// JSON slog prints a nil []string as null; empty lists stay lists.
 	forwardedHeadersTrustedIPs := config.BouncerForwardedHeadersTrustedIPs

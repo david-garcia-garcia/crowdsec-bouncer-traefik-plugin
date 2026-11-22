@@ -41,6 +41,7 @@ The real-stack Pester suite SHALL run one rate-limit owner without `bouncerEnabl
 - **AND** Traefik logs `crowdsec bouncer unbound` with `"leg":"ratelimit"`
 - **AND** each subscriber logs WARN `crowdsec bouncer rate limit owner unavailable` once for that removal
 - **AND** when the owner is added back, the logs show `crowdsec bouncer bound` with `"leg":"ratelimit"` and an over-limit client is answered again
+- **AND** each subscriber logs INFO `crowdsec bouncer rate limit owner available` once and no WARN, whether Traefik rebuilt it before or after the owner
 
 #### Scenario: Bucket edit keeps the count
 - **WHEN** a client sends `requests` requests through a subscriber, then the owner's bucket is raised to `requests + 2`

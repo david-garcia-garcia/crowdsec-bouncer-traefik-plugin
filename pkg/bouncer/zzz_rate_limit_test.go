@@ -508,6 +508,8 @@ func TestRateLimit_ownerUnavailableLogsOnTransitions(t *testing.T) {
 // WARN / INFO counts after each step.
 func checkRateLimitOwnerTransitions(t *testing.T, emptyFirst bool) {
 	t.Helper()
+	ResetRateLimitOwnerWarningsForTest()
+	t.Cleanup(ResetRateLimitOwnerWarningsForTest)
 	cfg := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, func(cfg *configuration.Config) {
 		cfg.RateLimitEnabled = false
 		cfg.RateLimitInstanceName = "shared"
@@ -561,15 +563,117 @@ func checkRateLimitOwnerTransitions(t *testing.T, emptyFirst bool) {
 // owner-available INFO lines for app-a / shared, and no other WARN line.
 func assertRateLimitOwnerLines(t *testing.T, sink *syncLogSink, step string, wantWarn, wantInfo int) {
 	t.Helper()
+	assertRateLimitOwnerLinesOf(t, sink, step, "app-a", "shared", wantWarn, wantInfo)
+	if got := countLogLines(sink.String(), `"level":"WARN"`); got != wantWarn {
+		t.Fatalf("%s: WARN lines=%d want %d: %s", step, got, wantWarn, sink.String())
+	}
+}
+
+// assertRateLimitOwnerLinesOf checks that sink holds wantWarn owner-unavailable WARN lines and wantInfo
+// owner-available INFO lines naming router traefikName and rate-limit instance instanceName.
+func assertRateLimitOwnerLinesOf(t *testing.T, sink *syncLogSink, step, traefikName, instanceName string, wantWarn, wantInfo int) {
+	t.Helper()
 	logged := sink.String()
-	ownerAttrs := []string{`"traefikName":"app-a"`, `"instanceName":"shared"`}
+	ownerAttrs := []string{`"traefikName":"` + traefikName + `"`, `"instanceName":"` + instanceName + `"`}
 	if got := countLogLines(logged, append([]string{`"level":"WARN"`, `"msg":"` + msgRateLimitOwnerUnavailable + `"`}, ownerAttrs...)...); got != wantWarn {
-		t.Fatalf("%s: WARN %q lines=%d want %d: %s", step, msgRateLimitOwnerUnavailable, got, wantWarn, logged)
+		t.Fatalf("%s: %s/%s WARN %q lines=%d want %d: %s", step, traefikName, instanceName, msgRateLimitOwnerUnavailable, got, wantWarn, logged)
 	}
 	if got := countLogLines(logged, append([]string{`"level":"INFO"`, `"msg":"` + msgRateLimitOwnerAvailable + `"`}, ownerAttrs...)...); got != wantInfo {
-		t.Fatalf("%s: INFO %q lines=%d want %d: %s", step, msgRateLimitOwnerAvailable, got, wantInfo, logged)
+		t.Fatalf("%s: %s/%s INFO %q lines=%d want %d: %s", step, traefikName, instanceName, msgRateLimitOwnerAvailable, got, wantInfo, logged)
 	}
-	if got := countLogLines(logged, `"level":"WARN"`); got != wantWarn {
-		t.Fatalf("%s: WARN lines=%d want %d: %s", step, got, wantWarn, logged)
+}
+
+// newTestRateLimitSubscriber builds router traefikName through New, the way a Traefik reload builds it: a new
+// Bouncer subscribed to rate-limit instance instanceName, logging to log, with no client yet.
+func newTestRateLimitSubscriber(t *testing.T, traefikName, instanceName string, log *slog.Logger) *Bouncer {
+	t.Helper()
+	cfg := newTestRateLimitConfig(nil, func(cfg *configuration.Config) {
+		cfg.RateLimitEnabled = false
+		cfg.RateLimitInstanceName = instanceName
+	})
+	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), traefikName, cfg, Subscriptions{RateLimit: true}, log)
+	if err != nil {
+		t.Fatal(err)
 	}
+	return b
+}
+
+// TestRateLimit_ownerWarningOutlivesTheRebuiltSubscriber proves the owner-unavailable WARN is pending per router
+// name, not per Bouncer: a Traefik reload rebuilds a subscriber as a new Bouncer, and the new one neither repeats
+// the WARN its previous instance logged nor misses the INFO that answers it.
+func TestRateLimit_ownerWarningOutlivesTheRebuiltSubscriber(t *testing.T) {
+	ResetRateLimitOwnerWarningsForTest()
+	t.Cleanup(ResetRateLimitOwnerWarningsForTest)
+	log, sink := newTestLogSink(slog.LevelDebug)
+	owner := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
+	counter := &testRateLimitCounter{counts: map[string]int64{}}
+	empty := reclaim.Published{Value: (*ratelimit.Client)(nil)}
+
+	// The owner goes away: the bound instance of app-a warns.
+	first := newTestRateLimitSubscriber(t, "app-a", "shared", log)
+	first.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	first.ReceiveRateLimit(empty)
+	assertRateLimitOwnerLinesOf(t, sink, "owner removed", "app-a", "shared", 1, 0)
+
+	// A reload rebuilds app-a while the owner is still gone: its empty first delivery (Yaegi) is the same outage.
+	rebuiltWithoutOwner := newTestRateLimitSubscriber(t, "app-a", "shared", log)
+	rebuiltWithoutOwner.ReceiveRateLimit(empty)
+	assertRateLimitOwnerLinesOf(t, sink, "rebuilt without the owner", "app-a", "shared", 1, 0)
+
+	// The reload that restores the owner builds app-a after it: the new Bouncer's first bind answers the WARN.
+	restored := newTestRateLimitClient(t, owner, counter)
+	rebuiltAfterOwner := newTestRateLimitSubscriber(t, "app-a", "shared", log)
+	rebuiltAfterOwner.ReceiveRateLimit(reclaim.Published{Value: restored})
+	assertRateLimitOwnerLinesOf(t, sink, "rebuilt after the owner", "app-a", "shared", 1, 1)
+	if got := countLogLines(sink.String(), `"msg":"`+msgRateLimitOwnerAvailable+`"`, `"incarnation":"`+restored.Incarnation()+`"`); got != 1 {
+		t.Fatalf("INFO %q with incarnation %s lines=%d want 1: %s", msgRateLimitOwnerAvailable, restored.Incarnation(), got, sink.String())
+	}
+
+	// The INFO ended the outage for every instance of app-a: a later bind logs nothing, the next loss warns again.
+	rebuiltWithoutOwner.ReceiveRateLimit(reclaim.Published{Value: restored})
+	assertRateLimitOwnerLinesOf(t, sink, "older instance binds", "app-a", "shared", 1, 1)
+	rebuiltAfterOwner.ReceiveRateLimit(empty)
+	assertRateLimitOwnerLinesOf(t, sink, "second outage", "app-a", "shared", 2, 1)
+}
+
+// TestRateLimit_ownerWarningIsPendingPerRouterName proves routers with different names keep separate pending
+// WARN lines, a router rebuilt on another instance name warns for that instance and answers the router's WARN
+// when it binds, and a router rebuilt without the rate limit drops its pending WARN without a line.
+func TestRateLimit_ownerWarningIsPendingPerRouterName(t *testing.T) {
+	ResetRateLimitOwnerWarningsForTest()
+	t.Cleanup(ResetRateLimitOwnerWarningsForTest)
+	log, sink := newTestLogSink(slog.LevelDebug)
+	owner := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
+	counter := &testRateLimitCounter{counts: map[string]int64{}}
+	empty := reclaim.Published{Value: (*ratelimit.Client)(nil)}
+
+	// Two router names lose the same owner: one WARN each; binding one answers only that one.
+	appA := newTestRateLimitSubscriber(t, "app-a", "shared", log)
+	appB := newTestRateLimitSubscriber(t, "app-b", "shared", log)
+	appA.ReceiveRateLimit(empty)
+	appB.ReceiveRateLimit(empty)
+	appB.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	assertRateLimitOwnerLinesOf(t, sink, "app-b restored", "app-a", "shared", 1, 0)
+	assertRateLimitOwnerLinesOf(t, sink, "app-b restored", "app-b", "shared", 1, 1)
+
+	// app-a is rebuilt on instance other, also unpublished: the WARN names the instance it now misses.
+	renamed := newTestRateLimitSubscriber(t, "app-a", "other", log)
+	renamed.ReceiveRateLimit(empty)
+	assertRateLimitOwnerLinesOf(t, sink, "renamed while warned", "app-a", "other", 1, 0)
+
+	// other publishes: the INFO answers app-a, and the pending WARN on shared does not outlive it.
+	renamed.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	assertRateLimitOwnerLinesOf(t, sink, "renamed bound", "app-a", "other", 1, 1)
+	backOnShared := newTestRateLimitSubscriber(t, "app-a", "shared", log)
+	backOnShared.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	assertRateLimitOwnerLinesOf(t, sink, "back on shared", "app-a", "shared", 1, 0)
+
+	// app-a warns again, then a reload builds it without the rate limit: the WARN is dropped, so no INFO later.
+	backOnShared.ReceiveRateLimit(empty)
+	if _, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "app-a", configuration.New(), Subscriptions{}, log); err != nil {
+		t.Fatal(err)
+	}
+	resubscribed := newTestRateLimitSubscriber(t, "app-a", "shared", log)
+	resubscribed.ReceiveRateLimit(reclaim.Published{Value: newTestRateLimitClient(t, owner, counter)})
+	assertRateLimitOwnerLinesOf(t, sink, "dropped by an unsubscribed rebuild", "app-a", "shared", 2, 0)
 }
