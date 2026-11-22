@@ -7,6 +7,8 @@ One answer per limit is not enough either. A hard 429 on a soft limit blocks hum
 
 Adding a fifth shared leg by hand would copy, once more, the per-leg wiring that LAPI, AppSec, captcha, and ModSec each repeat in `plugin.go` (prepare, open, claim with a hand-written rollback list, subscribe, Watch) and on `Bouncer` (bound value, received pointer, seen flag, instance name, receive trio). That debt was recorded with the instruction to propose a shared leg unit before the next leg.
 
+Counting itself needs a choice. A sliding window counts every hit, including the ones it refuses, so a client that keeps sending stays limited. Operators who think in Traefik's own terms want a token bucket instead: a burst allowance that refills at a steady rate, with refused hits not counted. The owner asked for that choice once for the whole limiter, not per bucket.
+
 The counter library is in the pinned utilities module (v1.0.7) but not vendored there, and that tag still has the stale-previous-window and EXPIRE-not-retried defects, so the leg cannot be built on the current pin.
 
 Priority: P2 — real operator pain (no distributed, multi-bucket rate limit or shared policy in the WAF middleware) with a workaround in Traefik's own `rateLimit` middleware.
@@ -29,7 +31,12 @@ The captcha pieces are decided on the subscribing router:
 
 - A client holding a valid gate is not counted by `captcha` buckets.
 - When a `bypassCaptcha` rule matches, or the router has no usable captcha, a `captcha` bucket gives its `ratelimit` answer. An ERROR is logged once per bind when the router has no captcha subscription, and debounced to once every 5s when its captcha is unusable. Every such request also logs at DEBUG.
-- The captcha page's own requests (custom-provider widget assets, and form POSTs that carry the challenge marker) are never charged. On a router without AppSec, that form POST used to reach the application without anyone checking the answer, so the captcha could never be solved. When the policy can answer with a captcha, the router's captcha gate now validates the form itself: a right answer gets a 302 with the gate cookie, a wrong one gets the captcha page again with `captcha:ratelimit`.
+- Custom-provider widget assets of a usable captcha are never charged.
+- A form POST that carries the challenge marker skips the buckets only when this router's captcha gate answers it for the rate limit: a usable captcha, a policy that can answer with a captcha, and no `bypassCaptcha` rule. The gate then validates the form itself, so the captcha can be solved on a router without AppSec: a right answer gets a 302 with the gate cookie, a wrong one gets the captcha page again with `captcha:ratelimit`. Any other marker POST is charged like any request, so adding the marker to `POST /login` does not turn a brute-force bucket off. The cheap checks run before the body is read, so routes whose policy has no captcha answer never peek a POST body for the marker.
+
+A subscriber whose owner stops being published passes every request uncharged, so that state is logged: WARN `crowdsec bouncer rate limit owner unavailable` once when the router loses its owner, and INFO `crowdsec bouncer rate limit owner available` when it binds one again. The pending WARN is kept per router name for the whole process, not per `Bouncer`, because a Traefik reload rebuilds every middleware in an order it does not fix; without that, a subscriber rebuilt after the returning owner never logged the INFO for its WARN. Nothing is logged per request.
+
+The owner picks the counting algorithm for every bucket with `rateLimitAlgorithm`: `slidingWindow` (default, the counter above) or `tokenBucket` (one Redis token bucket per bucket, refilled at `requests` per `window`, up to the bucket's `burst`, default `requests`, with no queuing). Both sit behind one plugin-owned counter contract (`Status{Allowed, RetryAfter}`), so the walk, the answers, and `Retry-After` rounding do not branch on the algorithm. The algorithm is part of the published policy and its ownership key. Token-bucket keys end in `:tb`, so a switch starts every bucket from zero and never meets the other algorithm's keys. `burst` on a `slidingWindow` policy, or an `algorithm` key on a bucket row, fails startup with an error that names `rateLimitAlgorithm`. The token bucket has no buffered mode: every counted bucket is one EVAL, and a Redis error applies the failure action whatever `rateLimitSyncRate` says.
 
 The startup check for captcha readiness is gone, because the policy lives on the owner and the captcha on the subscriber. A new `bypassRateLimit` action-rule token skips only this leg.
 
@@ -38,31 +45,31 @@ Drops are recorded under `plugin:ratelimit:<bucket>` (`ban`, or `captcha` for th
 Proof:
 
 - Unit tests for each package.
-- Yaegi tests for the rate-limit Client and the leg binding.
-- `realredis` tests on Dragonfly for `pkg/ratelimit`, added to the Makefile target and CI.
+- Yaegi tests for the rate-limit Client (both algorithms) and the leg binding.
+- `realredis` tests on Dragonfly for `pkg/ratelimit` (sliding window and token bucket), added to the Makefile target and CI.
 - Real-stack Pester for:
-  - single-middleware buckets (`rate_limit.Tests.ps1`)
-  - one owner shared by two subscribers with separate budgets (`rate_limit_shared.Tests.ps1`)
+  - single-middleware buckets, a `tokenBucket` owner (burst, `Retry-After`, refill), and a bucket row with `algorithm` that fails startup (`rate_limit.Tests.ps1`)
+  - one owner shared by two subscribers with separate budgets, plus owner removal and return with one WARN and one INFO per subscriber (`rate_limit_shared.Tests.ps1`)
   - captcha, solve, then hard 429 on stacked buckets, plus the router-without-captcha and `bypassCaptcha` cases (`rate_limit_captcha.Tests.ps1`)
 
 ## What this changes
-**Operators.** New middleware settings turn on a Redis-backed rate limit and share it by instance name: `rateLimitEnabled`, `rateLimitInstanceName`, `rateLimitRedisHost`/`Password`/`PasswordFile`/`Database`, `rateLimitBuckets`, `rateLimitSyncRate`, `rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`, and `rateLimitStore`, plus a `bypassRateLimit` action-rule token; watch for the new verdict headers (`ban:ratelimit:<bucket>`, `captcha:ratelimit:<bucket>`, `*:ratelimit-failure`), the `plugin:ratelimit*` drop origins, INFO `crowdsec bouncer rate limit exceeded`, and ERROR `crowdsec bouncer rate limit captcha unavailable`.
+**Operators.** New middleware settings turn on a Redis-backed rate limit and share it by instance name: `rateLimitEnabled`, `rateLimitInstanceName`, `rateLimitAlgorithm` (`slidingWindow` | `tokenBucket`), `rateLimitRedisHost`/`Password`/`PasswordFile`/`Database`, `rateLimitBuckets` (with a per-bucket `burst` for the token bucket), `rateLimitSyncRate`, `rateLimitFailureAction`, `rateLimitStatusCode`, `rateLimitResponseHeaders`, and `rateLimitStore`, plus a `bypassRateLimit` action-rule token; watch for the new verdict headers (`ban:ratelimit:<bucket>`, `captcha:ratelimit:<bucket>`, `*:ratelimit-failure`), the `plugin:ratelimit*` drop origins, INFO `crowdsec bouncer rate limit exceeded`, WARN `crowdsec bouncer rate limit owner unavailable` and its INFO `crowdsec bouncer rate limit owner available`, and ERROR `crowdsec bouncer rate limit captcha unavailable`.
 **Admin users.** None.
 **Developers.** `bouncer.New` now takes a `bouncer.Subscriptions` value instead of four subscription booleans, and a new published leg is one `publishedLeg` entry in `plugin.go` bound through `legBinding` (no generics, for Yaegi), not hand-written switches and fields.
 **End users.** A client over a bucket's limit now gets HTTP 429 with `Retry-After` on the ban page, or the router's captcha page, which it can solve to keep going until a hard `ratelimit` bucket stops it.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — real operator pain (no distributed, multi-bucket rate limit or shared policy in the WAF middleware) with a workaround in Traefik's own `rateLimit` middleware.
-Reviewed head: d3052de4
+Reviewed head: 3b39183a
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45004453434 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -72,7 +79,7 @@ Owner decision: None.
 | Branch | 2026-11-20-add-redis-rate-limit-leg pushed | `git` |
 | OpenSpec | share-rate-limit-leg-and-bucket-actions | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 3b39183a (8/8 check runs: Main Process, Race detector, 6 e2e jobs) succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45004453434 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45004453434 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -111,7 +118,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-limit-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228; CI not seen.
+Ticket 2026-11-20-add-redis-rate-limit-leg on branch 2026-11-20-add-redis-rate-limit-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228; CI build 3b39183a (8/8 check runs: Main Process, Race detector, 6 e2e jobs) succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45004453434.
 
 ## Explore Decisions
 None.
@@ -137,7 +144,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 6 added / 14 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | d3052de4b8c2e341ad38cf2fc35b9af7105eb017 | Card must match the branch you measured |
+| Reviewed head | 3b39183a81501792256ac439dc08b0ebd28d4195 | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis/Dragonfly, the rate-limit Redis named by the owner's `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File` (a separate client from the decision-cache Redis, `pkg/ratelimit/client.go:131,145`). New key family: sliding-window hit counters.
@@ -147,6 +154,12 @@ None.
   - Writers: `BucketSet.Charge` → `Client.Take` → `Limiter.Take`, once per matching bucket with a key value per request; buffered deltas also flush on the timer, `Sleep`, and `Close`. Readers: the same limiter only (`GET` on the current and previous window keys). No other component reads `rl:*`.
   - migration: not applicable. Redis is schemaless; keys are created by the shipped code's own first `INCR`/`EVAL` and expire on their own. Nothing to deploy.
   - Rollback: `master` (v1.9.7) neither reads nor writes `rl:*`. Leftover keys expire by their TTL (at most about 3 windows after the window start). No red flag.
+- **New store**: Redis/Dragonfly, the same rate-limit Redis, when the owner sets `rateLimitAlgorithm: tokenBucket`. New key family: token buckets.
+  - Key: `rl:<subscriber traefik name>:<bucket name>:<hash16>:tb`, the same plugin key as the sliding window plus the suffix `:tb` (`pkg/ratelimit/token_bucket_counter.go:16,49`), so the two key families never meet and a switch of algorithm starts from zero.
+  - Fields: one Redis hash per key with `last` (time of the last take) and `tokens` (tokens left), written by `HSET` in the vendored Lua script (`tokenbucket/lua.go:54`); an empty hash reads as a full bucket (`tokens = burst`).
+  - TTL: one full refill (`burst x window / requests`) rounded up to whole seconds, at least 1s, set by `EXPIRE` on every take (`token_bucket_counter.go:70`, `lua.go:55`).
+  - Writers and readers: `BucketSet.Charge` → `tokenBucketCounter.Take` → `tokenbucket.Redis.Allow`, one EVAL per counted bucket per request. No other component reads these keys.
+  - migration: not applicable; schemaless, created and expired by the script. Rollback: `master` neither reads nor writes them; they expire by their TTL. No red flag.
 - **Fields**: Redis/Dragonfly, rate-limit window counters: key and value unchanged by round 2. The `windowcounter` v1.0.9/v1.0.10 bump replaces round 1's `INCR` + separate `EXPIRE` with one EVAL script and the one-key flush script with a batched one; key format `{opaqueKey}:{windowStart}`, the integer value, and the `2 x window` TTL are the same, and the plugin key keeps `b.name` as in round 1. Not a delta against `master`, which has no such store.
 - Redis/Dragonfly, LAPI decision store (`pkg/decisionstore/redis.go`, not in the pin): no key or value change. The vendored `simpleredis` bump changes transport only (pool turns, RESP parsing, TLS/user config), not what is written.
 - Not persistent, so not listed as stores: the reclaim-table key `ratelimit:owner:<fnv64>` (process memory; with round 2 it excludes the instance name), the buffered `windows` map, and the new usage-metrics origin label values under `plugin:ratelimit` on the existing LAPI metrics push.
