@@ -2,7 +2,7 @@
 
 # Let a LAN or VPN through
 
-`bouncerClientTrustedIps` lets these client addresses skip all checks, AppSec included. See [examples/trusted-ips](../../examples/trusted-ips/README.md).
+`bouncerClientTrustedIps` lets these client addresses skip all checks, including LAPI, the rate limit, AppSec, and ModSec. See [examples/trusted-ips](../../examples/trusted-ips/README.md).
 
 ```yaml
 bouncerClientTrustedIps:

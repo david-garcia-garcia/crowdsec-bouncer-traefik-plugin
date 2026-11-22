@@ -49,7 +49,7 @@ err = reclaim.SetAlias(modsecurity.OwnershipKey(&config, name), instanceAlias("m
 - `pkg/wafhop/body.go` (shared body rules)
 - `pkg/configuration/configuration.go` (`modsec*` knobs)
 - `plugin.go`
-- `examples/modsecurity/` (runnable example, `make run_modsecurity`; operator docs: README "ModSecurity (OWASP CRS)")
+- `examples/modsecurity/` (runnable example, `make run_modsecurity`; operator docs: `docs/modsecurity.md`, failure handling in `docs/failure-modes.md`)
 
 ## Gotchas
 

@@ -25,6 +25,7 @@ On a matching request, each of these lets the request through:
 | LAPI is unreachable, or decisions could not be refreshed, and `bouncerLapiFailureAction` is `captcha`. | `captcha:lapi-failure`, `captcha:stream-unhealthy` |
 | AppSec answered `captcha`. | `captcha:appsec` |
 | AppSec is unreachable and `bouncerAppsecFailureAction` is `captcha`. | `captcha:appsec-failure` |
+| The ModSecurity sidecar gave no verdict and `bouncerModsecFailureAction` is `captcha`. | `captcha:modsec-failure` |
 | Another matching rule has the `captcha` action. | `captcha:rules` |
 | A captcha was due and this router has no captcha configured, so a ban would have been served. | `ban:captcha-downgrade` |
 
@@ -46,21 +47,22 @@ Match on what the client cannot choose for another resource: the path, the host,
 
 ## What you give up
 
-On the matching requests a captcha no longer slows anyone down. A client that CrowdSec wanted to challenge can call those routes freely, and during a LAPI or AppSec outage with failure action `captcha` they are let through as with `passthrough`. Only bans stop a client there. If one known integration is the reason for the rule and it has a fixed address, [`bouncerClientTrustedIps`](trusted-ips.md) for that address is the narrower setting.
+On the matching requests a captcha no longer slows anyone down. A client that CrowdSec wanted to challenge can call those routes freely, and during a LAPI, AppSec or ModSecurity outage with failure action `captcha` they are let through as with `passthrough`. Only bans stop a client there. If one known integration is the reason for the rule and it has a fixed address, [`bouncerClientTrustedIps`](trusted-ips.md) for that address is the narrower setting.
 
 ## How the path is matched
 
-The `path` pattern runs as written on the path the plugin receives, for every request. The other skip actions (`bypass`, `bypassLapi`, `bypassAppsec`) switch themselves off on a path with percent-encoding or other ambiguous characters. `bypassCaptcha` does not, so `/api/items%20x` works. It relies on Traefik having cleaned the path first. Measured on Traefik v3.7.11 and v3.7.19 with the rule above:
+The `path` pattern runs as written on the path the plugin receives, for every request. The other skip actions (`bypass`, `bypassLapi`, `bypassAppsec`, `bypassModsec`, `bypassRateLimit`) switch themselves off on a path with percent-encoding or other ambiguous characters. `bypassCaptcha` does not, so `/api/items%20x` works. It relies on Traefik having cleaned the path first. Measured on Traefik v3.7.11 and v3.7.19 with the rule above:
 
 | Request sent | Path the plugin and your application receive | Captcha bypassed |
 | ------------ | -------------------------------------------- | ---------------- |
-| `/api/../admin`, `/api/%2e%2e/admin`, `/api/..\admin` | `/admin` | No. Traefik resolved the path before the plugin. |
+| `/api/../admin`, `/api/%2e%2e/admin` | `/admin` | No. Traefik resolved the path before the plugin. |
 | `/api/..;/admin` | `/admin` from Traefik v3.7.18. Unchanged on earlier versions. | No from v3.7.18. Yes on earlier versions. |
 | `/api/..%2Fadmin`, `/api/..%5Cadmin`, `/api/..%3B/admin`, `/api/%252e%252e/admin` | Unchanged | Yes |
+| `/api/..\admin` | `/api/..%5Cadmin`. Traefik encodes the backslash and does not resolve it. | Yes |
 
-The last row is the limit. Traefik does not decode `%2F` (`/`), `%5C` (`\`), `%3B` (`;`) or `%25` (`%`) by default, so the request still starts with `/api/` and the rule matches. Your application receives the same encoded path. If it decodes those characters and then resolves `..`, it serves `/admin` to a client that should have seen a captcha. Anchoring the pattern does not prevent this. Bans are not affected: a banned client stays banned on every path.
+The last two rows are the limit. Traefik does not decode `%2F` (`/`), `%5C` (`\`), `%3B` (`;`) or `%25` (`%`) by default, so the request still starts with `/api/` and the rule matches. Your application receives the same encoded path. If it decodes those characters and then resolves `..`, it serves `/admin` to a client that should have seen a captcha. Anchoring the pattern does not prevent this. Bans are not affected: a banned client stays banned on every path.
 
-To close it, make Traefik reject those encoded characters on the entry point. It then answers HTTP 400 before the plugin runs:
+To close it, make Traefik reject those encoded characters on the entry point. It then answers HTTP 400 before the plugin runs, also for a raw `\`:
 
 ```yaml
 # Traefik static configuration (CLI flags)

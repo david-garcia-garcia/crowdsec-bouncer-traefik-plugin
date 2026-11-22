@@ -15,6 +15,6 @@ The ban template can also use:
 
 - `{{ .ClientIP }}` — the visitor's IP
 - `{{ .Domain }}` — the requested host
-- `{{ .RemediationReason }}` — `LAPI`, `APPSEC`, or `TECHNICAL_ISSUE`
+- `{{ .RemediationReason }}` — `LAPI`, `APPSEC`, `MODSEC`, `RATE_LIMIT`, or `TECHNICAL_ISSUE`
 
 A sample page is in [examples/custom-ban-page](../../examples/custom-ban-page/README.md). Without `bouncerBanFilePath`, a ban is just the status code with an empty body.

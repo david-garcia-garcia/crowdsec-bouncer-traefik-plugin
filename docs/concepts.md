@@ -16,6 +16,7 @@ A few CrowdSec terms used in this documentation:
 - **LAPI** (Local API): the CrowdSec service that stores decisions ("ban this IP for 4 hours"). This plugin reads decisions from it.
 - **CAPI** (Central API): CrowdSec's cloud service that distributes the community blocklist.
 - **AppSec**: CrowdSec's WAF component. It inspects a single request and answers allow or block.
+- **ModSec**: an optional OWASP ModSecurity CRS sidecar this plugin inspects against, separate from CrowdSec AppSec.
 - **Bouncer**: a component that enforces decisions. This plugin is a bouncer.
 
 This plugin only enforces decisions. It does not read logs; CrowdSec does that and produces the decisions.
@@ -111,6 +112,8 @@ The plugin reports what it did back to CrowdSec through LAPI's usage-metrics end
 
 - Requests processed, split by IPv4 and IPv6.
 - Requests dropped, split by remediation (ban or captcha) and by **decision origin**: your own CrowdSec detections, manual `cscli` decisions, the community blocklist (CAPI), and each subscribed blocklist on its own.
+- Requests blocked by a WAF: origin `appsec` for AppSec, `modsec` for the ModSecurity sidecar, and `plugin:appsec_failure` / `plugin:modsec_failure` when a failure action banned or challenged.
+- Requests the plugin dropped on its own, under `plugin:` origins: `plugin:rules:<name>` for a `bouncerActionRules` rule, `plugin:ratelimit:<bucket>` for a rate-limit bucket that answered (a ban, or the captcha page of a `captcha` bucket), `plugin:ratelimit` for the captcha page the rate limit served to a captcha form it checked, and `plugin:ratelimit_failure` (like `plugin:lapi_failure` and `plugin:appsec_failure`) for a failure action.
 - Estimated bytes dropped, split by the same decision origins. The estimate is the size of each blocked request (its URL, headers, and declared body length); the plugin does not read the body to measure it.
 - The number of active decisions held in memory.
 
@@ -129,5 +132,7 @@ The cache keeps CrowdSec decisions so the plugin does not ask LAPI on every requ
 - **`stream` / `alone`**: the full decision list is kept in memory. Redis is supported but not recommended here: it adds a network hop for data already refreshed on an interval.
 - **`live`**: each client's answer (banned, captcha, or clean) is kept for `lapiDefaultDecisionSeconds`. With several Traefik replicas, a shared Redis lets them reuse each other's answers. See [Configuration › Redis cache](configuration.md#redis-cache) and [examples/redis-cache](../examples/redis-cache/README.md).
 - **`none`**: no cache.
+
+When the Redis cache cannot be read, see [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
 
 Solved captchas are not stored in this cache; they are remembered with a signed cookie on the visitor's browser.

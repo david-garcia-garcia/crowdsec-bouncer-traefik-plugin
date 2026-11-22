@@ -12,6 +12,8 @@ Every setting of the plugin, grouped by what it configures. Use your editor's se
   - [LAPI](#lapi)
   - [Redis cache](#redis-cache)
   - [AppSec](#appsec)
+  - [ModSecurity](#modsecurity)
+  - [Rate limit](#rate-limit)
   - [Captcha](#captcha)
   - [Logging](#logging)
 - [Read a value from a file](#read-a-value-from-a-file)
@@ -204,6 +206,25 @@ http:
           logFilePath: ""
           logFormat: common
           logLevel: DEBUG
+          rateLimitAlgorithm: slidingWindow
+          rateLimitBuckets:
+            - name: login
+              method: "^POST$"
+              path: "^/login$"
+              requests: 5
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: false
+          rateLimitFailureAction: passthrough
+          rateLimitInstanceName: ""
+          rateLimitRedisDatabase: ""
+          rateLimitRedisHost: "redis-primary:6379"
+          rateLimitRedisPassword: password
+          rateLimitResponseHeaders: true
+          rateLimitStatusCode: 429
+          rateLimitStore: redis
+          rateLimitSyncRate: 200ms
           reclaimGraceSeconds: 30
 ```
 
@@ -264,11 +285,35 @@ This middleware sets up the captcha provider and shares it as `captchaInstanceNa
 
 Name under which the captcha provider is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
+#### `modsecEnabled`
+
+`bool` · default `false`
+
+This middleware connects to the ModSecurity CRS sidecar and shares the connection as `modsecInstanceName`. See [ModSecurity (OWASP CRS)](modsecurity.md).
+
+#### `modsecInstanceName`
+
+`string` · default the middleware name when it connects
+
+Name under which the sidecar connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
+
+#### `rateLimitEnabled`
+
+`bool` · default `false`
+
+Open the rate-limit Redis connection and share it, with `rateLimitBuckets` and the rest of the policy, as `rateLimitInstanceName`. With `bouncerEnabled` and no `rateLimitInstanceName`, the middleware also applies it to its own router. When `false`, the `rateLimit*` settings other than `rateLimitInstanceName` are not read or checked.
+
+#### `rateLimitInstanceName`
+
+`string` · default the middleware name when `rateLimitEnabled`
+
+On the middleware with `rateLimitEnabled`: the name its policy is shared as. On a middleware with `bouncerEnabled`: the policy this router applies, counted under this middleware's name. A middleware with neither `bouncerEnabled` nor `rateLimitEnabled` fails at startup when it sets it. See [Limit how often a client calls a route](rate-limit.md).
+
 #### `reclaimGraceSeconds`
 
 `int64` · default `30`
 
-How long a LAPI or AppSec connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
+How long a LAPI, AppSec, ModSec, or rate-limit Redis connection stays open after no middleware uses it, so a Traefik config reload can reuse it instead of reconnecting. `0` closes it immediately. Only the first value loaded in the Traefik process applies.
 
 ### Request handling
 
@@ -281,9 +326,9 @@ What this router does with each request. These settings are per router, even whe
 Rules that, for matching requests, skip checks or force a ban or captcha. Each rule has a unique `name` (no `:`), conditions, and an `action` list.
 
 - Conditions (all optional, all must match): `method`, `path`, `host`, `headers`, `cookies`. Values are regular expressions matched anywhere in the value, so anchor them (`^/health$`). `method` accepts a leading `!` to negate (`!POST`). An empty header or cookie pattern means "is present". A rule must have at least one condition.
-- Actions: `bypass` (skip LAPI and AppSec), `bypassLapi`, `bypassAppsec`, `bypassCaptcha`, `captcha`, `ban`. `ban` must be the only action of its rule. `captcha` and `bypassCaptcha` cannot share a rule.
+- Actions: `bypass` (skip LAPI, AppSec, and ModSec), `bypassLapi`, `bypassAppsec`, `bypassModsec`, `bypassCaptcha`, `bypassRateLimit` (skip only the [rate limit](rate-limit.md); `bypass` does not skip it), `captcha`, `ban`. `ban` must be the only action of its rule. `captcha` and `bypassCaptcha` cannot share a rule.
 - Every matching rule applies. A `ban` applies immediately. A `captcha` is shown unless CrowdSec bans the client anyway.
-- A `bypass`, `bypassLapi` or `bypassAppsec` rule with a `path` only skips checks when the path can be read one way. If the request path has percent-encoding (`%2F`, `%20`...), `;`, `\`, `*`, or `.`, `..` or empty segments, the rule still applies its `captcha` but skips nothing. Some backends read such paths differently: Java servers read `/health/..;/admin` as `/admin`. Anchoring the pattern does not prevent this; this check does.
+- A `bypass`, `bypassLapi`, `bypassAppsec`, `bypassModsec` or `bypassRateLimit` rule with a `path` only skips checks when the path can be read one way. If the request path has percent-encoding (`%2F`, `%20`...), `;`, `\`, `*`, or `.`, `..` or empty segments, the rule still applies its `captcha` but skips nothing. Some backends read such paths differently: Java servers read `/health/..;/admin` as `/admin`. Anchoring the pattern does not prevent this; this check does.
 - `bypass*` rules never skip AppSec under `/crowdsec-internal/challenge/` (see [bot detection](concepts.md#appsec)).
 - `bypassCaptcha` skips no check. Where a captcha would be served, the request goes through; bans still apply. It wins over a `captcha` action of another matching rule. Its `path` is matched as written, without the check of the previous point. See [Keep captchas off API routes](how-to/captcha-off-api-routes.md) for where it applies and where it does not.
 
@@ -314,7 +359,7 @@ To try the rules out, see [Test a ban or a captcha](how-to/test-ban-or-captcha.m
 
 `string` · default `ban`
 
-What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. While the backoff gate skips AppSec (`appsecUnhealthyBackOffPeriodSecs`), this action does not apply. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
 
 #### `bouncerBanFilePath`
 
@@ -326,7 +371,7 @@ Path to the ban page. Empty means no page (status code only). Content-Type is in
 
 `[]string` · default `[]`
 
-Client IPs or ranges that skip all checks, AppSec included (LAN, VPN). See [Let a LAN or VPN through](how-to/trusted-ips.md).
+Client IPs or ranges that skip all checks, the rate limit, AppSec, and ModSec included (LAN, VPN). See [Let a LAN or VPN through](how-to/trusted-ips.md).
 
 #### `bouncerDecisionScopeHeaders`
 
@@ -358,6 +403,12 @@ IPs or ranges of the proxies in front of Traefik (for example Cloudflare's range
 
 What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. In `live` and `none`, this also applies when a country, AS, or other header-scope lookup fails. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
 
+#### `bouncerModsecFailureAction`
+
+`string` · default `passthrough`
+
+What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreachable, or no connection published yet): `passthrough`, `ban`, or `captcha`, as for AppSec. A POST, PUT, or PATCH body streamed without a length is inspected on its headers only with `passthrough`, and gets this action otherwise. While the backoff gate skips the sidecar, this action does not apply. A 3xx or 4xx from the sidecar is a block, not a failure. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
+
 #### `bouncerOriginBasedDecisionRemap`
 
 `map[string]map[string]string` · default `{}`
@@ -368,7 +419,7 @@ Turn bans or captchas from specific origins into a captcha or a pass on this rou
 
 `bool` · default `true`
 
-When Redis cannot be reached, ban (`true`) or let the request through (`false`).
+When the LAPI Redis cache cannot be reached, ban (`true`) or skip the LAPI check (`false`). A Redis that answers too slowly bans either way. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
 
 #### `bouncerRemediationHeadersCustomName`
 
@@ -598,6 +649,104 @@ PEM client private key presented to AppSec.
 
 Do not verify AppSec's certificate. Not for production.
 
+#### `appsecUnhealthyBackOffPeriodSecs`
+
+`int64` · default `30`
+
+Cooldown in seconds of the AppSec backoff gate. After 5 AppSec failures in a row (or failures above about 30% of requests), AppSec is skipped for this long: requests continue without AppSec and without `bouncerAppsecFailureAction`. `0` turns the gate off, so every request calls AppSec and every failure gets the failure action. Set on the middleware that connects to AppSec. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
+
+### ModSecurity
+
+How the middleware that connects to the sidecar (`modsecEnabled: true`) reaches it. The failure action is per router: [`bouncerModsecFailureAction`](#bouncermodsecfailureaction). See [ModSecurity (OWASP CRS)](modsecurity.md).
+
+#### `modsecUrl`
+
+`string` · no default
+
+Absolute `http` or `https` URL of the inspect-only sidecar, for example `http://waf:8080`. Required when `modsecEnabled` is true. The request path and query are appended to it, so it must not have a query or fragment of its own.
+
+#### `modsecHttpTimeoutSeconds`
+
+`int64` · default `10`
+
+Timeout in seconds for one sidecar call. Must be at least `1`. CRS can take seconds on a large body; a timeout is a failure, not an allow.
+
+#### `modsecBodyLimit`
+
+`int64` · default `8388608` (8 MiB)
+
+Largest request body sent to the ModSecurity sidecar. A larger body gets HTTP 413 and the sidecar is not called. The whole body is held in memory, so there is no unlimited value: it must be at least `1`. Keep it at or below the sidecar's `MODSEC_REQ_BODY_NOFILES_LIMIT` (128 KiB in the image by default), or the sidecar answers 413 itself and the visitor gets that as a block.
+
+#### `modsecUnhealthyBackOffPeriodSecs`
+
+`int64` · default `0`
+
+Cooldown in seconds of the ModSec backoff gate, same rule as `appsecUnhealthyBackOffPeriodSecs`: after 5 sidecar failures in a row, the sidecar is skipped for this long, without `bouncerModsecFailureAction`. `0` turns the gate off. Set on the middleware that connects to the sidecar.
+
+### Rate limit
+
+The rate-limit policy and its Redis connection. Every setting below is read only on the middleware with `rateLimitEnabled: true`; routers that apply the policy name it with [`rateLimitInstanceName`](#ratelimitinstancename). See [Limit how often a client calls a route](rate-limit.md).
+
+#### `rateLimitBuckets`
+
+`[]object` · default `[]`
+
+The rate-limit buckets, checked in list order. Required when `rateLimitEnabled` is `true`. Each bucket has a unique `name` (no `:`), optional conditions (`method`, `path`, `host`, `headers`, `cookies`, as in `bouncerActionRules`; none means every request), `key` (list of `from`: `ip`, `header`, `cookie`, `query`, `host`, `path`, `method`, with `name` for `header`/`cookie`/`query`, optional `pattern` with a capture group, and `ipv4Prefix` / `ipv6Prefix` for `ip`), `requests` (at least 1), `window` (a duration in whole seconds, at least `1s`), `burst` (only with `rateLimitAlgorithm: tokenBucket`, at least 1, default `requests`), `action` (`ratelimit` by default, `captcha`, or `log`; `deny` fails at startup), and `final` (default `false`). `algorithm` on a bucket fails at startup: use `rateLimitAlgorithm`. Read only on the middleware with `rateLimitEnabled`. See [Limit how often a client calls a route](rate-limit.md).
+
+#### `rateLimitAlgorithm`
+
+`string` · default `slidingWindow`
+
+How every bucket of the policy counts: `slidingWindow` (`requests` per rolling `window`; a request over the limit still counts) or `tokenBucket` (refill `requests` per `window`, up to `burst` at once; a request over the limit takes no token). Changing it starts every bucket from zero. Read only on the middleware with `rateLimitEnabled`. See [Limit how often a client calls a route](rate-limit.md).
+
+#### `rateLimitFailureAction`
+
+`string` · default `passthrough`
+
+What to do when the rate-limit Redis cannot answer: `passthrough`, `ban`, or `captcha` (the captcha of each router that applies the policy; a router without one serves `ban:captcha-downgrade`). Read only on the middleware with `rateLimitEnabled`. With the sliding window and the default buffered `rateLimitSyncRate`, an unreachable Redis does not trigger it: each replica keeps its own count. It applies with `rateLimitSyncRate: 0`, always with `rateLimitAlgorithm: tokenBucket`, and in every mode to a bucket reached after the 250ms the rate limit may spend on Redis.
+
+#### `rateLimitStatusCode`
+
+`int` · default `429`
+
+HTTP status of a `ratelimit` answer. Separate from `bouncerRemediationStatusCode`. Read only on the middleware with `rateLimitEnabled`.
+
+#### `rateLimitResponseHeaders`
+
+`bool` · default `true`
+
+Send `Retry-After` on a `ratelimit` answer. Read only on the middleware with `rateLimitEnabled`.
+
+#### `rateLimitSyncRate`
+
+`string` · default `200ms`
+
+How often each replica writes its local sliding-window counts to Redis. `0` writes every hit before answering (exact counts). A positive value below `20ms` is treated as `20ms`. Not read with `rateLimitAlgorithm: tokenBucket`, which calls Redis for every counted bucket. Read only on the middleware with `rateLimitEnabled`.
+
+#### `rateLimitStore`
+
+`string` · default `redis`
+
+Where counters are kept. Only `redis` in this version.
+
+#### `rateLimitRedisHost`
+
+`string` · default `redis:6379`
+
+Redis (or Dragonfly) `host:port` that holds the rate-limit counters. It does not fall back to `lapiRedisHost`.
+
+#### `rateLimitRedisPassword`
+
+`string` · default `""`
+
+Password for the rate-limit Redis. `rateLimitRedisPasswordFile` reads it from a file.
+
+#### `rateLimitRedisDatabase`
+
+`string` · default `""`
+
+Redis database number for the rate-limit counters.
+
 ### Captcha
 
 How the middleware that sets up the captcha (`captchaEnabled: true`) talks to the provider and remembers solved captchas. See [Remediation](concepts.md#remediation) and [examples/captcha](../examples/captcha/README.md).
@@ -772,6 +921,7 @@ These settings accept either the value itself or, with the `File` variant, a pat
 | `lapiCapiMachineId` | `lapiCapiMachineIdFile` |
 | `lapiCapiPassword` | `lapiCapiPasswordFile` |
 | `lapiRedisPassword` | `lapiRedisPasswordFile` |
+| `rateLimitRedisPassword` | `rateLimitRedisPasswordFile` |
 | `appsecKey` | `appsecKeyFile` |
 | `appsecTlsCertificateAuthority` | `appsecTlsCertificateAuthorityFile` |
 | `appsecTlsClientCertificate` | `appsecTlsClientCertificateFile` |

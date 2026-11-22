@@ -7,7 +7,7 @@
 
 ## What this plugin is
 
-A CrowdSec bouncer for Traefik. For every request it decides, based on CrowdSec, whether to let the visitor through, ban them, or show them a captcha. Decisions come from community blocklists, your own CrowdSec detections, and (optionally) the CrowdSec AppSec WAF.
+A CrowdSec bouncer for Traefik. For every request it decides, based on CrowdSec, whether to let the visitor through, ban them, or show them a captcha. Decisions come from community blocklists, your own CrowdSec detections, and (optionally) the CrowdSec AppSec WAF. It can also inspect the same request with an OWASP ModSecurity CRS sidecar (`modsecEnabled`).
 
 It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin). What changed:
 
@@ -19,7 +19,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **Captcha passes stored on the visitor.** A solved captcha is remembered with a signed cookie on that browser (optionally tied to its IP). The original plugin whitelisted the IP on the server, so one solve let in every browser behind that address, and multi-instance setups needed Redis to share it.
 - **No Redis needed.** The recommended setup keeps decisions in memory. Redis is only useful for the `live` LAPI mode with several Traefik replicas.
 - **Per-router settings.** Each router keeps its own status code, captcha, trusted IPs, and behavior when CrowdSec is down. The original plugin shared one set of settings across every CrowdSec middleware in Traefik.
-- **Captcha when CrowdSec is down.** `bouncerLapiFailureAction` and `bouncerAppsecFailureAction` choose `ban`, `passthrough`, or `captcha` when LAPI or AppSec cannot answer. The original plugin could only block or let the request through. See [Choose what happens when CrowdSec is down](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/crowdsec-down.md).
+- **Captcha when CrowdSec is down.** `bouncerLapiFailureAction`, `bouncerAppsecFailureAction`, and `bouncerModsecFailureAction` choose `ban`, `passthrough`, or `captcha` when LAPI, AppSec, or the ModSecurity sidecar cannot answer. The original plugin could only block or let the request through. See [Choose what happens when CrowdSec is down](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/crowdsec-down.md).
 - **Soften a ban per origin with `bouncerOriginBasedDecisionRemap`.** On one router, turn a ban from a chosen origin into a captcha or a pass: the community blocklist, every blocklist, or one named list. Other routers sharing the same LAPI connection keep the original ban. See [Show a community ban as a captcha](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/community-ban-as-captcha.md).
 - **Several CrowdSec engines** in one Traefik, each with its own API key, or several routers sharing one engine. See [Middleware Architecture](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/middleware-architecture.md).
 - **Config reloads apply.** Changing the LAPI host, key, mode, interval, or any other setting takes effect on a Traefik configuration reload. The original plugin kept the first values until Traefik restarted.
@@ -28,8 +28,10 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 - **AppSec independent of the LAPI mode.** A router can run the WAF, the decision lookup, or both.
 - **Client certificates for AppSec.** `appsecTlsClientCertificate` and `appsecTlsClientKey` authenticate the plugin to AppSec with mTLS, as LAPI already allowed. The original plugin did not support mTLS for AppSec. See [Use HTTPS to communicate with the Appsec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/connect-to-crowdsec.md#use-https-to-communicate-with-appsec).
 - **Separate timeouts.** LAPI, AppSec, and captcha validation each have their own (`lapiHttpTimeoutSeconds`, `appsecHttpTimeoutSeconds`, `captchaSiteverifyHttpTimeoutSeconds`), so a short AppSec timeout does not cut LAPI calls short. The original plugin used one `httpTimeoutSeconds` for all three.
+- **ModSecurity CRS in the same middleware.** `modsecEnabled` sends each request to an OWASP CRS sidecar after LAPI and AppSec, so one middleware is the whole edge WAF. A WAF that keeps failing is skipped for a cooldown instead of banning or slowing every request. See [ModSecurity (OWASP CRS)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/modsecurity.md).
 - **Permanent rules with `bouncerActionRules`.** Ban, captcha, or skip checks for requests matching a path, host, method, header, or cookie, without any CrowdSec decision. For example, always show a captcha to a whole country or region by matching a country header such as `CF-IPCountry`, or skip all checks for a specific host. See [bouncerActionRules](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/configuration.md#bounceractionrules).
 - **No captcha on API routes with `bypassCaptcha`.** A `bouncerActionRules` action for requests that cannot solve a captcha, such as API calls from another server: where a captcha would be served, the request goes through. Bans still apply. See [Keep captchas off API routes](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/captcha-off-api-routes.md).
+- **Rate limit shared across Traefik replicas.** Named buckets, each with its own request match (path, host, method, header, cookie) and its own key (client IP or network, a header, a cookie, a query parameter, part of the path), count in Redis so every replica sees the same total. Traefik's own `rateLimit` middleware can also share its counters through Redis, but each middleware counts on one source (the client address, one header, or the host); this plugin adds named buckets with their own request match, keys built from several parts, log-only buckets, captcha buckets that show the captcha before a hard limit, one policy shared by several routers with a separate count per router, and drops reported to CrowdSec. See [Limit how often a client calls a route](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/rate-limit.md).
 - **Detailed verdict header.** `bouncerRemediationHeadersCustomName` now tells not only what was done (ban or captcha) but why and from where: a CrowdSec decision and its origin (`ban:lapi:CAPI`, `ban:lapi:lists_firehol_level1`), AppSec, a rule, or an outage of LAPI or AppSec. Add it to your access logs to trace every blocked request back to its cause. The original plugin only sent `ban` or `captcha`. See [See the verdict in access logs](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/verdict-in-access-logs.md).
 
 > [!TIP]
@@ -39,8 +41,7 @@ It is a rewrite of [maxlerebourg/crowdsec-bouncer-traefik-plugin](https://github
 > The basic middlewares you need to secure your Traefik ingress:
 >
 > - 🌍 **Geoblock**: [david-garcia-garcia/traefik-geoblock](https://github.com/david-garcia-garcia/traefik-geoblock) - Block or allow requests based on IP geolocation
-> - 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence and automated blocking
-> - 🔒 **ModSecurity CRS**: [david-garcia-garcia/traefik-modsecurity](https://github.com/david-garcia-garcia/traefik-modsecurity) - Web Application Firewall with OWASP Core Rule Set
+> - 🛡️ **CrowdSec**: [david-garcia-garcia/crowdsec-bouncer-traefik-plugin](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin) - Real-time threat intelligence, AppSec, captcha, and optional ModSecurity CRS inspect
 > - 🚦 **Ratelimit**: [Traefik Rate Limit](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ratelimit/) - Control request rates and prevent abuse
 
 > [!WARNING]
@@ -85,6 +86,8 @@ flowchart LR
   LAPI["LAPI"]
   CAPI["CAPI / community lists"]
   AppSec["AppSec"]
+  ModSec["ModSecurity CRS sidecar"]
+  Redis["Redis (rate limit)"]
 
   User -->|"HTTP request"| Traefik
   Traefik -->|"User Http Request"| Plugin
@@ -95,8 +98,12 @@ flowchart LR
   Engine -->|"decisions"| LAPI
   CAPI -->|"remote blocklists"| LAPI
   LAPI -->|"decision lookup"| Plugin
+  Plugin -.->|"count this client"| Redis
   Plugin -.->|"this request?"| AppSec
   AppSec -.->|"allow / block"| Plugin
+  Plugin -.->|"this request?"| ModSec
+  ModSec -.->|"2xx allow / 3xx-4xx block"| Plugin
+  ModSec -->|"error log"| Engine
 ```
 
 Users are blocked based on:
@@ -104,10 +111,14 @@ Users are blocked based on:
 - Remote decisions (threat intelligence)
 - Local decisions from inspecting your Traefik access logs and identifying attack patterns
 - AppSec WAF
+- Optional ModSecurity CRS sidecar (`modsecEnabled`), see [ModSecurity (OWASP CRS)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/modsecurity.md)
+- Optional rate limit shared through Redis (`rateLimitEnabled`), see [Limit how often a client calls a route](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/rate-limit.md)
 
 This plugin only enforces decisions. It does not read logs; CrowdSec does that and produces the decisions.
 
 To share one CrowdSec connection between routers, or to use several CrowdSec engines in one Traefik, see [Middleware architecture](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/middleware-architecture.md).
+
+Each request goes through these checks in a fixed order, and the first one that answers ends it: see [How the middleware works](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-it-works.md). What each check does when its backend (LAPI, AppSec, the ModSecurity sidecar, Redis, the captcha provider) is down is in [When a dependency is down](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/failure-modes.md).
 
 ## Quick start
 
@@ -142,30 +153,34 @@ http:
           lapiMode: stream
 ```
 
-To add the WAF, set `appsecEnabled: true`. To serve captchas, see [Captcha settings](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/configuration.md#captcha).
+To add the WAF, set `appsecEnabled: true`. To add OWASP CRS, see [ModSecurity (OWASP CRS)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/modsecurity.md). To limit request rates, see [Limit how often a client calls a route](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/rate-limit.md). To serve captchas, see [Captcha settings](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/configuration.md#captcha).
 
 > [!WARNING]
 > AppSec only receives the first 10 MB of a request body by default (`appsecBodyLimit`).
 
 ## Documentation
 
-<a name="usage"></a><a name="variables"></a><a name="configuration"></a><a name="what-you-can-do"></a><a name="decisions"></a><a name="remediation"></a><a name="appsec"></a><a name="lapi-modes"></a><a name="cache"></a><a name="middleware-architecture"></a>
+<a name="usage"></a><a name="variables"></a><a name="configuration"></a><a name="what-you-can-do"></a><a name="decisions"></a><a name="remediation"></a><a name="appsec"></a><a name="lapi-modes"></a><a name="cache"></a><a name="middleware-architecture"></a><a name="order-of-the-checks"></a><a name="modsecurity-owasp-crs"></a><a name="when-a-waf-is-down-failure-action-and-backoff"></a><a name="limit-how-often-a-client-calls-a-route"></a><a name="connections-on-a-router-with-no-backend"></a>
 
 The full documentation is in [docs/](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/README.md).
 
 | I want to… | Read |
 | ---------- | ---- |
+| Understand how a request is checked: the legs, their order, who owns what | [How the middleware works](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-it-works.md) |
 | Understand decisions, ban and captcha, AppSec, LAPI modes, metrics and cache | [Concepts](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/concepts.md) |
 | Look up a setting | [Configuration reference](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/configuration.md) |
 | Protect several routers or use several CrowdSec engines | [Middleware architecture](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/middleware-architecture.md) |
 | Set up the LAPI key, client certificates or HTTPS | [Connect to CrowdSec](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/connect-to-crowdsec.md) |
 | Test a ban or a captcha | [Test a ban or a captcha](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/test-ban-or-captcha.md) |
 | Run behind Cloudflare or another proxy | [Remediate the visitor, not the proxy](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/behind-proxy.md) |
+| Know what happens when LAPI, AppSec, ModSecurity, Redis or the captcha provider is down | [When a dependency is down](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/failure-modes.md) |
 | Choose what happens when CrowdSec is down | [CrowdSec down](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/crowdsec-down.md) |
+| Add OWASP CRS next to AppSec | [ModSecurity (OWASP CRS)](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/modsecurity.md) |
+| Limit how often a client calls a route | [Rate limit](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/rate-limit.md) |
 | Keep captchas off API routes | [bypassCaptcha](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/captcha-off-api-routes.md) |
 | See every other task | [How-to guides](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/how-to/README.md) |
 | Run the tests or load the plugin from a checkout | [Development](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/development.md) |
 
 ## Examples
 
-Runnable setups for Cloudflare, Redis, trusted IPs, a binary VM, TLS authentication, Kubernetes, standalone mode, AppSec, captcha, custom ban and captcha pages, and country decisions: see the [list of examples](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/README.md#examples).
+Runnable setups for Cloudflare, Redis, trusted IPs, a binary VM, TLS authentication, Kubernetes, standalone mode, AppSec, captcha, custom ban and captcha pages, country decisions, and a ModSecurity CRS sidecar: see the [list of examples](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/master/docs/README.md#examples).
