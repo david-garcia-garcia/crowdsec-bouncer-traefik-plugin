@@ -30,5 +30,6 @@
   Taken: human decision 2026-11-22 ("WARN al desconectarse"); dcfd0393 logs WARN `crowdsec bouncer rate limit owner unavailable` once per move to no client and INFO `crowdsec bouncer rate limit owner available` on the bind that ends it, from the rate-limit binding's unbind and bind hooks, never per request.
 - [ ] note large  `knowledge/debt/2026-11-22-rate-limit-memory-store.md`
   Why: `rateLimitStore: memory` still fails startup; round 2 addendum C takes only the `tokenBucket` half of the round-1 token-bucket-and-memory-store note, so the memory store moves to its own note.
-- [ ] note large  `knowledge/debt/2026-11-22-rate-limit-owner-return-info-after-reload.md`
+- [x] note large  `knowledge/debt/2026-11-22-rate-limit-owner-return-info-after-reload.md`
   Why: a subscriber that the owner-restoring reload rebuilds after the owner binds at once and logs no INFO, so the owner-unavailable WARN of its previous instance is never answered (measured on real Traefik).
+  Taken: human decision 2026-11-22 ("arreglalo en este PR"); 3d3d6ca9 keeps the WARN pending per subscriber middleware name, process-wide (`rateLimitOwnerWarnings`, value the instance name), so a rebuilt subscriber logs no second WARN for the same outage and the first bind of any build of that name logs the INFO; measured on real Traefik: one WARN and one INFO per subscriber, every WARN answered.
