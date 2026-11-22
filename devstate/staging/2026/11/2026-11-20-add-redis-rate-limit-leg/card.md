@@ -55,7 +55,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P2 — real operator pain (no distributed, multi-bucket rate limit or shared policy in the WAF middleware) with a workaround in Traefik's own `rateLimit` middleware.
-Reviewed head: 7bd7951f
+Reviewed head: d3052de4
 Owner decision: None.
 
 ## Review scores
@@ -79,24 +79,25 @@ Owner decision: None.
 ## Specs
 Worktree:
 - [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
-- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
+- [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
-- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — modified
 - [core_plugin_ratelimit_buckets](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — added
-- [core_plugin_ratelimit_buckets](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — added
+- [core_plugin_ratelimit_buckets](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — added
 - [core_plugin_ratelimit_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-21-add-redis-rate-limit-leg/proposal.md) — added
-- [core_plugin_ratelimit_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/share-rate-limit-leg-and-bucket-actions/proposal.md) — added
+- [core_plugin_ratelimit_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/changes/archive/2026-11-22-share-rate-limit-leg-and-bucket-actions/proposal.md) — added
 
 Completed:
 - [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
 - [core_plugin_lapi_usage-metrics](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/core_plugin_lapi_usage-metrics/spec.md) — modified
 - [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
 - [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_middleware_instance-slots](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/core_plugin_middleware_instance-slots/spec.md) — modified
 - [core_plugin_ratelimit_buckets](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/core_plugin_ratelimit_buckets/spec.md) — added
 - [core_plugin_ratelimit_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-20-add-redis-rate-limit-leg/openspec/specs/core_plugin_ratelimit_client/spec.md) — added
 
@@ -134,9 +135,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 6 added / 13 modified | Same list as ## Specs |
+| Specs in this PR | 6 added / 14 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 7bd7951f74ca0eb0aae82fcb9bed13a65b784197 | Card must match the branch you measured |
+| Reviewed head | d3052de4b8c2e341ad38cf2fc35b9af7105eb017 | Card must match the branch you measured |
 
 ### Stored data model
 - **New store**: Redis/Dragonfly, the rate-limit Redis named by the owner's `rateLimitRedisHost`, `rateLimitRedisDatabase`, `rateLimitRedisPassword`/`File` (a separate client from the decision-cache Redis, `pkg/ratelimit/client.go:131,145`). New key family: sliding-window hit counters.
