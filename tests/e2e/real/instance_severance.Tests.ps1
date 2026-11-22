@@ -445,6 +445,69 @@ $knobs
         $a.Success | Should -BeTrue
         $b.Success | Should -BeTrue
     }
+
+    # README "Connections on a router with no backend": the holder sits on noop@internal
+    # with a Host no visitor sends, and the app router shares its legs from the same file.
+    It "T6 holder on a noop@internal router with no backend publishes both legs" {
+        $knobs = Get-SevKnobs
+        $svc = Get-SevService
+        $holdRule = 'Host(`sev-holders.invalid`)'
+        Write-SevYaml @"
+http:
+  routers:
+    sev-t6-hold:
+      rule: $holdRule
+      entryPoints: [web]
+      middlewares: [sev-t6-hold]
+      service: noop@internal
+    sev-t6-app:
+      rule: $(Get-SevRule '/sev-t6-app')
+      entryPoints: [web]
+      middlewares: [sev-t6-app]
+      service: sev-whoami
+$svc
+  middlewares:
+    sev-t6-hold:
+      plugin:
+        bouncer:
+          bouncerEnabled: "false"
+          lapiMode: stream
+          lapiEnabled: "true"
+          appsecEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
+          lapiKey: "$script:OwnerKey"
+          lapiHost: crowdsec:8080
+          appsecHost: crowdsec:7422
+$knobs
+    sev-t6-app:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          lapiInstanceName: $(Get-SevSlot)
+          appsecInstanceName: $(Get-SevSlot)
+$knobs
+"@
+        $holdRow = @(Get-SevFileRouters | Where-Object { $_.name -eq 'sev-t6-hold@file' }) | Select-Object -First 1
+        $holdRow.status | Should -Be "enabled" -Because "noop@internal always builds, so the holder router loads"
+
+        # Unbound legs answer with the default failure action (ban, 403). The first
+        # answer that is not the pre-switch 404 must already be the bound 200.
+        $ip = "10.90.0.56"
+        $first = Wait-SevCodes -Path "/sev-t6-app" -IP $ip -Codes @(200, 403, 429) -TimeoutSeconds 15
+        $first.Success | Should -BeTrue -Because "T6 app route must come up"
+        $first.StatusCode | Should -Be 200 -Because "the holder from the same configuration is bound before the app router takes a request"
+
+        $holder = Wait-ForHttpStatus -Url "$script:TraefikUrl/" -Headers @{ "Host" = "sev-holders.invalid"; "X-Forwarded-For" = $ip } -ExpectedStatusCodes @(418) -TimeoutSeconds 5
+        $holder.Success | Should -BeTrue -Because "bouncerEnabled false calls next, and noop@internal answers 418"
+
+        $sqli = Test-HttpRequest -Endpoint "/sev-t6-app?id=1%27%20OR%20%271%27%3D%271" -IP $ip -TraefikUrl $script:TraefikUrl
+        $sqli.StatusCode | Should -Be 403 -Because "the app router uses the holder's AppSec leg"
+
+        Add-TestDecision -IP $ip -Type "ban" -Reason "T6"
+        $banned = Wait-SevCodes -Path "/sev-t6-app" -IP $ip -Codes @(403, 429) -TimeoutSeconds 15
+        $banned.Success | Should -BeTrue -Because "the app router uses the holder's LAPI leg"
+    }
 }
 
 Describe "Instance severance late bind" {
