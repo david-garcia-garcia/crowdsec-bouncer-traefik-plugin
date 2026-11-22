@@ -1,0 +1,117 @@
+# Rate-limit leg
+
+## Language
+
+**Rate-limit Client**:
+The reclaim value of the rate-limit leg: the counter of the owner's algorithm (a `slidingWindowCounter` over one vendored `windowcounter.Limiter`, or a `tokenBucketCounter` with one vendored `tokenbucket.Redis` per bucket), the `simpleredis` client they write through, and the owner's compiled buckets and policy (`ratelimit.Policy`: failure action, status code, `Retry-After` switch). Opened by the owner (`rateLimitEnabled`) under an ownership key of the middleware name, `rateLimitAlgorithm` (empty keys as `slidingWindow`), the Redis settings (`rateLimitRedisHost`, resolved password, `rateLimitRedisDatabase`, parsed `rateLimitSyncRate`), the bucket rows, and the policy; `rateLimitInstanceName` is not in the key. Published under the owner's `rateLimitInstanceName` on reclaim group `ratelimit`. It is the production `ratelimit.Counter`.
+_Avoid_: rate limiter instance, a Bouncer-owned Limiter or bucket set, per-subscriber policy, `lapiRedis*` fallback
+
+**Algorithm**:
+`rateLimitAlgorithm`, chosen once for the whole limiter on the owner: `slidingWindow` (default; `requests` per rolling `window`, a hit over the limit still counts, honours the sync rate) or `tokenBucket` (refill `requests` per `window`, up to `burst` tokens, default `requests`; a hit over the limit is refunded, so it takes no token; every counted bucket is one EVAL; no sync rate). `ratelimit.EffectiveAlgorithm` maps empty to `slidingWindow`; `ratelimit.ValidateAlgorithm` accepts the two names and empty.
+_Avoid_: a per-bucket algorithm, `leaky bucket`, queuing (`maxDelay` > 0), reading `rateLimitSyncRate` under `tokenBucket`
+
+**Owner / subscriber**:
+The owner is the middleware with `rateLimitEnabled`: it Opens and publishes the Client, and only its `rateLimit*` settings are read. A subscriber is any router with `bouncerEnabled` and a `rateLimitInstanceName`: it Watches that name, charges the owner's buckets under its own Traefik name, and answers with the owner's policy. One middleware with both flags and no name owns and subscribes to itself.
+_Avoid_: subscriber-side buckets, status, or failure action; filling a subscriber's name
+
+**Bucket**:
+One row of `rateLimitBuckets`: a unique colon-free `name`, the `httprule.Rule` predicates flat on the row (no predicate = every request), a `key` list, `requests` per `window`, `burst` (token bucket only; at least 1, default `requests`; set on a `slidingWindow` policy it fails compile naming `rateLimitAlgorithm`; a full refill over 8760h fails), `action` (`ratelimit` default | `captcha` | `log`; anything else, round-1 `deny` included, fails compile naming the three), and `final`. Compiled once into a `ratelimit.BucketSet` for the owner's algorithm (`NewBucketSet(rules, algorithm)`); `HasCaptchaBucket()` says whether a row is `captcha`. A row `algorithm` fails compile with a pointer to `rateLimitAlgorithm`. Each compiled bucket hands the counter a `ratelimit.Limit{Bucket, Burst, Requests, Window}`.
+_Avoid_: rule (that is an action rule), a nested `match:` object, a per-bucket `algorithm`, `deny` (the round-1 name of `ratelimit`)
+
+**Walk**:
+`(*BucketSet).Charge` over the matching buckets in list order. Precedence `ratelimit` over `captcha` over `log`: a `ratelimit` bucket over its limit returns at once (`Verdict.RateLimit`); the first `captcha` bucket over its limit is kept (`Verdict.Captcha`) and the walk goes on; a `log` bucket over its limit is appended to `Verdict.Exceeded`; a matching `final` stops after that bucket; a counter error returns at once (`Verdict.Err`) and wins over a kept captcha bucket. Each answering bucket (`ratelimit.AnsweringBucket`) carries its own `RetryAfter`.
+_Avoid_: stopping on a captcha bucket, a captcha answer that beats a later ratelimit bucket
+
+**Skipped bucket**:
+A bucket the walk does not charge: a key part with no value, or a `captcha` bucket when `gateCleared` (the client holds this router's valid captcha gate). A skipped bucket is not charged, cannot answer, and its `final` does not apply.
+_Avoid_: a cleared gate that only hides the captcha answer while still counting
+
+**Counter key**:
+`rl:<middleware name>:<bucket>:<first 16 hex of SHA-256 of the key part values joined by NUL>`; each counter appends its suffix: `windowcounter` `:<window start>` (a string per window), `tokenBucketCounter` `:tb` (one hash `{last, tokens}`, TTL one full refill). The two never meet, so an algorithm switch starts from zero. Raw request values never reach Redis.
+_Avoid_: the client IP as the Redis key, the ownership key, `rl:<bucket>` without the middleware name
+
+**Step budget**:
+`ratelimit.StepBudget` (250ms): one `context.WithTimeout` around the whole rate-limit step of a request, every bucket and every Redis command (dial and retries included). The Client's `simpleredis` `CommandTimeout` is the same value.
+_Avoid_: a per-bucket timeout, a public timeout knob, decisionstore's 1s command timeout
+
+## Overview
+
+`pkg/ratelimit` owns the leg: authoring types (`BucketRule`, `KeyPart`), compile (`NewBucketSet`, used by `ValidateParams` and `Open`), evaluation (`(*BucketSet).Charge`), the counter contract (`Counter`, `Limit`, the plugin-owned `Status{Allowed, RetryAfter}`) with its two adapters (`slidingWindowCounter`, `tokenBucketCounter`, one file each), and the Redis-backed `Client` (`Open`, `OwnershipKey`, `Settings`, `RedisSettings`, `Policy`, `Buckets()`, `Policy()`, `Incarnation()`). It does not import `pkg/configuration`; configuration imports it for `Config.RateLimitBuckets`, the way it imports `httprule.ActionRule`. The Bouncer step is `serveRateLimit` in `pkg/bouncer/bouncer_serve_ratelimit.go`, between `serveLAPI` and `serveAppSec`. Specs: `core_plugin_ratelimit_client`, `core_plugin_ratelimit_buckets`.
+
+## How to use
+
+- The leg is the last `publishedLeg` in `plugin.go` (`core_plugin_middleware_instance-slots.md`): `prepareRateLimit` fills an omitted `rateLimitInstanceName` with the Traefik name, resolves the password (`configuration.GetVariable(config, "RateLimitRedisPassword")`), and parses the sync rate (`configuration.RateLimitSyncRateDuration`, the parser `ValidateParams` also uses), only when owned; `rateLimitSettings` builds `ratelimit.Settings` for `open` and `ownershipKey`. Its claim runs last, so a taken name clears the other enabled legs. Without `rateLimitEnabled` the middleware reads no password file, dials nothing, and `ClearPublisher`s group `ratelimit`.
+- A router subscribes when `bouncerEnabled` and `rateLimitInstanceName` are set (`Subscriptions.RateLimit`); `Watch` stores the Client through `route.ReceiveRateLimit`. An unpublished owner (typed nil) passes every request; the binding logs WARN `crowdsec bouncer rate limit owner unavailable` on the move to it and INFO `crowdsec bouncer rate limit owner available` on the next bind of a router with that name, across reloads (Gotchas).
+- Compile buckets once: `ValidateParams` compiles and discards (`RateLimitBuckets: bucket %d: …`) on the owner, `Open` compiles again in the reclaim create and keeps the set on the Client. Do not compile on the request path or per subscriber.
+- In `serveRateLimit`: `loadedRateLimit()` and `usableCaptcha()` once per request; the captcha page's own requests are never charged: a widget asset of the usable captcha (`IsCustomResourceRequest`) continues, and a challenge-form POST goes to `handleCaptchaKindServeHTTP` with reason `ratelimit` and origin `lapi.OriginPluginRateLimitChallengeForm` (`plugin:ratelimit`, header `captcha:ratelimit`) only when `isRateLimitChallengeFormAnswer` holds (usable captcha, `rateLimitAnswersWithCaptcha`, no `bypassCaptcha` rule, then the marker); any other marker POST is charged like any request; `gateCleared` is `usableCaptcha().Check(req)`, computed only when `Buckets().HasCaptchaBucket()`; then `client.Buckets().Charge(ctx, client, b.name, req.Request, req.IPAddr(), gateCleared)` under `context.WithTimeout(req.Context(), ratelimit.StepBudget)`. `b.name` is the subscriber, so each subscriber keeps its own Redis keys. The client address is the `GetRemoteIP` result on `clientrequest.Request`; do not re-parse `RemoteAddr` or forwarded headers.
+- Key part owners: `ip` → `ip.MaskPrefix` on that address (`ipv4Prefix` / `ipv6Prefix`, 0 keeps the whole address); `host` → `httprule.RequestHostname`; `path` → `req.URL.Path`; `method` → `req.Method`; `header` → `Header.Get`; `cookie` → `req.Cookie`; `query` → `URL.Query()` parsed at most once per `Charge`. A `pattern` keeps capture group 1. A part that is missing, empty, or does not match its pattern skips that bucket for the request, its `final` included.
+- Read the `Verdict` with the Client's `Policy()`, in this order: `Exceeded` → INFO `crowdsec bouncer rate limit exceeded`; `Err` → `applyRateLimitFailureAction` with `policy.FailureAction` (`configuration.EffectiveRateLimitFailureAction` applied by the owner; empty and `passthrough` continue to AppSec; `ban` → ban page with header `ban:ratelimit-failure` and origin `lapi.OriginPluginRateLimitFailure`; `captcha` → `captchaRateLimitFailure`: a `bypassCaptcha` rule continues, no usable captcha → `ban:captcha-downgrade` through `logRateLimitCaptchaDowngrade`, else the challenge with `captcha:ratelimit-failure`); `RateLimit` → `answerRateLimit`: `handleBanStatusServeHTTP` with `policy.StatusCode`, `Retry-After` from that bucket's `RetryAfter` when `policy.ResponseHeaders`, header `ban:ratelimit:<bucket>`, origin `lapi.OriginPluginRateLimit(bucket)`, drop `ban`, and `warnCaptchaSuperseded`; `Captcha` → `answerCaptchaBucket`: a `bypassCaptcha` rule or no usable captcha → `answerRateLimit` for that bucket (the downgrade also through `logRateLimitCaptchaDowngrade`), else `handleCaptchaKindServeHTTP` with reason `ratelimit` and the bucket origin, so the header is `captcha:ratelimit:<bucket>` and the drop is `captcha`.
+- Algorithm: `newClient` switches on the owner's algorithm once, at Open: `slidingWindow` builds `windowcounter.New(redis, syncRate)` behind `slidingWindowCounter` and keeps it in `Client.limiter` for Sleep / Wake / Close; `tokenBucket` builds `tokenbucket.NewRedis(redis, requests/window, burst, 0, ttl)` per compiled bucket (`BucketSet.limits()`) behind `tokenBucketCounter`, with `ttl` = full refill rounded up to whole seconds, at least 1s (`tokenBucketTTL`), and leaves `limiter` nil. `Charge` and `pkg/bouncer` never branch on the algorithm.
+- Unit tests pass a fake `ratelimit.Counter` behind `ratelimit.NewTestClient(settings, counter)` (bound with `bindTestRateLimit` in `pkg/bouncer`), or a test type in `pkg/ratelimit`. Real Redis: `go test -tags realredis ./pkg/ratelimit` (`build_e2e_go-redis.md`).
+
+## Pattern snippet
+
+```go
+client := b.loadedRateLimit()
+if client == nil || match.SkipRateLimit {
+	return false
+}
+captchaClient := b.usableCaptcha()
+if captchaClient != nil && captchaClient.IsCustomResourceRequest(req.Request) {
+	return false
+}
+if b.isRateLimitChallengeFormAnswer(req, match, captchaClient, client) {
+	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit, lapi.OriginPluginRateLimitChallengeForm)
+}
+buckets, policy := client.Buckets(), client.Policy()
+gateCleared := captchaClient != nil && buckets.HasCaptchaBucket() && captchaClient.Check(req)
+ctx, cancel := context.WithTimeout(req.Context(), ratelimit.StepBudget)
+defer cancel()
+verdict := buckets.Charge(ctx, client, b.name, req.Request, req.IPAddr(), gateCleared)
+if verdict.Err != nil {
+	return b.applyRateLimitFailureAction(rw, req, match, policy.FailureAction, captchaClient)
+}
+if verdict.RateLimit.Name != "" {
+	b.answerRateLimit(rw, req, match, verdict.RateLimit, policy)
+	return true
+}
+if verdict.Captcha.Name != "" {
+	return b.answerCaptchaBucket(rw, req, match, verdict.Captcha, policy, captchaClient)
+}
+```
+
+## Key files
+
+- `pkg/ratelimit/`
+- `pkg/bouncer/bouncer_serve_ratelimit.go`
+- `pkg/bouncer/bouncer_leg_ratelimit.go` (`loadedRateLimit`, `ReceiveRateLimit`, owner WARN / INFO hooks)
+- `pkg/bouncer/rate_limit_owner_warnings.go` (pending owner WARN per router name, process-wide)
+- `pkg/ratelimit/test_client.go` (`NewTestClient`)
+- `pkg/configuration/configuration.go`
+- `plugin.go`
+- `pkg/ratelimit/counter.go` (`Status`, `Limit`, `Counter`), `pkg/ratelimit/sliding_window_counter.go`, `pkg/ratelimit/token_bucket_counter.go`
+- `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/windowcounter/limiter.go`
+- `vendor/github.com/david-garcia-garcia/traefik-middleware-utilities/tokenbucket/redis.go`, `lua.go`
+
+## Gotchas
+
+- `windowcounter` and `tokenbucket` at the `v1.0.12` pin are vendored as published (`go mod vendor`). Do not patch `vendor/`; CI re-vendors. depguard `Main` allows both for `pkg/ratelimit`; `pkg/bouncer` imports neither.
+- `tokenbucket.Redis` holds no goroutine and nothing to close; `Close` only closes the shared Redis client, and `Sleep` / `Wake` only log for a token-bucket Client. With `maxDelay` 0 the Lua refunds a take whose wait is positive, so stored tokens never go below 0 and an expired hash equals a full bucket (the Lua seeds `tokens = burst`). Measured under Yaegi v0.16.1: `zzz_yaegi_test.go` opens a token-bucket Client and charges it against a dead address; the real-stack Pester case runs it inside Traefik against Dragonfly. Exact mode is one EVAL (INCR, EXPIRE when the key has no TTL) plus one GET of the previous window per counted bucket; the buffered flush is one EVAL per batch of up to 256 keys.
+- Buffered mode answers a Redis outage with a nil error and this replica's local count (utilities PR #62), skipping Redis for one sync rate after each failure. The failure action therefore only applies in exact mode or when the step deadline or request context ends. Tests that need a counter error against a dead address use `rateLimitSyncRate: 0`.
+- With `slidingWindow` a hit is counted even when it is answered, so a client that keeps sending stays limited. With `tokenBucket` an answered hit takes no token: a client sending above the rate is admitted at the refill rate.
+- Every captcha answer of this leg is decided on the subscribing router at request time, from its own captcha subscription, not the owner's. There is no startup check for a `captcha` bucket or failure action `captcha`.
+- A `captcha` bucket never passes a request: `bypassCaptcha` turns it into the `ratelimit` answer (429 by default), unlike every other captcha source, which `bypassCaptcha` lets through. The failure action `captcha` keeps the other sources' meaning and continues on `bypassCaptcha`.
+- Captcha downgrade logging. The bind hook `logRateLimitCaptchaUnsubscribed` (on `ReceiveRateLimit`) logs ERROR `crowdsec bouncer rate limit captcha unavailable` with `reason` `unsubscribed`, `traefikName`, `instanceName` once per bind, when the policy has a `captcha` bucket or failure action `captcha` and the router has no captcha subscription. At request time a router subscribed to an unpublished or invalid captcha logs the same message with `reason` `unusable` (plus `captchaInstanceName`) through `logger.Debounced` (5s, keyed on the message process-wide). Every downgraded request logs DEBUG `rateLimitCaptchaDowngrade` (`ip`, `origin`, `reason`). Neither captcha answer of this leg reaches `handleCaptchaKindServeHTTP` without a usable captcha, so neither logs the per-request WARN `crowdsec bouncer captcha unsubscribed` the other legs keep.
+- The captcha page's own requests skip every bucket only while the router has a usable captcha: custom widget assets always, a POST with the marker `crowdsec_captcha_challenge=v1` only when this router's captcha gate answers it for the rate limit (`isRateLimitChallengeFormAnswer`: the policy can answer with a captcha and no `bypassCaptcha` rule matched). Any other marker POST is charged: skipping it let a client add the marker to a form-encoded `POST /login` and turn off a brute-force `ratelimit` bucket on a router with a captcha and no AppSec, or on a `bypassCaptcha` path. A marker POST that skips the buckets must not just continue: on a router without AppSec nothing after this step validates it, so the form would reach the application and the challenge could never be solved (measured on real Traefik). The policy and `match.BypassCaptchaName` checks run before `HasChallengeMarker`, so routes whose policy has no captcha answer never read up to 64 KiB of a POST body for the marker; the field is read directly, not through `bypassesCaptcha`, because this step does not serve the gate and its TRACE would repeat on every request. A widget-asset path is one exact configured path, so skipping it exempts no other endpoint and keeps no gate condition. A client that always posts the marker to a router whose gate answers it is never limited (`knowledge/debt/2026-11-21-rate-limit-captcha-marker-flood.md`). A custom template without the marker gets its verification POST counted.
+- Owner loss logging. `ReceiveRateLimit` passes `traceBinding` an unbind hook (`warnRateLimitOwnerUnavailable`): WARN `crowdsec bouncer rate limit owner unavailable` (`traefikName`, `instanceName`) once per move to no Client, since the route then charges nothing; the bind hook (`bindRateLimitClient`) logs INFO `crowdsec bouncer rate limit owner available` (`traefikName`, `instanceName`, `incarnation`) on the bind that ends that WARN, then runs the captcha check. Both run under `bindingMu` on the receive path, never per request. A replace (A by B) logs neither. The WARN is pending per subscriber Traefik middleware name, process-wide, not per `Bouncer`: `rateLimitOwnerWarnings` (`rate_limit_owner_warnings.go`, map `traefikName → instanceName` under its own mutex, a leaf lock inside `bindingMu`; lines are logged under it). Every reload builds new `Bouncer`s of the same name in an order Traefik does not fix, so per-instance state lost the WARN: a subscriber built after the returning owner bound at once and its previous instance's WARN went unanswered, and each Yaegi rebuild during the outage warned again. Now the unbind hook skips the WARN when the name already has one pending for the same instance name (another instance name replaces it, so a renamed subscriber warns for what it now misses), and the first bind of any `Bouncer` of that name logs the INFO and drops the record (its `instanceName` is the bound one). `bouncer.New` without `Subscriptions.RateLimit` drops the record silently. A middleware removed while warned leaves its entry for the process lifetime; a later router of that name on the same still-unpublished instance then logs no new WARN. Tests reset the map with `ResetRateLimitOwnerWarningsForTest` (the `logger.ResetDebounceForTest` shape). Under Yaegi (Traefik) a subscriber that starts before its owner gets the typed nil from `Watch`, so it logs one WARN, then one INFO when the owner publishes; compiled Go skips that first delivery and logs neither (`zzz_yaegi_leg_binding_test.go`, root `TestNew_RateLimitOwnerUnavailableWarnsOnTransitions`, `pkg/bouncer` `TestRateLimit_ownerWarningOutlivesTheRebuiltSubscriber`). On real Traefik (measured, `rate_limit_shared.Tests.ps1`) a file-provider removal of the owner logs exactly one WARN per subscriber, and the restore one INFO per subscriber and no WARN, whichever side of the owner Traefik rebuilt it. A reload that rebuilds owner and subscriber with no WARN pending and builds the subscriber first logs WARN then INFO within milliseconds (Yaegi typed nil, as at startup); a reload that keeps the owner published logs neither. The other legs pass a nil unbind hook: their missing Client already applies a failure action.
+- A solved client is exempt from `captcha` buckets for `captchaGracePeriodSeconds` (default 86400s). Only a `ratelimit` bucket on the same key bounds it; nothing enforces that one exists.
+- The gate check (`captcha.Client.Check`, one HMAC) runs only on routers whose bound policy has a `captcha` bucket.
+- Any owner edit of a Redis setting, a bucket row, or the policy opens a new Client (new incarnation); subscribers rebind on the next publish. Counters live in Redis by subscriber and bucket name, so an edit that keeps a bucket's name keeps its count in exact mode, and a rename starts it from zero. A rename of `rateLimitInstanceName` keeps the Client and moves the alias.
+- A Client's lifecycle lines carry the `instanceName` it was created with; a rename that keeps the Client keeps that attr until the Client is reopened.
+- Windows are whole seconds of at least 1s; `windowcounter` would only fail at `Take`, so `NewBucketSet` rejects them at startup.
+- `Retry-After` is the counter's `RetryAfter` rounded up to whole seconds, at least 1s, in `Charge` (one rounding owner for both algorithms): `windowcounter.Status.RetryAfter` (the next admit with no other traffic; hits sent before it still count and push it out) or `tokenbucket.Status.RetryAfter` (the time until one token is back). Each adapter maps its library status to the plugin-owned `ratelimit.Status`, so `pkg/bouncer` (depguard) and test fakes import neither vendored package.
+- A `path`-matched bucket has the same alternate-encoding gap as ban and captcha rules (`knowledge/debt/2026-11-15-ban-captcha-path-rules-ambiguous-path-evasion.md`). A catch-all bucket does not, unless an earlier `final` bucket with a `path` condition matches the encoded path and stops the walk before it.
+- Only the file provider is proven to decode the bucket list (real-stack `config/dynamic/rate-limit.yml`). Traefik drops unknown keys, which is why the row field `algorithm` exists only to reject it with a pointer to `rateLimitAlgorithm`, and `rateLimitStore` only to reject `memory` (`knowledge/debt/2026-11-22-rate-limit-memory-store.md`).
+- `tokenBucket` has no buffered mode: a Redis outage is a counter error and applies the failure action whatever `rateLimitSyncRate` says (root `TestNew_RateLimitTokenBucketDeadRedisAppliesFailureAction`).
+- In exact mode (and with `tokenBucket`) a blackholed Redis costs every request up to `StepBudget` for the whole outage; there is no backoff gate (`knowledge/debt/2026-11-20-rate-limit-redis-backoff-gate.md`). Buffered mode only pays it on the requests that land when `windowcounter` retries Redis.
+- `newClient` hands `simpleredis` a `debugCappedLogger`: the library logs WARN or ERROR per failed dial or command, so without the cap an outage writes WARN lines on every request. One failing request is one DEBUG line from `serveRateLimit`; keep a new Redis client of this leg behind the same cap.

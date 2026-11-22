@@ -17,7 +17,7 @@ import (
 // False means ServeHTTP continues with AppSec. A cleared captcha gate, a widget asset, and a captcha
 // on a request a bypassCaptcha rule matched do not write.
 func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
-	if match.SkipLapi || !b.subscribeLAPI {
+	if match.SkipLapi || !b.lapiLeg.subscribed {
 		return false
 	}
 	lapiClient := b.loadedLAPI()

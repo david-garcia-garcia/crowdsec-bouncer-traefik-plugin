@@ -26,10 +26,10 @@ e2e_mock_%:
 e2e_pester:
 	pwsh -File ./tests/e2e/real/Test-Integration.ps1
 
-# DecisionStore go test against Dragonfly (same image as Pester). Untagged go test stays docker-free.
+# DecisionStore and rate-limit go test against Dragonfly (same image as Pester). Untagged go test stays docker-free.
 test_realredis:
 	docker compose -f tests/e2e/go/docker-compose.yml up -d
-	go test -tags realredis -count=1 ./pkg/decisionstore ; status=$$? ; \
+	go test -tags realredis -count=1 ./pkg/decisionstore ./pkg/ratelimit ; status=$$? ; \
 	docker compose -f tests/e2e/go/docker-compose.yml down -v --remove-orphans ; \
 	exit $$status
 

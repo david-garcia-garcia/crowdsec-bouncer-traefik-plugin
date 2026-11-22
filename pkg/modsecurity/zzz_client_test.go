@@ -8,6 +8,7 @@ import (
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/backendbackoff"
 )
 
 func testModsecConfig(url string) *configuration.Config {
@@ -122,7 +123,7 @@ func TestNew_positiveBackoffBuildsGateAndCloseClosesIt(t *testing.T) {
 		t.Fatal("positive backoff must build a gate")
 	}
 	client.Close()
-	if err := client.GateForTest().Inner().Report(gateKey, true); err == nil {
+	if _, err := client.GateForTest().Inner().Report(backendbackoff.Permit{}, true); err == nil {
 		t.Fatal("closed gate must reject Report")
 	}
 }

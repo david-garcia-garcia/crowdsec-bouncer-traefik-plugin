@@ -16,9 +16,11 @@ import (
 	"strconv"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 )
 
 // Enums for crowdsec mode.
@@ -38,6 +40,7 @@ const (
 	ReasonLAPI                  = "LAPI"
 	ReasonAPPSEC                = "APPSEC"
 	ReasonMODSEC                = "MODSEC"
+	ReasonRateLimit             = "RATE_LIMIT"
 	HcaptchaProvider            = "hcaptcha"
 	RecaptchaProvider           = "recaptcha"
 	RecaptchaEnterpriseProvider = "recaptcha-enterprise"
@@ -62,6 +65,8 @@ const (
 	DefaultModsecBodyLimit int64 = 8 * 1024 * 1024
 	// DefaultAppsecUnhealthyBackOffPeriodSecs is the AppSec gate cooldown when omitted.
 	DefaultAppsecUnhealthyBackOffPeriodSecs int64 = 30
+	// RateLimitStoreRedis is the only rate-limit store in this version.
+	RateLimitStoreRedis = "redis"
 )
 
 // Config the plugin configuration. Fields are alphabetical by json tag so
@@ -166,6 +171,19 @@ type Config struct {
 	ModsecInstanceName                  string                       `json:"modsecInstanceName,omitempty"`
 	ModsecUnhealthyBackOffPeriodSecs    int64                        `json:"modsecUnhealthyBackOffPeriodSecs,omitempty"`
 	ModsecURL                           string                       `json:"modsecUrl,omitempty"`
+	RateLimitAlgorithm                  string                       `json:"rateLimitAlgorithm,omitempty"`
+	RateLimitBuckets                    []ratelimit.BucketRule       `json:"rateLimitBuckets,omitempty"`
+	RateLimitEnabled                    bool                         `json:"rateLimitEnabled,omitempty"`
+	RateLimitFailureAction              string                       `json:"rateLimitFailureAction,omitempty"`
+	RateLimitInstanceName               string                       `json:"rateLimitInstanceName,omitempty"`
+	RateLimitRedisDatabase              string                       `json:"rateLimitRedisDatabase,omitempty"`
+	RateLimitRedisHost                  string                       `json:"rateLimitRedisHost,omitempty"`
+	RateLimitRedisPassword              string                       `json:"rateLimitRedisPassword,omitempty"`
+	RateLimitRedisPasswordFile          string                       `json:"rateLimitRedisPasswordFile,omitempty"`
+	RateLimitResponseHeaders            bool                         `json:"rateLimitResponseHeaders,omitempty"`
+	RateLimitStatusCode                 int                          `json:"rateLimitStatusCode,omitempty"`
+	RateLimitStore                      string                       `json:"rateLimitStore,omitempty"`
+	RateLimitSyncRate                   string                       `json:"rateLimitSyncRate,omitempty"`
 	ReclaimGraceSeconds                 int64                        `json:"reclaimGraceSeconds,omitempty"`
 }
 
@@ -213,6 +231,15 @@ func EffectiveFailureAction(action string) string {
 // EffectiveModsecFailureAction maps empty config to passthrough: unlike LAPI and AppSec,
 // a ModSec sidecar outage lets traffic through unless the operator asks otherwise.
 func EffectiveModsecFailureAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
+// EffectiveRateLimitFailureAction maps empty config to passthrough, the CreateConfig default:
+// a Redis outage lets traffic through unless the operator asks otherwise.
+func EffectiveRateLimitFailureAction(action string) string {
 	if action == "" {
 		return FailureActionPassthrough
 	}
@@ -291,6 +318,18 @@ func New() *Config {
 		ModsecEnabled:                       false,
 		ModsecHTTPTimeoutSeconds:            10,
 		ModsecUnhealthyBackOffPeriodSecs:    0,
+		RateLimitAlgorithm:                  ratelimit.AlgorithmSlidingWindow,
+		RateLimitBuckets:                    []ratelimit.BucketRule{},
+		RateLimitEnabled:                    false,
+		RateLimitFailureAction:              FailureActionPassthrough,
+		RateLimitInstanceName:               "",
+		RateLimitRedisDatabase:              "",
+		RateLimitRedisHost:                  "redis:6379",
+		RateLimitRedisPassword:              "",
+		RateLimitResponseHeaders:            true,
+		RateLimitStatusCode:                 http.StatusTooManyRequests,
+		RateLimitStore:                      RateLimitStoreRedis,
+		RateLimitSyncRate:                   "200ms",
 		ReclaimGraceSeconds:                 30,
 	}
 }
@@ -444,7 +483,62 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 		return err
 	}
 
+	// Rate-limit settings only on the owner (rateLimitEnabled); a subscriber's leftovers do not fail startup.
+	if config.RateLimitEnabled {
+		if err := validateRateLimit(config); err != nil {
+			return err
+		}
+	}
+
 	return validateLogging(config)
+}
+
+// validateRateLimit checks every rate-limit setting of the owner (rateLimitEnabled): store, Redis host,
+// password file, algorithm, sync rate, failure action, status, and the bucket list (compiled for the
+// algorithm, then discarded).
+func validateRateLimit(config *Config) error {
+	if config.RateLimitStore != RateLimitStoreRedis {
+		return fmt.Errorf("RateLimitStore: must be %q (%q is not supported in this version)", RateLimitStoreRedis, config.RateLimitStore)
+	}
+	if strings.TrimSpace(config.RateLimitRedisHost) == "" {
+		return errors.New("RateLimitRedisHost: cannot be empty")
+	}
+	if _, err := GetVariable(config, "RateLimitRedisPassword"); err != nil {
+		return err
+	}
+	if err := ratelimit.ValidateAlgorithm(config.RateLimitAlgorithm); err != nil {
+		return fmt.Errorf("RateLimitAlgorithm: %w", err)
+	}
+	if _, err := RateLimitSyncRateDuration(config); err != nil {
+		return err
+	}
+	// captcha needs no captcha instance here: the subscribing router decides at request time.
+	if err := validateFailureAction("RateLimitFailureAction", config.RateLimitFailureAction, true); err != nil {
+		return err
+	}
+	if config.RateLimitStatusCode < 100 || config.RateLimitStatusCode >= 600 {
+		return errors.New("RateLimitStatusCode: cannot be less than 100 and more than 600")
+	}
+	if len(config.RateLimitBuckets) == 0 {
+		return errors.New("RateLimitBuckets: cannot be empty when RateLimitEnabled is true")
+	}
+	if _, err := ratelimit.NewBucketSet(config.RateLimitBuckets, config.RateLimitAlgorithm); err != nil {
+		return fmt.Errorf("RateLimitBuckets: %w", err)
+	}
+	return nil
+}
+
+// RateLimitSyncRateDuration parses rateLimitSyncRate: a Go duration, 0 or more. It is the one parser
+// ValidateParams and New use.
+func RateLimitSyncRateDuration(config *Config) (time.Duration, error) {
+	syncRate, err := time.ParseDuration(strings.TrimSpace(config.RateLimitSyncRate))
+	if err != nil {
+		return 0, fmt.Errorf("RateLimitSyncRate: %w", err)
+	}
+	if syncRate < 0 {
+		return 0, errors.New("RateLimitSyncRate: cannot be negative")
+	}
+	return syncRate, nil
 }
 
 // validateOpenVsSubscribe rejects leftover secrets or names when nothing owns or subscribes (E2).
@@ -460,7 +554,11 @@ func validateOpenVsSubscribe(config *Config) error {
 		return err
 	}
 	// ModSec E2 is leftover modsecInstanceName only; leftover owner-read modsec* is not a secret.
-	return validateLegOpenVsSubscribe("ModSec", config.BouncerEnabled, config.ModsecEnabled, config.ModsecInstanceName, false)
+	if err := validateLegOpenVsSubscribe("ModSec", config.BouncerEnabled, config.ModsecEnabled, config.ModsecInstanceName, false); err != nil {
+		return err
+	}
+	// Rate-limit E2 is leftover rateLimitInstanceName only; a subscriber ignores owner-read rateLimit*.
+	return validateLegOpenVsSubscribe("RateLimit", config.BouncerEnabled, config.RateLimitEnabled, config.RateLimitInstanceName, false)
 }
 
 func validateLegOpenVsSubscribe(leg string, bounceEnabled, owned bool, instanceName string, secretPresent bool) error {

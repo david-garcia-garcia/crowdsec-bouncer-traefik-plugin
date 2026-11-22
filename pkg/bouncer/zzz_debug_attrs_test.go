@@ -286,12 +286,12 @@ func TestHunt_ServeHTTPLiveLookupTraceIncludesScopes(t *testing.T) {
 		},
 		log:                   log,
 		remediationStatusCode: http.StatusForbidden,
-		subscribeLAPI:         true,
+		lapiLeg:               legBinding{subscribed: true},
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
 		}),
 	}
-	b.lapiBound.Store(lapiClient)
+	b.lapiLeg.bound.Store(lapiClient)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil)
 	req.RemoteAddr = "127.0.0.1:1"
 	req.Header.Set("X-Forwarded-For", "203.0.113.10")

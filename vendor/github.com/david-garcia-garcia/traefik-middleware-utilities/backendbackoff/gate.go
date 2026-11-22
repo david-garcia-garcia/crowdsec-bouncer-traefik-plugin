@@ -3,6 +3,7 @@ package backendbackoff
 
 import (
 	"errors"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -58,10 +59,27 @@ type Gate struct {
 
 	mu     sync.Mutex
 	closed bool
+	seq    uint64
 	keys   map[string]*memEntry
+	// head and tail are the expiry list over keys. Every Allow, and every Report that lands, sets expireAt = now + TTL
+	// (TTL is fixed) and moves its entry to the tail, so the head expires first while the clock does not move backwards.
+	// Concrete pointers, not container/list: its any-typed Value is a Yaegi risk.
+	head *memEntry
+	tail *memEntry
 }
 
-// memEntry is one key's credit, backoff exponent, and idle expire time.
+// Permit identifies one admitted Allow. The zero value is a deny.
+type Permit struct {
+	key string
+	gen uint64
+}
+
+// Allowed reports whether Allow admitted a backend attempt.
+func (p Permit) Allowed() bool {
+	return p.gen != 0
+}
+
+// memEntry is one key's credit, backoff exponent, idle expire time, and its place in Gate's expiry list.
 type memEntry struct {
 	credit           float64
 	n                int
@@ -71,6 +89,12 @@ type memEntry struct {
 	probeUntil       time.Time
 	probeOutstanding bool
 	expireAt         time.Time
+	gen              uint64
+
+	// key, prev, and next link the entry into the expiry list; key is the keys map key, so the list head can be deleted from the map.
+	key  string
+	prev *memEntry
+	next *memEntry
 }
 
 // New builds an in-process gate. Zero Config applies defaults.
@@ -135,6 +159,8 @@ func (g *Gate) Close() {
 	g.mu.Lock()
 	g.closed = true
 	g.keys = nil
+	g.head = nil
+	g.tail = nil
 	g.mu.Unlock()
 }
 
@@ -152,7 +178,9 @@ func (g *Gate) successCredit() float64 {
 	return g.cfg.FailureRatio / (1 - g.cfg.FailureRatio)
 }
 
-// cooldownDuration is BaseCooldown * 2^n, jittered, capped at MaxCooldown.
+// cooldownDuration is BaseCooldown * 2^n, never above MaxCooldown.
+// With Jitter > 0 the wait is drawn uniformly from
+// [wait*(1-Jitter), min(wait*(1+Jitter), MaxCooldown)).
 func (g *Gate) cooldownDuration(n int) time.Duration {
 	wait := g.cfg.BaseCooldown
 	// Double until MaxCooldown rather than 2^n in float.
@@ -169,14 +197,8 @@ func (g *Gate) cooldownDuration(n int) time.Duration {
 	if g.cfg.Jitter <= 0 {
 		return wait
 	}
-	// Spread wait by ±Jitter so replicas that trip together do not probe in lockstep.
-	jitterSample := g.rng.Float64()
-	jittered := time.Duration(float64(wait) * (1 + g.cfg.Jitter*(2*jitterSample-1)))
-	if jittered < 0 {
-		jittered = 0
-	}
-	if jittered > g.cfg.MaxCooldown {
-		return g.cfg.MaxCooldown
-	}
-	return jittered
+	// Draw inside the pre-bounded interval so the cap is an endpoint, not a clamp pile-up.
+	lower := float64(wait) * (1 - g.cfg.Jitter)
+	upper := math.Min(float64(wait)*(1+g.cfg.Jitter), float64(g.cfg.MaxCooldown))
+	return time.Duration(lower + g.rng.Float64()*(upper-lower))
 }

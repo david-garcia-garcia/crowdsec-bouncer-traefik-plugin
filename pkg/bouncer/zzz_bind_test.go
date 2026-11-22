@@ -6,41 +6,49 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 )
 
 func bindTestLAPI(b *Bouncer, client *lapi.Client) {
-	b.subscribeLAPI = client != nil
+	b.lapiLeg.subscribed = client != nil
 	if client != nil {
 		client.SetCrowdsecModeForTest(configuration.StreamMode)
-		b.lapiBound.Store(client)
+		b.lapiLeg.bound.Store(client)
 		return
 	}
-	b.lapiBound.Store((*lapi.Client)(nil))
+	b.lapiLeg.bound.Store((*lapi.Client)(nil))
 }
 
 func bindTestAppSec(b *Bouncer, client *appsec.Client) {
-	b.subscribeAppSec = client != nil
+	b.appsecLeg.subscribed = client != nil
 	if client != nil {
-		b.appsecBound.Store(client)
+		b.appsecLeg.bound.Store(client)
 		return
 	}
-	b.appsecBound.Store((*appsec.Client)(nil))
+	b.appsecLeg.bound.Store((*appsec.Client)(nil))
 }
 
 func bindTestCaptcha(b *Bouncer, client *captcha.Client) {
-	b.subscribeCaptcha = client != nil
+	b.captchaLeg.subscribed = client != nil
 	if client != nil {
-		b.captchaBound.Store(client)
+		b.captchaLeg.bound.Store(client)
 		return
 	}
-	b.captchaBound.Store((*captcha.Client)(nil))
+	b.captchaLeg.bound.Store((*captcha.Client)(nil))
 }
 
 func bindTestModSec(b *Bouncer, client *modsecurity.Client) {
-	b.subscribeModsec = client != nil
+	b.modsecLeg.subscribed = client != nil
 	if client != nil {
-		b.modsecBound.Store(client)
+		b.modsecLeg.bound.Store(client)
 		return
 	}
-	b.modsecBound.Store((*modsecurity.Client)(nil))
+	b.modsecLeg.bound.Store((*modsecurity.Client)(nil))
+}
+
+// bindTestRateLimit subscribes b to client, or unsubscribes it when client is nil. It stores a Box as
+// Watch does, so a later ReceiveRateLimit stores the same atomic.Value type.
+func bindTestRateLimit(b *Bouncer, client *ratelimit.Client) {
+	b.rateLimitLeg.subscribed = client != nil
+	b.storeBinding(&b.rateLimitLeg.bound, client)
 }

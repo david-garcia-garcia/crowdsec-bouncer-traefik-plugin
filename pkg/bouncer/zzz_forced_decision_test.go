@@ -233,8 +233,8 @@ func TestServeHTTP_forcedDecisionCaptchaGatePasses(t *testing.T) {
 func TestServeHTTP_forcedDecisionAppsecOnlyCaptcha(t *testing.T) {
 	client := testCaptchaClient(t, "/fast.js", "", "", nil)
 	b, _, passed := testForcedDecisionBouncer(t, nil, client, nil, false)
-	b.subscribeLAPI = false
-	b.lapiBound.Store((*lapi.Client)(nil))
+	b.lapiLeg.subscribed = false
+	b.lapiLeg.bound.Store((*lapi.Client)(nil))
 	rw := httptest.NewRecorder()
 	b.ServeHTTP(rw, testForcedDecisionRequest("c"))
 	if *passed {
@@ -250,7 +250,7 @@ func TestBouncerNew_compilesActionHeaderRules(t *testing.T) {
 	cfg := configuration.New()
 	cfg.LapiMode = configuration.StreamMode
 	cfg.BouncerActionRules = decisionHeaderRules()
-	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, true, false, false, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, Subscriptions{AppSec: true}, log)
 	if err != nil {
 		t.Fatal(err)
 	}

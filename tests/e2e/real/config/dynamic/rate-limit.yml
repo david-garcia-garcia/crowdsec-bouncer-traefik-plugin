@@ -1,0 +1,204 @@
+# The Redis rate limit on five routers, against the stack's Dragonfly (rate_limit.Tests.ps1).
+# File provider only: the bucket list is a list of objects with a nested key list.
+# /rate-limit/ owns a LAPI client with its own key and a 10s metrics interval, so a ratelimit answer
+# reaches cscli as a drop; a bypassRateLimit rule exempts /rate-limit/health.
+# Sync rate 0 (exact mode) so each hit is counted in Dragonfly before the verdict.
+# /rate-limit-log/ only logs. The three -down- routers point at a port where nothing listens:
+# -down-pass and -down-ban run in exact mode, where an outage reaches the failure action;
+# -down-local keeps the default buffered sync rate, where an outage keeps the replica's local limit.
+# /rate-limit-token-bucket/ owns a tokenBucket policy (burst 3, one token per 5s) and keeps the default
+# sync rate, which the token bucket does not read. /rate-limit-bad-row/ sets algorithm on a bucket, so its
+# middleware fails at startup and Traefik does not serve that router.
+http:
+  routers:
+    rate-limit:
+      rule: PathPrefix(`/rate-limit/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit]
+      service: whoami@docker
+    rate-limit-log:
+      rule: PathPrefix(`/rate-limit-log/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-log]
+      service: whoami@docker
+    rate-limit-down-pass:
+      rule: PathPrefix(`/rate-limit-down-pass/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-down-pass]
+      service: whoami@docker
+    rate-limit-down-ban:
+      rule: PathPrefix(`/rate-limit-down-ban/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-down-ban]
+      service: whoami@docker
+    rate-limit-down-local:
+      rule: PathPrefix(`/rate-limit-down-local/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-down-local]
+      service: whoami@docker
+    rate-limit-token-bucket:
+      rule: PathPrefix(`/rate-limit-token-bucket/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-token-bucket]
+      service: whoami@docker
+    rate-limit-bad-row:
+      rule: PathPrefix(`/rate-limit-bad-row/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-bad-row]
+      service: whoami@docker
+  middlewares:
+    bouncer-rate-limit:
+      plugin:
+        bouncer:
+          bouncerActionRules:
+            - name: health
+              path: ^/rate-limit/health$
+              action:
+                - bypassRateLimit
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "true"
+          lapiHost: crowdsec:8080
+          lapiHttpTimeoutSeconds: "30"
+          lapiKey: "c51a1c7000000000000000000000001e"
+          lapiMetricsUpdateIntervalSeconds: "10"
+          lapiMode: none
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: login
+              path: ^/rate-limit/
+              requests: "3"
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitRedisHost: dragonfly:6379
+          rateLimitSyncRate: "0"
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-log:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: dry-run
+              requests: 1
+              window: 1m
+              action: log
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitRedisHost: dragonfly:6379
+          rateLimitSyncRate: "0"
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-down-pass:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: per-ip
+              requests: 1
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitFailureAction: passthrough
+          rateLimitRedisHost: dragonfly:1
+          rateLimitSyncRate: "0"
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-down-ban:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: per-ip
+              requests: 1
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitFailureAction: ban
+          rateLimitRedisHost: dragonfly:1
+          rateLimitSyncRate: "0"
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-down-local:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: per-ip
+              requests: 1
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitFailureAction: ban
+          rateLimitRedisHost: dragonfly:1
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-token-bucket:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitAlgorithm: tokenBucket
+          rateLimitBuckets:
+            - name: burst
+              requests: 1
+              window: 5s
+              burst: 3
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitRedisHost: dragonfly:6379
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-bad-row:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBuckets:
+            - name: bad-row
+              algorithm: tokenBucket
+              requests: 1
+              window: 5s
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitRedisHost: dragonfly:6379
+          reclaimGraceSeconds: "2"

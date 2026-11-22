@@ -18,6 +18,14 @@ _Avoid_: leftover bouncerCaptcha*, leftover captchaProvider as own, implicit own
 The Config field that means this router will open a ModSec Client. Same field `New` uses for `modsecurity.Open`. A leftover `modsecUrl` is not this field.
 _Avoid_: leftover `modSecurityUrl`, implying own from URL, AppSec enabled
 
+**RateLimitEnabled**:
+The Config field that means this router owns the rate-limit leg: it opens and publishes the rate-limit Client with its `rateLimitBuckets` and policy. Same field the rate-limit `publishedLeg` in `plugin.go` uses to prepare, open, and claim, and `ValidateParams` uses to run `validateRateLimit`. Charging is the subscribe axis (`bouncerEnabled` plus `rateLimitInstanceName`), not this field. A non-empty bucket list or a set `rateLimitRedisHost` is not this field.
+_Avoid_: implying the leg from leftover `rateLimit*` settings, `lapiRedisEnabled`, reading `rateLimit*` on a subscriber
+
+**RateLimitInstanceName**:
+The name the rate-limit owner publishes under and a subscriber Watches. Empty on an owner fills to the Traefik name; empty on a subscriber means no rate limit. A leftover name with neither `bouncerEnabled` nor `rateLimitEnabled` fails (E2).
+_Avoid_: filling it on a subscriber, putting it in the Client ownership key
+
 **Owner-read captcha settings**:
 The `captcha*` / `Captcha*` Config knobs `pkg/captcha` reads when `captchaEnabled` is true. Not `captchaEnabled` / `captchaInstanceName`, and not bounce-decision `Bouncer*` fields even when a value is the word `captcha`.
 _Avoid_: bouncerCaptcha*, nested captcha map, bounce-decision captcha as owner-read
@@ -55,10 +63,11 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - `bouncer.New` warns once with `crowdsec bouncer ban template unavailable` and the same `reason` values when the ban file is empty or not loadable, keeps `banTemplate` nil, and succeeds. Ban GET stays status with an empty body. Do not warn from `bouncer.New` about `CaptchaFilePath`. Do not invent bundled default templates.
 - After CAPI (alone) or LAPI (other modes), call `validateAppsecURLKeyAndTLS` only when `config.AppsecEnabled`. Do not hide that `if` only inside a LAPI wrapper — alone never calls it.
 - Reuse `AppsecEnabled`. Do not re-derive from leftover AppSec fields or `lapiMode`.
-- Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover owner-read `captcha*` is not a secret. Leftover `bouncerCaptcha*` never reaches `New`. ModSec E2 is leftover `modsecInstanceName` only; leftover owner-read `modsec*` is not a secret.
+- Reject `lapiMode: appsec` (E4). Gate LAPI URL/keys on `LapiEnabled`. Reject leftover instance name or secret when bounce and owner flags are both false (E2). Captcha E2 is leftover `captchaInstanceName` only; leftover owner-read `captcha*` is not a secret. Leftover `bouncerCaptcha*` never reaches `New`. ModSec E2 is leftover `modsecInstanceName` only; leftover owner-read `modsec*` is not a secret. Rate-limit E2 is leftover `rateLimitInstanceName` only; a subscriber ignores leftover owner-read `rateLimit*`.
 - When `ModsecEnabled` is true, reject `modsecBodyLimit` below 1 (`ModsecBodyLimit: cannot be less than 1`; no unlimited value) and an empty or non-absolute http(s) `modsecUrl`. When the flag is false, both still pass.
 - Validate `bouncerModsecFailureAction` with `validateFailureAction`, like LAPI and AppSec: empty (passthrough at runtime), `passthrough`, `ban`, or `captcha`. The old `open` / `close` values fail `New`.
 - The only backoff knobs are `appsecUnhealthyBackOffPeriodSecs` and `modsecUnhealthyBackOffPeriodSecs` (negative fails, `0` disables that leg's gate). The trip rule is fixed in `pkg/admission`; there is no ratio, threshold, or max-period knob to validate.
+- When `RateLimitEnabled` is true, `validateRateLimit` checks in order: `rateLimitStore` is `redis` (anything else, `memory` included, fails as not supported in this version), a non-empty `rateLimitRedisHost`, `RateLimitRedisPassword` through `GetVariable`, `rateLimitAlgorithm` through `ratelimit.ValidateAlgorithm` (`slidingWindow`, `tokenBucket`, or empty = `slidingWindow`; error `RateLimitAlgorithm: must be …`), `rateLimitSyncRate` through `RateLimitSyncRateDuration` (a Go duration, 0 or more; `New` uses the same parser), `rateLimitFailureAction` through `validateFailureAction` (`captcha` passes without a captcha instance name: the subscribing router decides at request time), `rateLimitStatusCode` from 100 to 599, a non-empty `rateLimitBuckets`, then `ratelimit.NewBucketSet(buckets, rateLimitAlgorithm)` wrapped as `RateLimitBuckets: bucket %d: …` (compiled, then discarded; a row `algorithm` and a `burst` on a `slidingWindow` policy fail there, naming `rateLimitAlgorithm`). When it is false none of this runs: leftover settings and an unreadable `rateLimitRedisPasswordFile` pass, including on a subscriber.
 - `LapiEnabled` and `CaptchaEnabled` default false. Tests and compose that Open LAPI or own captcha must set the flag true. A set `captchaProvider` does not own captcha.
 - `captcha` on `bouncerLapiFailureAction` / `bouncerAppsecFailureAction` / `bouncerModsecFailureAction` is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
 - Call `httprule.NewActionSet` on `BouncerActionRules`. An omitted or empty list passes (that setting is off). A fully empty rule (path, host, headers, and cookies absent AND method any) fails `ValidateParams`; a method-only or host-only rule passes. Empty name, colon in name, duplicate name, empty/unknown/duplicate action, or `ban` mixed with other tokens fail. `!!` and a leading `!` with an empty pattern fail. Invalid RE2 fails. Error text names `BouncerActionRules`. `plugin.New` returns a nil handler and that error without opening LAPI. Do not ignore an invalid pattern. Do not fail because captcha is unusable. `ValidateParams` discards the compiled set; `bouncer.New` compiles again to store it.
@@ -116,7 +125,8 @@ _ = checkFile.Close()
 
 ## Key files
 
-- `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`, `validateModsecURL`, `validateFailureAction`)
+- `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`, `validateModsecURL`, `validateFailureAction`, `validateRateLimit`, `RateLimitSyncRateDuration`)
+- `pkg/ratelimit` (`NewBucketSet`)
 - `pkg/httprule` (`New`, `NewActionSet`)
 - `pkg/captcha/captcha.go` (`Client.New` captcha-template WARN)
 - `pkg/bouncer/bouncer.go` (`New` ban-template WARN)

@@ -29,7 +29,7 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	}
 	// Nothing answered (allow, failure-action passthrough, or a cleared captcha gate):
 	// the challenge prefix still must not reach origin.
-	if !match.SkipAppsec && b.subscribeAppSec && isCrowdsecChallengeCallbackPath(req.URL.Path) {
+	if !match.SkipAppsec && b.appsecLeg.subscribed && isCrowdsecChallengeCallbackPath(req.URL.Path) {
 		http.NotFound(rw, req.Request)
 		return true
 	}
@@ -41,7 +41,7 @@ func (b *Bouncer) answerAppSec(rw http.ResponseWriter, req clientrequest.Request
 	if match.CaptchaName != "" {
 		return b.applyCaptchaRuleServeHTTP(rw, req, match)
 	}
-	if match.SkipAppsec || !b.subscribeAppSec {
+	if match.SkipAppsec || !b.appsecLeg.subscribed {
 		return false
 	}
 	if b.applyAppsecServeHTTP(rw, req, match) {

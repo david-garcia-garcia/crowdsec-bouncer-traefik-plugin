@@ -5,11 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"text/template"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
-	captcha "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
@@ -17,48 +14,32 @@ import (
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/modsecurity"
 )
 
 // Bouncer is one Traefik router handler. It is not the reclaim value.
 type Bouncer struct {
-	appsecBound              atomic.Value // *appsec.Client; typed nil when empty
+	appsecLeg                legBinding // *appsec.Client
 	appsecFailureAction      string
 	actionRules              *httprule.ActionSet
 	banTemplate              *template.Template
 	banTemplateContentType   string
-	captchaBound             atomic.Value      // *captcha.Client; typed nil when empty
-	modsecBound              atomic.Value      // *modsecurity.Client; typed nil when empty
+	captchaLeg               legBinding        // *captcha.Client
+	modsecLeg                legBinding        // *modsecurity.Client
 	trustedClients           *ip.PoolStrategy  // client addresses that skip LAPI, AppSec, and ModSec
 	decisionScopeHeaders     map[string]string // CrowdSec header scope → request header
 	enabled                  bool
 	forwardedCustomHeader    string
 	forwardedHeadersInsecure bool
-	lapiBound                atomic.Value // *lapi.Client; typed nil when empty
-	lapiFailureAction        string       // per-router LAPI fallback (not on Client identity)
-	lapiInstanceName         string
-	appsecInstanceName       string
-	captchaInstanceName      string
-	modsecInstanceName       string
+	lapiLeg                  legBinding // *lapi.Client
+	lapiFailureAction        string     // per-router LAPI fallback (not on Client identity)
 	modsecFailureAction      string
-	subscribeLAPI            bool
-	subscribeAppSec          bool
-	subscribeCaptcha         bool
-	subscribeModsec          bool
 	redisUnreachableBlock    bool  // per-router Redis fail-closed
 	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
-	bindingMu                sync.Mutex
-	lapiReceived             *lapi.Client
-	appsecReceived           *appsec.Client
-	captchaReceived          *captcha.Client
-	modsecReceived           *modsecurity.Client
-	lapiReceiveSeen          bool
-	appsecReceiveSeen        bool
-	captchaReceiveSeen       bool
-	modsecReceiveSeen        bool
+	bindingMu                sync.Mutex // serializes bind / unbind traces of every leg
 	name                     string
 	next                     http.Handler
+	rateLimitLeg             legBinding // *ratelimit.Client: the owner's counter, buckets, and policy
 	remediationCustomHeader  string
 	remediationStatusCode    int
 	trustedHops              *ip.PoolStrategy // hops allowed to set the forwarded client header
@@ -68,8 +49,19 @@ type Bouncer struct {
 
 const msgBanTemplateUnavailable = "crowdsec bouncer ban template unavailable"
 
-// New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, ReceiveCaptcha, and ReceiveModSec.
-func New(next http.Handler, name string, config *configuration.Config, subscribeLAPI, subscribeAppSec, subscribeCaptcha, subscribeModsec bool, log *slog.Logger) (*Bouncer, error) {
+// Subscriptions says which published legs a route subscribes to. plugin.go sets a leg when
+// bouncerEnabled is on and that leg's instance name is set.
+type Subscriptions struct {
+	LAPI      bool
+	AppSec    bool
+	Captcha   bool
+	ModSec    bool
+	RateLimit bool
+}
+
+// New returns a per-router handler. Clients arrive later through ReceiveLAPI, ReceiveAppSec, ReceiveCaptcha,
+// ReceiveModSec, and ReceiveRateLimit.
+func New(next http.Handler, name string, config *configuration.Config, subscriptions Subscriptions, log *slog.Logger) (*Bouncer, error) {
 	log = log.With("traefikName", name)
 	hopChecker, _ := ip.NewChecker(log, config.BouncerForwardedHeadersTrustedIPs)
 	clientChecker, _ := ip.NewChecker(log, config.BouncerClientTrustedIPs)
@@ -85,7 +77,6 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 	if err != nil {
 		return nil, err
 	}
-
 	var banTemplate *template.Template
 	var banTemplateContentType string
 	if config.BouncerBanFilePath == "" {
@@ -101,6 +92,12 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 	}
 
 	routeHandler := &Bouncer{
+		// One binding per published leg; leg is the plugin's reclaim group name.
+		lapiLeg:                  legBinding{leg: "lapi", instanceName: config.LapiInstanceName, subscribed: subscriptions.LAPI},
+		appsecLeg:                legBinding{leg: "appsec", instanceName: config.AppsecInstanceName, subscribed: subscriptions.AppSec},
+		captchaLeg:               legBinding{leg: "captcha", instanceName: config.CaptchaInstanceName, subscribed: subscriptions.Captcha},
+		modsecLeg:                legBinding{leg: "modsec", instanceName: config.ModsecInstanceName, subscribed: subscriptions.ModSec},
+		rateLimitLeg:             legBinding{leg: "ratelimit", instanceName: config.RateLimitInstanceName, subscribed: subscriptions.RateLimit},
 		appsecFailureAction:      configuration.EffectiveFailureAction(config.BouncerAppsecFailureAction),
 		actionRules:              actionRules,
 		banTemplate:              banTemplate,
@@ -111,15 +108,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		forwardedCustomHeader:    forwardedCustomHeader,
 		forwardedHeadersInsecure: config.BouncerForwardedHeadersInsecure,
 		lapiFailureAction:        configuration.EffectiveFailureAction(config.BouncerLapiFailureAction),
-		lapiInstanceName:         config.LapiInstanceName,
-		appsecInstanceName:       config.AppsecInstanceName,
-		captchaInstanceName:      config.CaptchaInstanceName,
-		modsecInstanceName:       config.ModsecInstanceName,
 		modsecFailureAction:      configuration.EffectiveModsecFailureAction(config.BouncerModsecFailureAction),
-		subscribeLAPI:            subscribeLAPI,
-		subscribeAppSec:          subscribeAppSec,
-		subscribeCaptcha:         subscribeCaptcha,
-		subscribeModsec:          subscribeModsec,
 		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
 		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
@@ -130,6 +119,10 @@ func New(next http.Handler, name string, config *configuration.Config, subscribe
 		trustedHops:              &ip.PoolStrategy{Checker: hopChecker},
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
+	}
+	// A router rebuilt without the rate limit drops the owner-unavailable WARN its name still has pending.
+	if !subscriptions.RateLimit {
+		pendingRateLimitOwnerWarnings.forget(name)
 	}
 	// JSON slog prints a nil []string as null; empty lists stay lists.
 	forwardedHeadersTrustedIPs := config.BouncerForwardedHeadersTrustedIPs
@@ -173,7 +166,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	logger.Trace(b.log, "ServeHTTP", "ip", req.IPAddrString(), "isTrusted", isTrusted)
 	if isTrusted {
 		b.next.ServeHTTP(rw, req.Request)
-		// Trusted clients skip LAPI, AppSec, and ModSec.
+		// Trusted clients skip LAPI, the rate limit, AppSec, and ModSec.
 		return
 	}
 
@@ -191,6 +184,9 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 	}
 
 	if b.serveLAPI(rw, req, match) {
+		return
+	}
+	if b.serveRateLimit(rw, req, match) {
 		return
 	}
 	if b.serveAppSec(rw, req, match) {

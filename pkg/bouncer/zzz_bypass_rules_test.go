@@ -63,7 +63,7 @@ func TestBouncerNew_compilesActionRules(t *testing.T) {
 		{Name: "healthz", Action: []string{httprule.ActionBypassAppsec}, Rule: httprule.Rule{Path: "^/healthz$"}},
 		{Name: "ok", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "^/ok/"}},
 	}
-	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, false, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, Subscriptions{}, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func TestBouncerNew_compilesActionRules(t *testing.T) {
 func TestBouncerNew_emptyActionRulesMatchNothing(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
-	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, false, log)
+	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, Subscriptions{}, log)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestBouncerNew_invalidActionRules(t *testing.T) {
 	log := logger.New("ERROR", "")
 	cfg := configuration.New()
 	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "("}}}
-	_, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, false, false, false, false, log)
+	_, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, Subscriptions{}, log)
 	if err == nil {
 		t.Fatal("invalid action rule must fail New")
 	}
@@ -137,7 +137,7 @@ func TestServeHTTP_nonMatchingLapiBypassStillLooksUp(t *testing.T) {
 
 func TestServeHTTP_lapiBypassSkipsUnboundLAPIFailure(t *testing.T) {
 	b, passed := testBypassOriginBouncer(t)
-	b.subscribeLAPI = true
+	b.lapiLeg.subscribed = true
 	b.lapiFailureAction = configuration.FailureActionBan
 	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	rw := httptest.NewRecorder()
@@ -202,8 +202,8 @@ func TestServeHTTP_lapiBypassSkipsLiveAndNoneLookup(t *testing.T) {
 			}
 			t.Cleanup(lapiClient.Close)
 			b, passed := testBypassOriginBouncer(t)
-			b.subscribeLAPI = true
-			b.lapiBound.Store(lapiClient)
+			b.lapiLeg.subscribed = true
+			b.lapiLeg.bound.Store(lapiClient)
 			b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 			b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 			if !*passed {

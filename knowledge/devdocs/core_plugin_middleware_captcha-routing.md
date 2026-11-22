@@ -7,7 +7,7 @@ The captcha-kind path of `handleRemediationServeHTTP`: unsubscribed WARN-then-ba
 _Avoid_: captcha gate cookie, `{ip}_captcha`, prefix bypass
 
 **Unsubscribed captcha**:
-A captcha-kind remediation on a Bouncer that never subscribed to captcha (`subscribeCaptcha` false: bounce on, empty `CaptchaInstanceName`).
+A captcha-kind remediation on a Bouncer that never subscribed to captcha (`Subscriptions.Captcha` false: bounce on, empty `CaptchaInstanceName`).
 _Avoid_: subscribed-unpublished, `!Valid`
 
 **Challenge marker**:
@@ -32,14 +32,15 @@ _Avoid_: `CaptchaCustomValidateURL`, the bundled default `captcha.html`
 
 ## Overview
 
-`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). `serveAppsecCaptchaGate` is the AppSec entry to the same handler (`core_plugin_appsec.md`): an AppSec `captcha` verdict, or a challenge-marker POST AppSec let through. A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. A request a `bypassCaptcha` action rule matched never reaches this handler: its callers ask `bypassesCaptcha` first and return false (`core_plugin_middleware_action-rules.md`). Cookie mint stays on `core_plugin_middleware_captcha-gate`.
+`handleRemediationServeHTTP` sends captcha kind to `handleCaptchaKindServeHTTP` (WARN-and-ban when this router never subscribed). `serveAppsecCaptchaGate` is the AppSec entry to the same handler (`core_plugin_appsec.md`): an AppSec `captcha` verdict, or a challenge-marker POST AppSec let through. The rate-limit step (`serveRateLimit`) is the third entry: a `captcha` bucket's challenge, a challenge-form POST its gate answers, and the failure action `captcha` (`core_plugin_ratelimit.md`). A subscribed, usable client then routes after cookie grace and first-solve 302. A widget asset or a cleared gate returns false and does not call next. A request a `bypassCaptcha` action rule matched never reaches this handler: its callers ask `bypassesCaptcha` first and return false (`core_plugin_middleware_action-rules.md`). Cookie mint stays on `core_plugin_middleware_captcha-gate`.
 
 ## How to use
 
-- When kind is captcha and `subscribeCaptcha` is false, WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
+- When kind is captcha and the route does not subscribe to captcha (`Subscriptions.Captcha` false), WARN `crowdsec bouncer captcha unsubscribed` with `leg` `captcha` and `instanceName` (empty when unsubscribed), then ban with `headerReason` `captcha-downgrade` (`ban:captcha-downgrade` when the remediation header is set). Do not emit `ip`. Do not call `GetRemoteIP`. Emit on every remediating request.
 - Do not WARN when subscribed. Empty or `!Valid` still ban without this stem (`headerReason` `captcha-downgrade`).
 - Load the published captcha Client. Empty or `!Valid` remediates as ban with `headerReason` `captcha-downgrade`. Do not construct a local client on the request path or in bounce-only `New`.
-- The caller passes the challenge-page header reason and the downgrade ban template reason: `handleRemediationServeHTTP` passes `headerReasonFromOrigin(origin)` and `LAPI`; `serveAppsecCaptchaGate` passes `appsec` and `APPSEC`. Do not derive the AppSec reason from origin `appsec` (that maps to `lapi`).
+- The caller passes the challenge-page header reason and the downgrade ban template reason: `handleRemediationServeHTTP` passes `headerReasonFromOrigin(origin)` and `LAPI`; `serveAppsecCaptchaGate` passes `appsec` and `APPSEC`; the rate-limit step passes `ratelimit` (`ratelimit-failure` for the failure action) and `RATE_LIMIT` (`configuration.ReasonRateLimit`). Do not derive the AppSec reason from origin `appsec` (that maps to `lapi`).
+- The rate-limit step calls `handleCaptchaKindServeHTTP` only with a usable captcha (`usableCaptcha()` non-nil). Without one it writes its own answer (`ratelimit` for a bucket, `ban:captcha-downgrade` for the failure action) and logs through `logRateLimitCaptchaDowngrade`, so it never reaches the per-request WARN `crowdsec bouncer captcha unsubscribed`. Keep that order on a new rate-limit captcha path.
 - Pass this router's `remediationCustomHeader` and the already-formatted challenge-page value into `ServeHTTP(rw, req, …)`. Pass the header name into `WriteSolvedRedirect`. Do not store the header on Client.
 - Sequence a loaded Valid client as: custom-resource path returns false → Check-true form POST 302 → other Check-true requests return false → `captcha.ServeHTTP` (HEAD included). Else ban. Do not call AppSec or next from this handler.
 - HEAD under a subscribed, usable captcha remediation gets the challenge page, never the ban page. That is ratified; do not "fix" it back to ban. A HEAD on a custom-resource path still reaches origin.

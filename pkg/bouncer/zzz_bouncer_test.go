@@ -641,7 +641,7 @@ func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
 	t.Run("unpublished passthrough custom.js", func(t *testing.T) {
 		nextCalled := false
 		b := &Bouncer{
-			subscribeAppSec:     true,
+			appsecLeg:           legBinding{subscribed: true},
 			appsecFailureAction: configuration.FailureActionPassthrough,
 			log:                 logger.New("ERROR", ""),
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
@@ -979,7 +979,7 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg := configuration.New()
 		cfg.LapiMode = configuration.StreamMode
 		cfg.BouncerForwardedHeadersInsecure = true
-		b, err := New(next, "test", cfg, false, true, false, false, log)
+		b, err := New(next, "test", cfg, Subscriptions{AppSec: true}, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}
@@ -992,7 +992,7 @@ func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 		cfg.LapiMode = configuration.StreamMode
 		cfg.BouncerForwardedHeadersInsecure = true
 		cfg.BouncerForwardedHeadersCustomName = "CF-Connecting-IP"
-		b, err := New(next, "test", cfg, false, true, false, false, log)
+		b, err := New(next, "test", cfg, Subscriptions{AppSec: true}, log)
 		if err != nil {
 			t.Fatalf("New = %v", err)
 		}

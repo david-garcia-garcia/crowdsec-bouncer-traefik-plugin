@@ -10,50 +10,26 @@ import (
 
 // loadedLAPI is the LAPI client this route has stored, or nil.
 func (b *Bouncer) loadedLAPI() *lapi.Client {
-	client, _ := reclaim.Unbox(&b.lapiBound).(*lapi.Client)
+	client, _ := reclaim.Unbox(&b.lapiLeg.bound).(*lapi.Client)
 	return client
 }
 
 // ReceiveLAPI stores the published LAPI client and traces the pointer change.
 // published is a reclaim.Published. The same pointer is a no-op.
+// A newly bound client also warns when a header scope is not in the stream.
 func (b *Bouncer) ReceiveLAPI(published any) {
-	if !b.subscribeLAPI {
-		return
-	}
-	notice, _ := published.(reclaim.Published)
-	b.storeBinding(&b.lapiBound, notice.Value)
-	b.receiveLAPI()
+	b.receiveBinding(&b.lapiLeg, published, func() string { return b.loadedLAPI().Incarnation() }, b.warnMissingStreamScopes, nil)
 }
 
-// receiveLAPI traces a LAPI bind or unbind.
-// A non-nil client also warns when a header scope is not in the stream.
-func (b *Bouncer) receiveLAPI() {
-	current := b.loadedLAPI()
-	b.bindingMu.Lock()
-	defer b.bindingMu.Unlock()
-	if b.lapiReceiveSeen && current == b.lapiReceived {
-		return
-	}
-	previous := b.lapiReceived
-	b.lapiReceived = current
-	b.lapiReceiveSeen = true
-	if previous != nil && previous != current {
-		b.traceBouncerBinding(false, "lapi", b.lapiInstanceName, previous.Incarnation())
-	}
-	if current == nil {
-		if previous == nil {
-			b.traceBouncerBinding(false, "lapi", b.lapiInstanceName, "")
-		}
-		return
-	}
-	missing := decisionscope.MissingStreamScopes(b.decisionScopeHeaders, current.StreamScopes())
+// warnMissingStreamScopes warns when a decision scope header names a scope the bound LAPI client does not poll.
+func (b *Bouncer) warnMissingStreamScopes() {
+	missing := decisionscope.MissingStreamScopes(b.decisionScopeHeaders, b.loadedLAPI().StreamScopes())
 	if len(missing) > 0 {
 		b.log.Warn("crowdsec bouncer stream scopes missing",
 			"traefikName", b.name,
 			"missing", strings.Join(missing, ","),
 		)
 	}
-	b.traceBouncerBinding(true, "lapi", b.lapiInstanceName, current.Incarnation())
 }
 
 // LapiClient is the published LAPI client this route has stored, or nil.

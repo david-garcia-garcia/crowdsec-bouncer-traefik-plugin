@@ -151,7 +151,7 @@ func TestBypassCaptcha_remappedBanStaysBan(t *testing.T) {
 func TestBypassCaptcha_lapiFailureActionCaptchaReachesOrigin(t *testing.T) {
 	b, passed, _ := testBypassCaptchaLapiBouncer(t, testCaptchaClient(t, "/fast.js", "", "", nil), nil, decisionscope.CaptchaValue, "crowdsec")
 	bindTestLAPI(b, nil)
-	b.subscribeLAPI = true
+	b.lapiLeg.subscribed = true
 	b.lapiFailureAction = configuration.FailureActionCaptcha
 
 	serveBypassCaptchaRequest(b, "/api/items")
@@ -210,7 +210,7 @@ func TestBypassCaptcha_appsecVerdicts(t *testing.T) {
 func TestBypassCaptcha_appsecFailureActionCaptchaReachesOrigin(t *testing.T) {
 	b, next, _ := testAppsecVerdictBouncer(t, appsecAnswers(http.StatusOK, `{"action":"allow"}`), testCaptchaClient(t, "/fast.js", "", "", nil))
 	bindTestAppSec(b, nil)
-	b.subscribeAppSec = true
+	b.appsecLeg.subscribed = true
 	b.appsecFailureAction = configuration.FailureActionCaptcha
 	b.actionRules = apiBypassCaptchaRules(t)
 
@@ -338,12 +338,12 @@ func testBypassCaptchaLiveBouncer(t *testing.T, remap map[string]map[string]stri
 		banTemplateContentType:   "text/html; charset=utf-8",
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(remap),
 		actionRules:              apiBypassCaptchaRules(t),
-		subscribeLAPI:            true,
+		lapiLeg:                  legBinding{subscribed: true},
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passed = true
 		}),
 	}
-	b.lapiBound.Store(lapiClient)
+	b.lapiLeg.bound.Store(lapiClient)
 	bindTestCaptcha(b, testCaptchaClient(t, "/fast.js", "", "", nil))
 	return b, &passed
 }

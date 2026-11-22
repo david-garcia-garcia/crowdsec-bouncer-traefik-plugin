@@ -9,14 +9,16 @@ import (
 )
 
 // Action tokens on one ActionRule. Order in the authoring array does not matter.
+// ActionBypass skips LAPI, AppSec, and ModSec; only ActionBypassRateLimit skips the rate limit.
 const (
-	ActionBan           = "ban"
-	ActionBypass        = "bypass"
-	ActionBypassAppsec  = "bypassAppsec"
-	ActionBypassCaptcha = "bypassCaptcha"
-	ActionBypassLapi    = "bypassLapi"
-	ActionBypassModsec  = "bypassModsec" //nolint:gosec // G101: action token, not a credential
-	ActionCaptcha       = "captcha"
+	ActionBan             = "ban"
+	ActionBypass          = "bypass"
+	ActionBypassAppsec    = "bypassAppsec"
+	ActionBypassCaptcha   = "bypassCaptcha"
+	ActionBypassLapi      = "bypassLapi"
+	ActionBypassModsec    = "bypassModsec" //nolint:gosec // G101: action token, not a credential
+	ActionBypassRateLimit = "bypassRateLimit"
+	ActionCaptcha         = "captcha"
 )
 
 // ActionRule is one authoring row: unique name, action tokens, and Rule predicates.
@@ -42,6 +44,7 @@ type actionTokens struct {
 	skipAppsec    bool
 	skipLapi      bool
 	skipModsec    bool
+	skipRateLimit bool
 }
 
 // NewActionSet validates names and action tokens, then compiles predicates with New.
@@ -52,7 +55,7 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 	tokens := make([]actionTokens, len(rules))
 	seenNames := make(map[string]struct{}, len(rules))
 	for i, rule := range rules {
-		name, err := compileActionName(rule.Name, seenNames)
+		name, err := CompileRowName(rule.Name, seenNames)
 		if err != nil {
 			return nil, fmt.Errorf("rule %d: %w", i, err)
 		}
@@ -75,7 +78,7 @@ func NewActionSet(rules []ActionRule) (*ActionSet, error) {
 // ActionMatch is every matching row reduced for one request.
 // BanName, CaptchaName and BypassCaptchaName are the first matching rule of that token. Empty means none.
 // BypassCaptchaName means the request gets no captcha, so CaptchaName is empty whenever it is set.
-// SkipLapi, SkipAppsec, and SkipModsec are OR'd across every non-ban hit. A ban row contributes only its name.
+// SkipLapi, SkipAppsec, SkipModsec, and SkipRateLimit are OR'd across every non-ban hit. A ban row contributes only its name.
 // AmbiguousPathName is the first matching rule with a path predicate whose skips were dropped
 // because the request path has more than one reading (see SingleReadingPath). Empty means none.
 type ActionMatch struct {
@@ -86,6 +89,7 @@ type ActionMatch struct {
 	SkipAppsec        bool
 	SkipLapi          bool
 	SkipModsec        bool
+	SkipRateLimit     bool
 }
 
 // Matching returns every matching index in list order. Cookie is parsed once when needed.
@@ -120,7 +124,7 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		if set.BypassCaptcha(i) && match.BypassCaptchaName == "" {
 			match.BypassCaptchaName = set.Name(i)
 		}
-		if !set.SkipLapi(i) && !set.SkipAppsec(i) && !set.SkipModsec(i) {
+		if !set.skipsLeg(i) {
 			continue
 		}
 		if set.set.hasPath(i) && reading.ambiguous() {
@@ -137,6 +141,9 @@ func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
 		}
 		if set.SkipModsec(i) {
 			match.SkipModsec = true
+		}
+		if set.SkipRateLimit(i) {
+			match.SkipRateLimit = true
 		}
 	}
 	if match.BypassCaptchaName != "" {
@@ -199,8 +206,19 @@ func (set *ActionSet) SkipModsec(i int) bool {
 	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipModsec
 }
 
-// compileActionName trims name, rejects empty, colon, and duplicates.
-func compileActionName(raw string, seen map[string]struct{}) (string, error) {
+// SkipRateLimit reports whether the row at index i skips the rate limit (bypassRateLimit only).
+func (set *ActionSet) SkipRateLimit(i int) bool {
+	return set != nil && i >= 0 && i < len(set.tokens) && set.tokens[i].skipRateLimit
+}
+
+// skipsLeg reports whether the row at index i skips any leg: LAPI, AppSec, ModSec, or the rate limit.
+func (set *ActionSet) skipsLeg(i int) bool {
+	return set.SkipLapi(i) || set.SkipAppsec(i) || set.SkipModsec(i) || set.SkipRateLimit(i)
+}
+
+// CompileRowName trims the name of one authoring row (an action rule or a rate-limit bucket) and
+// rejects empty, colon, and a name already in seen. The caller adds the returned name to seen.
+func CompileRowName(raw string, seen map[string]struct{}) (string, error) {
 	name := strings.TrimSpace(raw)
 	if name == "" {
 		return "", errors.New("name: empty")
@@ -247,6 +265,8 @@ func compileActionTokens(raw []string) (actionTokens, error) {
 			parsed.skipModsec = true
 		case ActionBypassCaptcha:
 			parsed.bypassCaptcha = true
+		case ActionBypassRateLimit:
+			parsed.skipRateLimit = true
 		default:
 			return actionTokens{}, fmt.Errorf("action: unknown %q", token)
 		}

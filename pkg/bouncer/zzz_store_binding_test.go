@@ -15,7 +15,7 @@ func TestStoreBinding_ConcurrentUnboxVsStore(t *testing.T) {
 	b := &Bouncer{}
 	first := &lapi.Client{}
 	second := &lapi.Client{}
-	b.storeBinding(&b.lapiBound, first)
+	b.storeBinding(&b.lapiLeg.bound, first)
 
 	const iterations = 20000
 	var wg sync.WaitGroup
@@ -24,9 +24,9 @@ func TestStoreBinding_ConcurrentUnboxVsStore(t *testing.T) {
 		defer wg.Done()
 		for i := range iterations {
 			if i%2 == 0 {
-				b.storeBinding(&b.lapiBound, first)
+				b.storeBinding(&b.lapiLeg.bound, first)
 			} else {
-				b.storeBinding(&b.lapiBound, second)
+				b.storeBinding(&b.lapiLeg.bound, second)
 			}
 		}
 	}()
@@ -42,7 +42,7 @@ func TestStoreBinding_ConcurrentUnboxVsStore(t *testing.T) {
 	}()
 	wg.Wait()
 
-	stored := b.lapiBound.Load()
+	stored := b.lapiLeg.bound.Load()
 	boxed, ok := stored.(*reclaim.Box)
 	if !ok {
 		t.Fatalf("stored concrete type %T, want *reclaim.Box", stored)

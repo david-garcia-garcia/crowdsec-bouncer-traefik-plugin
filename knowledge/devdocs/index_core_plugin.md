@@ -8,17 +8,17 @@ description: How LAPI Clients share one Store keyed by CrowdSec cursor SessionHe
 ## Middleware New
 priority: normal
 local: core_plugin_middleware.md
-description: How Traefik New reclaims a LAPI Client, an AppSec Client, a captcha Client, and a ModSec Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
+description: How Traefik New reclaims a LAPI Client, an AppSec Client, a captcha Client, a ModSec Client, and the rate-limit Client and returns a per-router Bouncer (`core_plugin_middleware_bouncer`).
 
 ## Ban page
 priority: normal
 local: core_plugin_middleware_ban-page.md
-description: How handleBanServeHTTP and handleBanStatusServeHTTP write the operator ban response (status, including the relayed AppSec ban http_status, Content-Type, Cache-Control, optional template).
+description: How handleBanServeHTTP and handleBanStatusServeHTTP write the operator ban response (status, including the relayed AppSec ban http_status and the rate-limit status, Content-Type, Cache-Control, optional template).
 
 ## Instance slots
 priority: normal
 local: core_plugin_middleware_instance-slots.md
-description: How named LAPI, AppSec, captcha, and ModSec slots Publish and Subscribe through Yaegi-safe atomic.Value.
+description: How named LAPI, AppSec, captcha, ModSec, and rate-limit slots Publish and Subscribe through one published-leg table and Yaegi-safe atomic.Value bindings.
 
 ## Local plugin
 priority: normal
@@ -149,4 +149,9 @@ description: How this plugin copies an inbound request to the CRS sidecar and cl
 priority: normal
 local: core_plugin_wafhop_shared-request.md
 description: How AppSec and ModSec share body buffering, client-gone classification, and the hop-by-hop list through pkg/wafhop while keeping their own limits and fallbacks.
+
+## Rate-limit leg
+priority: normal
+local: core_plugin_ratelimit.md
+description: How the owner opens and publishes the Redis rate-limit Client with its buckets and policy, and how subscribers charge those buckets under their own name between the LAPI and AppSec steps.
 

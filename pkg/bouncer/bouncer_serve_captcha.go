@@ -17,7 +17,7 @@ const msgCaptchaUnsubscribed = "crowdsec bouncer captcha unsubscribed"
 // usableCaptcha is this router's captcha client when it can serve the gate: subscribed, published, and Valid.
 // Nil means a captcha here is a downgrade ban.
 func (b *Bouncer) usableCaptcha() *captcha.Client {
-	if !b.subscribeCaptcha {
+	if !b.captchaLeg.subscribed {
 		return nil
 	}
 	captchaClient := b.loadedCaptcha()
@@ -36,7 +36,7 @@ func (b *Bouncer) isCaptchaFormAnswer(req clientrequest.Request) bool {
 // applyCaptchaRuleServeHTTP queries AppSec unless this rule skips it, then serves the captcha gate when AppSec did not write.
 // False means the gate did not write, and ServeHTTP calls next.
 func (b *Bouncer) applyCaptchaRuleServeHTTP(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
-	if !match.SkipAppsec && b.subscribeAppSec && b.applyAppsecServeHTTP(rw, req, match) {
+	if !match.SkipAppsec && b.appsecLeg.subscribed && b.applyAppsecServeHTTP(rw, req, match) {
 		return true
 	}
 	return b.handleRemediationServeHTTP(rw, req, decisionscope.CaptchaValue, lapi.OriginPluginRules(match.CaptchaName))
@@ -66,8 +66,8 @@ func (b *Bouncer) serveAppsecCaptchaGate(rw http.ResponseWriter, req clientreque
 // Parameters follow handleBanServeHTTP: banReason is the ban template reason on a downgrade, headerReason names the challenge page.
 // False means a widget asset or a cleared gate, and the caller continues.
 func (b *Bouncer) handleCaptchaKindServeHTTP(rw http.ResponseWriter, req clientrequest.Request, banReason, headerReason, origin string) bool {
-	if !b.subscribeCaptcha {
-		b.log.Warn(msgCaptchaUnsubscribed, "leg", "captcha", "instanceName", b.captchaInstanceName)
+	if !b.captchaLeg.subscribed {
+		b.log.Warn(msgCaptchaUnsubscribed, "leg", "captcha", "instanceName", b.captchaLeg.instanceName)
 		b.handleBanServeHTTP(rw, req, banReason, headerReasonCaptchaDowngrade, origin)
 		return true
 	}

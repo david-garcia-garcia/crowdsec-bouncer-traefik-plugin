@@ -1,6 +1,7 @@
 package lapi
 
 import (
+	"fmt"
 	"io"
 	"log/slog"
 	"sync/atomic"
@@ -14,9 +15,12 @@ import (
 )
 
 // NewTestClient returns an in-memory Client with a memory DecisionStore.
+// Its incarnation is set as New sets it, so a bouncer binding tells it apart from nil.
 func NewTestClient(log *slog.Logger) (*Client, *decisionstore.Store) {
 	store := decisionstore.NewMemory(log)
-	return &Client{decisionStore: store, log: log, crowdsecMode: configuration.StreamMode}, store
+	client := &Client{decisionStore: store, log: log, crowdsecMode: configuration.StreamMode}
+	client.incarnation = fmt.Sprintf("%p", client)
+	return client, store
 }
 
 // SetCrowdsecModeForTest sets crowdsecMode for tests that bind a client onto a bouncer.
@@ -137,4 +141,19 @@ func (c *Client) TestDroppedByteCount(origin, ipType string) int64 {
 	c.metricsReporter.metricsMu.Lock()
 	defer c.metricsReporter.metricsMu.Unlock()
 	return c.metricsReporter.windowCounters[key]
+}
+
+// TestProcessedCount is the processed count for ipType (ipv4 or ipv6) since the last report.
+func (c *Client) TestProcessedCount(ipType string) int64 {
+	if c == nil || c.metricsReporter == nil {
+		return 0
+	}
+	switch ipType {
+	case "ipv4":
+		return atomic.LoadInt64(&c.metricsReporter.processedIPv4)
+	case "ipv6":
+		return atomic.LoadInt64(&c.metricsReporter.processedIPv6)
+	default:
+		return atomic.LoadInt64(&c.metricsReporter.processedUnknown)
+	}
 }

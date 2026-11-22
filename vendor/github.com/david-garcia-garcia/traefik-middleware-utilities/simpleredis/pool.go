@@ -3,6 +3,7 @@ package simpleredis
 import (
 	"bufio"
 	"context"
+	"crypto/tls"
 	"errors"
 	"net"
 	"time"
@@ -39,10 +40,19 @@ func (c *pooledConn) close() {
 	_ = c.netConn.Close()
 }
 
-// liveCap is the frozen live-socket bound. After New it is cap(inUseTurns).
+// turnWaiter is one borrow queued on turnWaiters for an in-use turn past PoolSize.
+type turnWaiter struct {
+	// ready is closed exactly once, under inUseMu, by the give-back that grants the turn or by the
+	// wait's own abandon; whichever runs first also removes the waiter from turnWaiters.
+	ready chan struct{}
+	// granted is written under inUseMu before close(ready), so reading it after <-ready is safe.
+	granted bool
+}
+
+// liveCap is the frozen live-socket bound. After New it is turnCap.
 func (sr *SimpleRedis) liveCap() int {
-	if sr.inUseTurns != nil {
-		return cap(sr.inUseTurns)
+	if sr.turnCap != 0 {
+		return sr.turnCap
 	}
 	if sr.poolSize > 0 {
 		return sr.poolSize
@@ -58,27 +68,41 @@ func (sr *SimpleRedis) inUseTurnWait() time.Duration {
 	return defaultPoolTimeout
 }
 
-// ensureInUseTurns creates the in-use-turn channel once from liveCap(). New calls this.
+// ensureInUseTurns freezes the in-use-turn cap once from liveCap(), with every turn free. New calls this.
 func (sr *SimpleRedis) ensureInUseTurns() {
-	if sr.inUseTurns != nil {
+	if sr.turnCap != 0 {
 		return
 	}
 	liveCap := sr.liveCap()
-	sr.inUseTurns = make(chan struct{}, liveCap)
-	for i := 0; i < liveCap; i++ {
-		sr.inUseTurns <- struct{}{}
-	}
+	sr.turnCap = liveCap
+	sr.freeTurns = liveCap
 }
 
-// freeInUseTurn returns one in-use-socket token to the pool. No-op before the pool is created.
+// freeInUseTurn returns one in-use turn to the pool. No-op before the pool is created.
+// With a borrow queued, the turn goes to the oldest waiter in place, so a later borrow never overtakes it.
 // An extra return when the semaphore is already full is dropped and counted on OverFrees so the caller does not hang.
+// Lock and Unlock are explicit, without defer or a helper: under Yaegi each interpreted call or defer
+// costs about a microsecond on every command, and nothing between them can panic.
 func (sr *SimpleRedis) freeInUseTurn() {
-	if sr.inUseTurns == nil {
+	if sr.turnCap == 0 {
 		return
 	}
-	select {
-	case sr.inUseTurns <- struct{}{}:
-	default:
+	overFree := false
+	sr.inUseMu.Lock()
+	if last := len(sr.turnWaiters) - 1; last >= 0 {
+		oldest := sr.turnWaiters[0]
+		copy(sr.turnWaiters, sr.turnWaiters[1:])
+		sr.turnWaiters[last] = nil
+		sr.turnWaiters = sr.turnWaiters[:last]
+		oldest.granted = true
+		close(oldest.ready)
+	} else if sr.freeTurns < sr.turnCap {
+		sr.freeTurns++
+	} else {
+		overFree = true
+	}
+	sr.inUseMu.Unlock()
+	if overFree {
 		// Over-free: some path returned a turn it did not take. Drop so the request does not hang.
 		// No error exists on this path and none is invented for the log, so this stays a named event.
 		sr.overFrees.Add(1)
@@ -110,36 +134,62 @@ func (sr *SimpleRedis) freeInUseTurn() {
 //
 //nolint:revive,stylecheck // error stays before handshakeFailed; reordering would collide with in-flight SimpleRedis PRs.
 func (sr *SimpleRedis) borrowSocket(ctx context.Context, skipIdle bool) (conn *pooledConn, err error, handshakeFailed bool, fromIdle bool) {
-	// closed is atomic; inUseTurns is written once in New before concurrent use.
+	// closed is atomic; turnCap is written once in New before concurrent use.
 	if sr.closed.Load() {
 		sr.logger.Debug("borrowSocket: "+RedisUnreachable, "reason", "closed")
 		return nil, errUnreachable, false, false
 	}
-	if sr.inUseTurns == nil {
+	if sr.turnCap == 0 {
 		return nil, errNotFromNew, false, false
 	}
 	if err := contextStop(ctx); err != nil {
 		return nil, err, false, false
 	}
 
-	// Uncontended borrow must not allocate a timer; the wait exists only for a waiter past poolSize.
-	select {
-	case <-sr.inUseTurns:
-	default:
-		// Waiter past poolSize: PoolTimeout timer, or ctx.Done when the command deadline is sooner.
-		timer := time.NewTimer(sr.inUseTurnWait())
-		select {
-		case <-sr.inUseTurns:
-			if !timer.Stop() {
-				<-timer.C
+	// No select here, or anywhere in session source (TestSessionSourceHasNoSelect): Yaegi v0.16.1 shares one
+	// case list per select statement across goroutines, so concurrent borrows woke on each other's channels,
+	// returned (nil, nil) and moved turns between clients (knowledge/research/ext_traefik_plugins_yaegi-select/).
+	// One Lock either takes a free turn or queues this borrow, so a give-back never lets a later borrow
+	// overtake a waiter. The uncontended take allocates nothing; it is inline for the reason freeInUseTurn gives.
+	var waiter *turnWaiter
+	sr.inUseMu.Lock()
+	if sr.freeTurns > 0 {
+		sr.freeTurns--
+	} else {
+		waiter = &turnWaiter{ready: make(chan struct{})}
+		sr.turnWaiters = append(sr.turnWaiters, waiter)
+	}
+	sr.inUseMu.Unlock()
+	if waiter != nil {
+		// Waiter past poolSize: PoolTimeout, or ctx when the command deadline or a cancel comes sooner.
+		// The abandon removes the waiter under the same lock a give-back grants under; whichever runs first
+		// closes ready and the others find the waiter gone, so a turn is never lost or handed out twice,
+		// and the timer and the ctx share it without a sync.Once. A time.AfterFunc plus a context.AfterFunc
+		// measured cheaper than one context.AfterFunc on a context.WithTimeout child (compiled about
+		// 350 vs 650 ns per wait, Yaegi about 4.1 vs 4.5 µs).
+		abandon := func() {
+			sr.inUseMu.Lock()
+			for i, queued := range sr.turnWaiters {
+				if queued == waiter {
+					last := len(sr.turnWaiters) - 1
+					copy(sr.turnWaiters[i:], sr.turnWaiters[i+1:])
+					sr.turnWaiters[last] = nil
+					sr.turnWaiters = sr.turnWaiters[:last]
+					close(waiter.ready)
+					break
+				}
 			}
-		case <-ctx.Done():
-			if !timer.Stop() {
-				<-timer.C
-			}
+			sr.inUseMu.Unlock()
+		}
+		poolTimer := time.AfterFunc(sr.inUseTurnWait(), abandon)
+		stopCtxAbandon := context.AfterFunc(ctx, abandon)
+		<-waiter.ready
+		poolTimer.Stop()
+		stopCtxAbandon()
+		// A granted waiter continues even if ctx fired meanwhile: the turn is held like any other borrow's,
+		// and the command path's own ctx checks end the command and release it.
+		if !waiter.granted {
 			// A fired context is not logged here: exec is the single owner of caller-cancel versus library-budget.
-			return nil, ctx.Err(), false, false
-		case <-timer.C:
 			if err := contextStop(ctx); err != nil {
 				return nil, err, false, false
 			}
@@ -247,20 +297,27 @@ func (sr *SimpleRedis) parkIdleConn(conn *pooledConn) bool {
 	return true
 }
 
-// dial opens TCP to host, then AUTH and SELECT when those New fields are set.
-// Dialer.Timeout is the per-attempt cap; DialContext also honors ctx (overall budget or caller).
-// handshakeFailed is true when TCP succeeded and AUTH or SELECT then failed; exec must not retry that error.
+// dial opens TCP to host (plus a TLS client handshake when New stored a TLS configuration), then AUTH and SELECT
+// when those New fields are set.
+// Dialer.Timeout is the per-attempt cap on connect plus handshake; DialContext also honors ctx (overall budget or caller).
+// handshakeFailed is true when the connection succeeded and AUTH or SELECT then failed; exec must not retry that error.
+// A deterministic TLS rejection during the handshake is errTLS with handshakeFailed false: shouldRetry already
+// refuses it because it is neither errUnreachable nor a retryable Redis reply.
 //
 //nolint:revive // error stays before handshakeFailed; reordering would collide with in-flight SimpleRedis PRs.
 func (sr *SimpleRedis) dial(ctx context.Context) (conn *pooledConn, err error, handshakeFailed bool) {
 	if err := contextStop(ctx); err != nil {
 		return nil, err, false
 	}
-	dialer := net.Dialer{Timeout: sr.DialTimeout()}
-	netConn, err := dialer.DialContext(ctx, "tcp", sr.host)
+	netConn, err := sr.openNetConn(ctx)
 	if err != nil {
 		if stop := contextStop(ctx); stop != nil {
 			return nil, stop, false
+		}
+		// A TLS rejection is an operator fix, so it is Error with the crypto/tls text, which is not a Redis reply.
+		if isTLSRejection(err) {
+			sr.logger.Error("dial: "+RedisTLS, "tls_error", err.Error())
+			return nil, errTLS, false
 		}
 		// The dialer's own text is not published: the line is the unreachable sentinel, and host is on simpleredis_open.
 		sr.logger.Debug("dial: " + RedisUnreachable)
@@ -275,12 +332,15 @@ func (sr *SimpleRedis) dial(ctx context.Context) (conn *pooledConn, err error, h
 	// AUTH before SELECT so a passworded server accepts the session.
 	// A handshake failure is Warn here and the verb says which step failed; do already logged what it saw.
 	// Never log the peer's text: Redis 7.4 AUTH replies can quote Config.Pass.
-	if sr.pass != "" {
-		if _, _, err = sr.do(ctx, conn, [][]byte{[]byte(verbAuth), []byte(sr.pass)}); err != nil {
+	if sr.user != "" || sr.pass != "" {
+		if _, _, err = sr.do(ctx, conn, sr.authArgs()); err != nil {
 			conn.close()
-			if errors.Is(err, ErrNoAuth) {
+			switch {
+			case errors.Is(err, ErrNoAuth):
 				sr.logger.Warn("dial: "+RedisNoAuth, "verb", verbAuth)
-			} else {
+			case errors.Is(err, ErrTLS):
+				sr.logger.Warn("dial: "+RedisTLS, "verb", verbAuth)
+			default:
 				sr.logger.Warn("dial: redis error", "verb", verbAuth)
 			}
 			return nil, err, true
@@ -289,13 +349,38 @@ func (sr *SimpleRedis) dial(ctx context.Context) (conn *pooledConn, err error, h
 	if sr.database != "" {
 		if _, _, err = sr.do(ctx, conn, [][]byte{[]byte(verbSelect), []byte(sr.database)}); err != nil {
 			conn.close()
-			if errors.Is(err, ErrNoAuth) {
+			switch {
+			case errors.Is(err, ErrNoAuth):
 				sr.logger.Warn("dial: "+RedisNoAuth, "verb", verbSelect)
-			} else {
+			case errors.Is(err, ErrTLS):
+				sr.logger.Warn("dial: "+RedisTLS, "verb", verbSelect)
+			default:
 				sr.logger.Warn("dial: redis error", "verb", verbSelect)
 			}
 			return nil, err, true
 		}
 	}
 	return conn, nil, false
+}
+
+// openNetConn obtains the socket for one dial attempt: plain TCP when New stored no TLS configuration, else TCP
+// plus a TLS client handshake with that configuration. Both are bounded by DialTimeout and ctx.
+// tls.Dialer, not tls.DialWithDialer: only DialContext honours ctx during the handshake. ServerName is not built
+// from host here; crypto/tls takes it from the address when the configuration leaves it empty.
+func (sr *SimpleRedis) openNetConn(ctx context.Context) (net.Conn, error) {
+	if sr.tlsConfig == nil {
+		dialer := net.Dialer{Timeout: sr.DialTimeout()}
+		return dialer.DialContext(ctx, "tcp", sr.host)
+	}
+	dialer := tls.Dialer{NetDialer: &net.Dialer{Timeout: sr.DialTimeout()}, Config: sr.tlsConfig}
+	return dialer.DialContext(ctx, "tcp", sr.host)
+}
+
+// authArgs is the AUTH command for this client: AUTH <user> <pass> when an ACL user is set (also with an empty
+// pass), else AUTH <pass>. Redis reads the one-argument form as the default user.
+func (sr *SimpleRedis) authArgs() [][]byte {
+	if sr.user != "" {
+		return [][]byte{[]byte(verbAuth), []byte(sr.user), []byte(sr.pass)}
+	}
+	return [][]byte{[]byte(verbAuth), []byte(sr.pass)}
 }

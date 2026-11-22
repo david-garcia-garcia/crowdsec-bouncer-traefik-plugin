@@ -1,0 +1,16 @@
+issueKey: 2026-11-20-add-redis-rate-limit-leg
+jobName: 2026-11-20-add-redis-rate-limit-leg
+issueHost: local
+issueRef: none
+prHost: github
+ciHost: github
+repoSlug: crowdsec-bouncer-traefik-plugin
+destBranch: master
+qualify: qualified-with-gaps
+src: c3db83466c6997b5
+localTests: passed
+requirement: requirement.md
+comments: none
+explore: explore.md
+change: share-rate-limit-leg-and-bucket-actions
+pr: { id: 228, url: https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/228 }
