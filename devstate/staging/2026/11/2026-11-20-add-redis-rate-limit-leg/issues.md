@@ -3,8 +3,9 @@
 - [x] note large  `knowledge/debt/2026-11-20-extract-common-leg-abstraction.md`
   Why: each published leg is copied by hand into five places in `plugin.go` and `Bouncer`; the owner asked to suggest a shared leg unit before the next leg, and the Open-only rate-limit leg does not need it.
   Taken: change `share-rate-limit-leg-and-bucket-actions` group 1 (20c5ee77) moves LAPI, AppSec, captcha, and ModSec onto one `publishedLeg` table and one `legBinding`; group 2 (31ca4c93) adds the rate limit as the fifth entry.
-- [ ] note large  `knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`
+- [x] note large  `knowledge/debt/2026-11-20-rate-limit-token-bucket-and-memory-store.md`
   Why: `tokenBucket`, `burst`, and the memory store are not in the first slice; the upstream blocker (utilities PR #54) is tagged in v1.0.9, which this branch now pins.
+  Taken: round 2 addendum C, change `share-rate-limit-leg-and-bucket-actions` group 5 (a6289da2) adds `rateLimitAlgorithm: tokenBucket` and `burst`; the memory store, not asked, moves to `knowledge/debt/2026-11-22-rate-limit-memory-store.md`.
 - [x] note large  `knowledge/debt/2026-11-20-bump-utilities-windowcounter-fixes.md`
   Why: `windowcounter` at v1.0.7 still has the stale-previous (PR #63) and EXPIRE-not-retried (PR #60) defects; bump when they are tagged.
   Closed 2026-11-21: utilities bumped to v1.0.9 (PRs #60, #62, #63); the buffered-outage contract change (#62) is handled (failure action now applies in exact mode only).
@@ -29,3 +30,5 @@
   Taken: human decision 2026-11-22 ("WARN al desconectarse"); dcfd0393 logs WARN `crowdsec bouncer rate limit owner unavailable` once per move to no client and INFO `crowdsec bouncer rate limit owner available` on the bind that ends it, from the rate-limit binding's unbind and bind hooks, never per request.
 - [ ] note large  `knowledge/debt/2026-11-22-rate-limit-memory-store.md`
   Why: `rateLimitStore: memory` still fails startup; round 2 addendum C takes only the `tokenBucket` half of the round-1 token-bucket-and-memory-store note, so the memory store moves to its own note.
+- [ ] note large  `knowledge/debt/2026-11-22-rate-limit-owner-return-info-after-reload.md`
+  Why: a subscriber that the owner-restoring reload rebuilds after the owner binds at once and logs no INFO, so the owner-unavailable WARN of its previous instance is never answered (measured on real Traefik).

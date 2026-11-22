@@ -22,6 +22,7 @@ BeforeAll {
             @{ Path = "/rate-limit-down-pass/ready"; Status = 200 }
             @{ Path = "/rate-limit-down-ban/ready"; Status = 403 }
             @{ Path = "/rate-limit-down-local/ready"; Status = @(200, 429) }
+            @{ Path = "/rate-limit-token-bucket/ready"; Status = @(200, 429) }
         )) {
         $ready = Wait-ForHttpStatus -Url "$($script:TraefikUrl)$($route.Path)" -Headers @{ "X-Forwarded-For" = (Get-RateLimitClientIP -HostNumber 250) } -ExpectedStatusCodes @($route.Status) -TimeoutSeconds 60
         if (-not $ready.Success) {
@@ -142,6 +143,43 @@ Describe "Redis rate limit" {
             $limited = Test-HttpRequest -Endpoint "/rate-limit-down-local/page" -IP $ip -TraefikUrl $script:TraefikUrl
             $limited.StatusCode | Should -Be 429 -Because "a buffered outage keeps counting locally, so failure action ban never applies"
             [string]$limited.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:per-ip"
+        }
+    }
+}
+
+Describe "Redis rate limit with rateLimitAlgorithm tokenBucket" {
+    Context "token bucket" -Tag "ratelimit" {
+        It "Should admit the burst at once, answer the next with the refill time, and admit again after it" {
+            $ip = Get-RateLimitClientIP -HostNumber 30
+
+            foreach ($attempt in 1..3) {
+                $allowed = Test-HttpRequest -Endpoint "/rate-limit-token-bucket/page" -IP $ip -TraefikUrl $script:TraefikUrl
+                $allowed.StatusCode | Should -Be 200 -Because "request $attempt of a burst of 3"
+                [string]$allowed.Headers["X-Crowdsec-Remediation"] | Should -BeNullOrEmpty
+            }
+            $limited = Test-HttpRequest -Endpoint "/rate-limit-token-bucket/page" -IP $ip -TraefikUrl $script:TraefikUrl
+            $limited.StatusCode | Should -Be 429 -Because "the burst of 3 is spent"
+            [string]$limited.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit:burst"
+            $retryAfter = [int]([string]$limited.Headers["Retry-After"])
+            # One token per 5s from an empty bucket, rounded up: 5 (4 only if the three requests took over 1s).
+            $retryAfter | Should -BeGreaterOrEqual 4
+            $retryAfter | Should -BeLessOrEqual 5 -Because "one token comes back every 5 seconds"
+
+            # An answered request takes no token, so the client gets in again once Retry-After has passed.
+            $again = Test-HttpRequest -Endpoint "/rate-limit-token-bucket/page" -IP $ip -TraefikUrl $script:TraefikUrl
+            $again.StatusCode | Should -Be 429 -Because "no token is back yet"
+            Start-Sleep -Milliseconds ($retryAfter * 1000 + 300)
+            $refilled = Test-HttpRequest -Endpoint "/rate-limit-token-bucket/page" -IP $ip -TraefikUrl $script:TraefikUrl
+            $refilled.StatusCode | Should -Be 200 -Because "one token refilled after Retry-After, and the answered requests took none"
+            $refilled.Content | Should -Match "Hostname:"
+            (Test-HttpRequest -Endpoint "/rate-limit-token-bucket/page" -IP $ip -TraefikUrl $script:TraefikUrl).StatusCode | Should -Be 429 -Because "only one token refilled"
+        }
+
+        It "Should not serve a router whose bucket sets algorithm, and log why" {
+            $response = Test-HttpRequest -Endpoint "/rate-limit-bad-row/page" -IP (Get-RateLimitClientIP -HostNumber 31) -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 404 -Because "the middleware fails at startup, so Traefik does not serve the router"
+            $logged = @(Get-ContainerLogLines -Container "traefik-test" -Since "1970-01-01T00:00:00Z" -Contains @('"routerName":"rate-limit-bad-row@file"', "RateLimitBuckets: bucket 0: algorithm: is not a bucket setting; set rateLimitAlgorithm"))
+            $logged.Count | Should -BeGreaterThan 0 -Because "Traefik logs the plugin's startup error, which points at rateLimitAlgorithm"
         }
     }
 }
