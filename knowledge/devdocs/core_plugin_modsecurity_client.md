@@ -3,7 +3,7 @@
 ## Language
 
 **ModSec Client**:
-The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`). Opened by ownership key (middleware name plus `modsecUrl`, `modsecHttpTimeoutSeconds`, `modsecBodyLimit`, and `modsecUnhealthyBackOffPeriodSecs`). Owns sidecar HTTP and the admission gate. Body buffering is `pkg/wafhop` (no pool). Not the AppSec Client and not CrowdSec AppSec JSON.
+The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`). Opened by ownership key (middleware name plus `modsecUrl`, `modsecHttpTimeoutSeconds`, `modsecBodyLimit`, `modsecBodyReadTimeoutSeconds`, and `modsecUnhealthyBackOffPeriodSecs`). Owns sidecar HTTP and the admission gate. Body buffering is `pkg/wafhop` (no pool). Not the AppSec Client and not CrowdSec AppSec JSON.
 _Avoid_: AppSec client, `modSecurityUrl`, the failure action as ownership, `atomic.Pointer[T]`, `X-Crowdsec-Appsec-*`
 
 **Admission gate**:
@@ -19,11 +19,11 @@ _Avoid_: failure action, copying Gate into this repository, a ratio, threshold, 
 - Keep the type in `pkg/modsecurity`. Do not import `pkg/appsec` or `pkg/lapi`. Do not speak CrowdSec AppSec JSON.
 - Call `modsecurity.Prepare` from `New` after captcha Prepare. When `modsecEnabled` is true and `modsecInstanceName` is empty after trim, fill it to the Traefik name. When the flag is false, leave an empty name empty.
 - Open with `modsecurity.Open` (reclaim by `OwnershipKey`). A knob change is a new Client. Two middleware names with the same `modsecUrl` are two Clients.
-- Hash `OwnershipKey` from middleware name plus `modsecUrl`, timeout, body limit, and `modsecUnhealthyBackOffPeriodSecs`. Slot name, `bouncerEnabled`, bounce knobs, LAPI, AppSec, captcha, and per-router `bouncerModsecFailureAction` stay off it.
+- Hash `OwnershipKey` from middleware name plus `modsecUrl`, timeout, body limit, `modsecBodyReadTimeoutSeconds` (`bodyReadTimeoutSeconds`), and `modsecUnhealthyBackOffPeriodSecs`. Slot name, `bouncerEnabled`, bounce knobs, LAPI, AppSec, captcha, and per-router `bouncerModsecFailureAction` stay off it.
 - When `modsecUnhealthyBackOffPeriodSecs` is greater than 0, `admission.New` builds one gate on `backendbackoff.Gate` from utilities `v1.0.12`. `Allow` returns a `Permit` and takes no context, so `Gate.Admit` checks the request context itself; `Report` takes that `Permit`. A stale permit's report is ignored and does not log the healthy line. Period `0` or omitted builds no gate (default `0`). The period is the only knob: each failure spends 1 of a budget of 5, each success earns back `0.30/0.70`, so 5 failures in a row trip. Max cooldown equals the base. Do not set `Jitter` or `TTL`.
 - The gate logs WARN `crowdsec modsec backoff started` once on the first skipped request, and INFO `crowdsec modsec backoff ended` once when a probe's report is applied. A stale permit's report does not log that line.
 - Omitted `modsecBodyLimit` is 8388608 (8 MiB). There is no unlimited value: with `modsecEnabled`, a limit below 1 fails `New` (`validateModsecURL`). A middleware that does not own ModSec does not validate it. Exceeding the limit is HTTP 413 and does not call the sidecar.
-- There is no method list for bodies (`modsecDenyVerbsWithBody` is gone). A readable body on any method goes to the sidecar; CRS 920170/920171 block a body on GET/HEAD. An operator who wants more adds a `SecRule` to the sidecar.
+- There is no method list for bodies (`modsecDenyVerbsWithBody` is gone). A body on any method, with or without `Content-Length`, goes to the sidecar; CRS 920170/920171 block a body on GET/HEAD. An operator who wants more adds a `SecRule` to the sidecar.
 - `newHTTPClient` sets `Timeout` from `modsecHttpTimeoutSeconds` (default 10) and `CheckRedirect` so a sidecar 3xx is a copied block (`http.ErrUseLastResponse`).
 - `Close` Closes a non-nil Gate and idle sidecar HTTP. Safe to call more than once. Sleep/Wake only log; ModSec has no tickers.
 
