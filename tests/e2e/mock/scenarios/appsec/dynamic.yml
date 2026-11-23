@@ -7,6 +7,14 @@ http:
       service: backend
       middlewares:
         - bouncer
+    # Body read deadline with failure action passthrough: the deadline must still block.
+    stream:
+      rule: "PathPrefix(`/stream`)"
+      entryPoints:
+        - web
+      service: backend
+      middlewares:
+        - bouncer-stream
   services:
     backend:
       loadBalancer:
@@ -17,6 +25,7 @@ http:
       plugin:
         bouncer:
           appsecBodyLimit: 4
+          appsecBodyReadTimeoutSeconds: 2
           appsecEnabled: "true"
           appsecHost: "@@APPSEC_HOST@@"
           appsecScheme: http
@@ -25,7 +34,25 @@ http:
           bouncerEnabled: "true"
           bouncerForwardedHeadersTrustedIps:
             - "127.0.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Remediation
           # IP bouncing disabled — this scenario exercises AppSec only.
+          lapiEnabled: "false"
+          lapiHost: "@@LAPI_HOST@@"
+          lapiKey: "@@APIKEY@@"
+          lapiScheme: http
+    bouncer-stream:
+      plugin:
+        bouncer:
+          appsecBodyReadTimeoutSeconds: 2
+          appsecEnabled: "true"
+          appsecHost: "@@APPSEC_HOST@@"
+          appsecScheme: http
+          appsecUnhealthyBackOffPeriodSecs: "0"
+          bouncerAppsecFailureAction: passthrough
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersTrustedIps:
+            - "127.0.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Remediation
           lapiEnabled: "false"
           lapiHost: "@@LAPI_HOST@@"
           lapiKey: "@@APIKEY@@"

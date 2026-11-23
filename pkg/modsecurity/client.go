@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -34,18 +35,19 @@ const gateKey = "modsec"
 type Client struct {
 	mu sync.Mutex
 
-	bodyLimit      int64
-	closed         bool
-	gate           *admission.Gate
-	httpClient     *http.Client
-	incarnation    string
-	instanceName   string
-	log            *slog.Logger
-	middlewareName string
-	modsecURL      string
-	pluginVersion  string
-	sessionKey     string
-	sleeping       bool
+	bodyLimit       int64
+	bodyReadTimeout time.Duration
+	closed          bool
+	gate            *admission.Gate
+	httpClient      *http.Client
+	incarnation     string
+	instanceName    string
+	log             *slog.Logger
+	middlewareName  string
+	modsecURL       string
+	pluginVersion   string
+	sessionKey      string
+	sleeping        bool
 }
 
 // New constructs a ModSec Client. Call Prepare first. Close releases the Gate and idle HTTP.
@@ -66,15 +68,16 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		return nil, err
 	}
 	client := &Client{
-		bodyLimit:      config.ModsecBodyLimit,
-		gate:           gate,
-		httpClient:     newHTTPClient(config.ModsecHTTPTimeoutSeconds),
-		instanceName:   config.ModsecInstanceName,
-		log:            log,
-		middlewareName: middlewareName,
-		modsecURL:      strings.TrimSuffix(strings.TrimSpace(config.ModsecURL), "/"),
-		pluginVersion:  pluginVersion,
-		sessionKey:     bindKey,
+		bodyLimit:       config.ModsecBodyLimit,
+		bodyReadTimeout: time.Duration(config.ModsecBodyReadTimeoutSeconds) * time.Second,
+		gate:            gate,
+		httpClient:      newHTTPClient(config.ModsecHTTPTimeoutSeconds),
+		instanceName:    config.ModsecInstanceName,
+		log:             log,
+		middlewareName:  middlewareName,
+		modsecURL:       strings.TrimSuffix(strings.TrimSpace(config.ModsecURL), "/"),
+		pluginVersion:   pluginVersion,
+		sessionKey:      bindKey,
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
 	client.log.Info(MsgInstanceStarted, "incarnation", client.incarnation, "reason", "started")
@@ -122,6 +125,12 @@ func (c *Client) Wake() {
 	c.sleeping = false
 	c.mu.Unlock()
 	c.log.Debug(MsgInstanceWaking, "incarnation", c.incarnation, "reason", "waking")
+}
+
+// BodyReadTimeoutSeconds is modsecBodyReadTimeoutSeconds: the total time this Client waits for a
+// body without Content-Length. The bouncer logs it when the deadline blocks a request.
+func (c *Client) BodyReadTimeoutSeconds() int64 {
+	return int64(c.bodyReadTimeout / time.Second)
 }
 
 // Incarnation is unique per Client create.

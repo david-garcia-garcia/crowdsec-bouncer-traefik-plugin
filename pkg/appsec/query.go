@@ -60,16 +60,17 @@ var ErrClientDisconnected = wafhop.ErrClientDisconnected
 // Query does not call AppSec and does not apply FailureAction; the bouncer answers 400 without a ban.
 var ErrClientBodyRead = wafhop.ErrClientBodyRead
 
+// ErrBodyReadTimeout is wafhop.ErrBodyReadTimeout: a body without Content-Length did not arrive within
+// appsecBodyReadTimeoutSeconds. Query does not call AppSec and does not apply FailureAction; the bouncer
+// answers 400 whatever the failure action says.
+var ErrBodyReadTimeout = wafhop.ErrBodyReadTimeout
+
 // ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction;
 // the bouncer answers it with bouncerAppsecBackOffAction.
 var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
 var errAppsecReadBody = errors.New("appsecQuery:readBody")
-
-// errUnreadableBody means a POST, PUT, or PATCH body streamed without a length under a failure action
-// other than passthrough. Query turns it into the failure action, or a gate skip while backing off.
-var errUnreadableBody = errors.New("appsecQuery:unreadableBody")
 
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
 func resultForFailureAction(action, errMsg string) (*Response, error) {
@@ -100,9 +101,7 @@ func appsecAllow() *Response {
 	return &Response{Action: ActionAllow}
 }
 
-// isMethodWithForwardableBody reports whether a readable body on this method is copied to AppSec.
-// Deliberately wider than wafhop.IsMethodWithBody: a DELETE body is worth inspecting, but an unreadable
-// DELETE body is not a drop candidate. Keep the two sets separate.
+// isMethodWithForwardableBody reports whether a client body on this method is copied to AppSec.
 func isMethodWithForwardableBody(method string) bool {
 	switch method {
 	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
@@ -116,15 +115,11 @@ func isMethodWithForwardableBody(method string) bool {
 // The status table in the body is the CrowdSec AppSec protocol this method follows.
 //
 // The body is read before admission, so a client error never holds a ticket the gate waits on.
-func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error) {
-	appsecReq, err := c.newAppsecForwardRequest(req, pol)
-	if errors.Is(err, errUnreadableBody) {
-		// No AppSec call, so no ticket: while backing off this is a skip, not the failure action.
-		if c.gate.BackingOff() {
-			return nil, ErrGateSkip
-		}
-		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreadableBody dropped")
-	}
+// ctrl is the inbound request's response controller: a body without Content-Length is read under
+// appsecBodyReadTimeoutSeconds, and ctrl cuts that read when the deadline fires (nil falls back to
+// closing the body, which cuts HTTP/2 only).
+func (c *Client) Query(req clientrequest.Request, pol Policy, ctrl *http.ResponseController) (*Response, error) {
+	appsecReq, err := c.newAppsecForwardRequest(req, ctrl)
 	if err != nil {
 		return nil, err
 	}
@@ -222,13 +217,13 @@ func (c *Client) admitAppsecHop(req clientrequest.Request) (admission.Ticket, er
 }
 
 // newAppsecForwardRequest builds the AppSec listener request, copying client headers and identity.
-func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) (*http.Request, error) {
+func (c *Client) newAppsecForwardRequest(req clientrequest.Request, ctrl *http.ResponseController) (*http.Request, error) {
 	routeURL := url.URL{
 		Scheme: c.appsecScheme,
 		Host:   c.appsecHost,
 		Path:   c.appsecPath,
 	}
-	appsecReq, err := c.newAppsecBodyRequest(routeURL.String(), req.Request, pol)
+	appsecReq, err := c.newAppsecBodyRequest(routeURL.String(), req.Request, ctrl)
 	if err != nil {
 		return nil, err
 	}
@@ -258,19 +253,14 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 	return appsecReq, nil
 }
 
-// newAppsecBodyRequest chooses GET (no, unreadable, or non-body-method body) or POST (copied client
-// body) toward AppSec. The original verb always travels on X-Crowdsec-Appsec-Verb.
-func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
+// newAppsecBodyRequest chooses POST (copied client body, with or without Content-Length) or GET (no
+// body, or a method whose body is not forwarded) toward AppSec. The original verb always travels on
+// X-Crowdsec-Appsec-Verb.
+func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, ctrl *http.ResponseController) (*http.Request, error) {
 	switch {
-	case wafhop.IsBodyUnreadable(httpReq):
-		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveAppsecFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
-			return nil, errUnreadableBody
-		}
-		req, _ := http.NewRequest(http.MethodGet, target, nil)
-		return req, nil
 	case wafhop.HasBody(httpReq) && isMethodWithForwardableBody(httpReq.Method):
-		// AppSec forwards the first appsecBodyLimit bytes (0 means no cap); the rest still reaches origin.
-		bodyBytes, err := wafhop.ReadBody(httpReq, c.appsecBodyLimit, wafhop.TruncateAtLimit)
+		// AppSec forwards the first appsecBodyLimit bytes; the rest still reaches origin.
+		bodyBytes, err := wafhop.ReadBody(httpReq, c.appsecBodyLimit, wafhop.TruncateAtLimit, ctrl, c.bodyReadTimeout)
 		if err != nil {
 			return nil, err
 		}

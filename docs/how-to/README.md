@@ -17,4 +17,5 @@ Common tasks and the settings behind them. The [Configuration reference](../conf
 | Run behind Cloudflare, a load balancer or another proxy | [Remediate the visitor, not the proxy](behind-proxy.md) |
 | Decide between failing open and failing closed | [Choose what happens when CrowdSec is down](crowdsec-down.md) |
 | Add OWASP CRS next to AppSec, tune it, and read why it blocked | [ModSecurity (OWASP CRS)](../modsecurity.md) |
+| Keep gRPC streams and long uploads working behind AppSec or ModSec | [Run streaming request bodies through the WAF legs](streaming-request-bodies.md) |
 | Act on country or ASN decisions | [Match a country or an ASN](country-or-asn.md) |

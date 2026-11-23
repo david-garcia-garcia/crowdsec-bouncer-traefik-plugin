@@ -35,9 +35,9 @@ func getRequest(target string) *http.Request {
 }
 
 // mustAllow fails unless Inspect answered allow (nil response, nil error).
-func mustAllow(t *testing.T, client *Client, req *http.Request, action string) {
+func mustAllow(t *testing.T, client *Client, req *http.Request) {
 	t.Helper()
-	resp, err := client.Inspect(req, action)
+	resp, err := client.Inspect(req, nil)
 	if err != nil || resp != nil {
 		t.Fatalf("want allow, got resp=%v err=%v", resp, err)
 	}
@@ -46,7 +46,7 @@ func mustAllow(t *testing.T, client *Client, req *http.Request, action string) {
 // mustBlock fails unless Inspect answered a block, and returns the client response WriteBlock wrote.
 func mustBlock(t *testing.T, client *Client, req *http.Request) *httptest.ResponseRecorder {
 	t.Helper()
-	resp, err := client.Inspect(req, configuration.FailureActionPassthrough)
+	resp, err := client.Inspect(req, nil)
 	if err != nil || resp == nil {
 		t.Fatalf("want block, got resp=%v err=%v", resp, err)
 	}
@@ -57,9 +57,9 @@ func mustBlock(t *testing.T, client *Client, req *http.Request) *httptest.Respon
 }
 
 // mustFail fails unless Inspect answered nil with an error matching want.
-func mustFail(t *testing.T, client *Client, req *http.Request, action string, want error) {
+func mustFail(t *testing.T, client *Client, req *http.Request, want error) {
 	t.Helper()
-	resp, err := client.Inspect(req, action)
+	resp, err := client.Inspect(req, nil)
 	if resp != nil || !errors.Is(err, want) {
 		t.Fatalf("want %v, got resp=%v err=%v", want, resp, err)
 	}
@@ -79,7 +79,7 @@ func TestInspect_cleanGETAllows(t *testing.T) {
 	client := newTestClient(t, testModsecConfig(sidecar.URL))
 	req := getRequest("http://example.com:443/")
 	req.Host = "example.com:443"
-	mustAllow(t, client, req, configuration.FailureActionBan)
+	mustAllow(t, client, req)
 }
 
 func TestWriteBlock_copiesEndToEndHeadersAndBody(t *testing.T) {
@@ -134,12 +134,12 @@ func TestInspect_sidecar5xxIsUnavailable(t *testing.T) {
 	}))
 	defer sidecar.Close()
 	client := newTestClient(t, testModsecConfig(sidecar.URL))
-	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionPassthrough, ErrUnavailable)
+	mustFail(t, client, getRequest("http://example.com/"), ErrUnavailable)
 }
 
 func TestInspect_sidecarTransportErrorIsUnavailable(t *testing.T) {
 	client := newTestClient(t, testModsecConfig("http://127.0.0.1:1"))
-	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionPassthrough, ErrUnavailable)
+	mustFail(t, client, getRequest("http://example.com/"), ErrUnavailable)
 }
 
 // The unreachable ERROR carries the transport cause, but not the visitor's path or query.
@@ -151,7 +151,7 @@ func TestInspect_unreachableLogsCauseWithoutVisitorURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	mustFail(t, client, getRequest("http://example.com/visitor-path?token=visitor-secret"), configuration.FailureActionPassthrough, ErrUnavailable)
+	mustFail(t, client, getRequest("http://example.com/visitor-path?token=visitor-secret"), ErrUnavailable)
 	if !strings.Contains(logs.String(), MsgUnavailable) || !strings.Contains(logs.String(), `error="dial tcp 127.0.0.1:1`) {
 		t.Fatalf("unreachable ERROR missing the dial error\n%s", logs.String())
 	}
@@ -181,7 +181,7 @@ func TestInspect_inboundCancelIsClientDisconnected(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
 	go func() {
-		_, err := client.Inspect(getRequest("http://example.com/").WithContext(ctx), configuration.FailureActionBan)
+		_, err := client.Inspect(getRequest("http://example.com/").WithContext(ctx), nil)
 		done <- err
 	}()
 	<-started
@@ -208,10 +208,10 @@ func TestInspect_gateSkipsSidecarAfterTripAndLogsOnce(t *testing.T) {
 	}
 	defer client.Close()
 	for range admission.TripFailures {
-		mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionBan, ErrUnavailable)
+		mustFail(t, client, getRequest("http://example.com/"), ErrUnavailable)
 	}
 	for range 3 {
-		mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionBan, ErrGateSkip)
+		mustFail(t, client, getRequest("http://example.com/"), ErrGateSkip)
 	}
 	if sidecarHits != admission.TripFailures {
 		t.Fatalf("sidecar hits=%d want %d", sidecarHits, admission.TripFailures)
@@ -249,7 +249,7 @@ func TestInspect_inboundCancelDoesNotTripGate(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		done := make(chan error, 1)
 		go func() {
-			_, err := client.Inspect(getRequest("http://example.com/").WithContext(ctx), configuration.FailureActionBan)
+			_, err := client.Inspect(getRequest("http://example.com/").WithContext(ctx), nil)
 			done <- err
 		}()
 		<-started
@@ -261,7 +261,7 @@ func TestInspect_inboundCancelDoesNotTripGate(t *testing.T) {
 	mu.Lock()
 	block = false
 	mu.Unlock()
-	mustAllow(t, client, getRequest("http://example.com/"), configuration.FailureActionBan)
+	mustAllow(t, client, getRequest("http://example.com/"))
 	mu.Lock()
 	defer mu.Unlock()
 	if want := admission.TripFailures + 2; hits != want {
@@ -279,7 +279,7 @@ func TestInspect_getWithBodyReachesSidecar(t *testing.T) {
 	}))
 	defer sidecar.Close()
 	client := newTestClient(t, testModsecConfig(sidecar.URL))
-	mustAllow(t, client, httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x")), configuration.FailureActionBan)
+	mustAllow(t, client, httptest.NewRequest(http.MethodGet, "http://example.com/", strings.NewReader("x")))
 	if gotBody != "x" || gotLength != 1 {
 		t.Fatalf("sidecar body=%q length=%d want x and 1", gotBody, gotLength)
 	}
@@ -295,7 +295,7 @@ func TestInspect_doesNotAppendRemoteAddrToXFF(t *testing.T) {
 	req := getRequest("http://example.com/")
 	req.Header.Set("X-Forwarded-For", "203.0.113.9")
 	req.RemoteAddr = "192.0.2.1:1234"
-	mustAllow(t, client, req, configuration.FailureActionPassthrough)
+	mustAllow(t, client, req)
 	if gotXFF != "203.0.113.9" {
 		t.Fatalf("XFF=%q; plugin must not append RemoteAddr", gotXFF)
 	}
@@ -310,8 +310,8 @@ func TestInspect_bodyOverLimitIsTooLargeWithoutSidecar(t *testing.T) {
 	cfg := testModsecConfig(sidecar.URL)
 	cfg.ModsecBodyLimit = 4
 	client := newTestClient(t, cfg)
-	mustAllow(t, client, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("1234")), configuration.FailureActionBan)
-	mustFail(t, client, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("12345")), configuration.FailureActionBan, ErrBodyTooLarge)
+	mustAllow(t, client, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("1234")))
+	mustFail(t, client, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("12345")), ErrBodyTooLarge)
 	if sidecarHits != 1 {
 		t.Fatalf("sidecar hits=%d want 1 (only the body at the limit)", sidecarHits)
 	}
@@ -322,36 +322,88 @@ func TestInspect_restoresBodyForNext(t *testing.T) {
 	defer sidecar.Close()
 	client := newTestClient(t, testModsecConfig(sidecar.URL))
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("payload"))
-	mustAllow(t, client, req, configuration.FailureActionPassthrough)
+	mustAllow(t, client, req)
 	got, _ := io.ReadAll(req.Body)
 	if string(got) != "payload" {
 		t.Fatalf("restored body=%q want payload", got)
 	}
 }
 
-// A streamed HTTP/2 body is never buffered (gRPC would hang). A POST cannot be inspected, so a
-// non-passthrough failure action makes it unavailable; passthrough and a GET are inspected on headers alone.
-func TestInspect_unreadableBodyFollowsAppsecRule(t *testing.T) {
+// newUnknownLengthTestRequest is an HTTP/2 request with body and no Content-Length.
+func newUnknownLengthTestRequest(method string, body io.ReadCloser) *http.Request {
+	req := httptest.NewRequest(method, "http://example.com/", nil)
+	req.ProtoMajor = 2
+	req.ContentLength = -1
+	req.Body = body
+	return req
+}
+
+// A body without Content-Length reaches the sidecar with its bytes, on any method, and is restored
+// for next. There is no failure-action input: leaving out Content-Length never skips CRS.
+func TestInspect_unknownLengthBodyReachesSidecar(t *testing.T) {
 	sidecarBodies := []string{}
 	sidecar := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		got, _ := io.ReadAll(r.Body)
-		sidecarBodies = append(sidecarBodies, string(got))
+		sidecarBodies = append(sidecarBodies, r.Method+" "+string(got))
 	}))
 	defer sidecar.Close()
 	client := newTestClient(t, testModsecConfig(sidecar.URL))
-	streamed := func(method string) *http.Request {
-		req := httptest.NewRequest(method, "http://example.com/", nil)
-		req.ProtoMajor = 2
-		req.ContentLength = -1
-		req.Body = io.NopCloser(&blockingReader{})
-		return req
+	for _, method := range []string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodGet} {
+		req := newUnknownLengthTestRequest(method, io.NopCloser(strings.NewReader("a=0&")))
+		mustAllow(t, client, req)
+		if got, _ := io.ReadAll(req.Body); string(got) != "a=0&" {
+			t.Fatalf("%s: restored body=%q want a=0&", method, got)
+		}
 	}
-	mustFail(t, client, streamed(http.MethodPost), configuration.FailureActionBan, ErrUnavailable)
-	mustFail(t, client, streamed(http.MethodPost), configuration.FailureActionCaptcha, ErrUnavailable)
-	mustAllow(t, client, streamed(http.MethodPost), configuration.FailureActionPassthrough)
-	mustAllow(t, client, streamed(http.MethodGet), configuration.FailureActionBan)
-	if len(sidecarBodies) != 2 || sidecarBodies[0] != "" || sidecarBodies[1] != "" {
-		t.Fatalf("sidecar must get headers only, bodies=%q", sidecarBodies)
+	want := []string{"POST a=0&", "PUT a=0&", "PATCH a=0&", "DELETE a=0&", "GET a=0&"}
+	if strings.Join(sidecarBodies, "|") != strings.Join(want, "|") {
+		t.Fatalf("sidecar got %q want %q", sidecarBodies, want)
+	}
+}
+
+// The restic shape: an empty HTTP/2 POST with no Content-Length reaches the sidecar and is allowed.
+func TestInspect_emptyUnknownLengthPostIsAllowed(t *testing.T) {
+	sidecarHits := 0
+	sidecar := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { sidecarHits++ }))
+	defer sidecar.Close()
+	client := newTestClient(t, testModsecConfig(sidecar.URL))
+	mustAllow(t, client, newUnknownLengthTestRequest(http.MethodPost, io.NopCloser(strings.NewReader(""))))
+	if sidecarHits != 1 {
+		t.Fatalf("sidecar hits=%d want 1", sidecarHits)
+	}
+}
+
+// A body without Content-Length that never ends is ErrBodyReadTimeout after modsecBodyReadTimeoutSeconds,
+// and the sidecar is not called.
+func TestInspect_stalledUnknownLengthBodyTimesOut(t *testing.T) {
+	sidecarHits := 0
+	sidecar := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { sidecarHits++ }))
+	defer sidecar.Close()
+	client := newTestClient(t, testModsecConfig(sidecar.URL))
+	client.bodyReadTimeout = 50 * time.Millisecond
+	body := newStallingTestBody()
+	defer func() { _ = body.Close() }()
+	started := time.Now()
+	mustFail(t, client, newUnknownLengthTestRequest(http.MethodPost, body), wafhop.ErrBodyReadTimeout)
+	if sidecarHits != 0 {
+		t.Fatalf("sidecar hits=%d want 0", sidecarHits)
+	}
+	if elapsed := time.Since(started); elapsed > 2*time.Second {
+		t.Fatalf("Inspect returned after %v, want about 50ms", elapsed)
+	}
+}
+
+// A body without Content-Length over modsecBodyLimit is ErrBodyTooLarge, as with a declared length.
+func TestInspect_unknownLengthBodyOverLimitIsTooLarge(t *testing.T) {
+	sidecarHits := 0
+	sidecar := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { sidecarHits++ }))
+	defer sidecar.Close()
+	cfg := testModsecConfig(sidecar.URL)
+	cfg.ModsecBodyLimit = 4
+	client := newTestClient(t, cfg)
+	mustFail(t, client, newUnknownLengthTestRequest(http.MethodPost, io.NopCloser(strings.NewReader("12345"))), ErrBodyTooLarge)
+	if sidecarHits != 0 {
+		t.Fatalf("sidecar hits=%d want 0", sidecarHits)
 	}
 }
 
@@ -360,7 +412,7 @@ func TestInspect_clientGoneMidBodyIsClientDisconnected(t *testing.T) {
 	client := newTestClient(t, testModsecConfig("http://127.0.0.1:1"))
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", nil)
 	req.Body = io.NopCloser(io.MultiReader(strings.NewReader("part"), &errReader{err: io.ErrUnexpectedEOF}))
-	mustFail(t, client, req, configuration.FailureActionBan, wafhop.ErrClientDisconnected)
+	mustFail(t, client, req, wafhop.ErrClientDisconnected)
 }
 
 // The sidecar copy carries no hop-by-hop header, so an HTTPS sidecar speaking HTTP/2 accepts a WebSocket handshake.
@@ -375,7 +427,7 @@ func TestInspect_sidecarCopyOmitsHopByHop(t *testing.T) {
 	req.Header.Set("Connection", "Upgrade")
 	req.Header.Set("Upgrade", "websocket")
 	req.Header.Set("Sec-WebSocket-Key", "dGhlIHNhbXBsZSBub25jZQ==")
-	mustAllow(t, client, req, configuration.FailureActionBan)
+	mustAllow(t, client, req)
 	if seen.Get("Upgrade") != "" || seen.Get("Sec-WebSocket-Key") == "" {
 		t.Fatalf("sidecar headers=%v", seen)
 	}
@@ -384,36 +436,33 @@ func TestInspect_sidecarCopyOmitsHopByHop(t *testing.T) {
 	}
 }
 
-type blockingReader struct{}
+// stallingTestBody blocks every Read until Close, the way an HTTP/2 stream that never ends blocks
+// until its handler closes the body.
+type stallingTestBody struct {
+	once sync.Once
+	cut  chan struct{}
+}
 
-func (*blockingReader) Read([]byte) (int, error) {
-	select {}
+// newStallingTestBody returns a body that stalls until it is closed.
+func newStallingTestBody() *stallingTestBody {
+	return &stallingTestBody{cut: make(chan struct{})}
+}
+
+// Read blocks until Close, then fails like a closed HTTP/2 request body.
+func (b *stallingTestBody) Read([]byte) (int, error) {
+	<-b.cut
+	return 0, errors.New("http2: request body closed due to handler exiting")
+}
+
+// Close unblocks Read.
+func (b *stallingTestBody) Close() error {
+	b.once.Do(func() { close(b.cut) })
+	return nil
 }
 
 type errReader struct{ err error }
 
 func (e *errReader) Read([]byte) (int, error) { return 0, e.err }
-
-// TestInspect_unreadableBodyWhileBackingOffIsGateSkip proves a streamed body is a gate skip, not the
-// failure action, while the sidecar is backing off: the same rule as AppSec.
-func TestInspect_unreadableBodyWhileBackingOffIsGateSkip(t *testing.T) {
-	sidecar := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "down", http.StatusServiceUnavailable)
-	}))
-	defer sidecar.Close()
-	cfg := testModsecConfig(sidecar.URL)
-	cfg.ModsecUnhealthyBackOffPeriodSecs = 30
-	client := newTestClient(t, cfg)
-	for range admission.TripFailures {
-		mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionBan, ErrUnavailable)
-	}
-	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionBan, ErrGateSkip)
-	streamed := httptest.NewRequest(http.MethodPost, "http://example.com/", nil)
-	streamed.ProtoMajor = 2
-	streamed.ContentLength = -1
-	streamed.Body = io.NopCloser(&blockingReader{})
-	mustFail(t, client, streamed, configuration.FailureActionBan, ErrGateSkip)
-}
 
 // TestInspect_hangHonorsModsecTimeout mirrors TestQuery_HangHonorsAppsecOverride: a sidecar that never
 // answers is ErrUnavailable after modsecHttpTimeoutSeconds, not after a default timeout.
@@ -427,7 +476,7 @@ func TestInspect_hangHonorsModsecTimeout(t *testing.T) {
 	cfg.ModsecHTTPTimeoutSeconds = 1
 	client := newTestClient(t, cfg)
 	started := time.Now()
-	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionPassthrough, ErrUnavailable)
+	mustFail(t, client, getRequest("http://example.com/"), ErrUnavailable)
 	if elapsed := time.Since(started); elapsed >= 4*time.Second {
 		t.Fatalf("Inspect took %v, want about the 1s timeout", elapsed)
 	}

@@ -311,6 +311,82 @@ function Invoke-RawHttpGet {
     }
 }
 
+# Sends an HTTP/2 request over plain HTTP (prior knowledge, h2c) whose body has no Content-Length.
+# The body is read from a pipe: BodyText first, then the body ends, or, with StallSeconds, it stays
+# open that long before it ends. Returns StatusCode, Headers, Content, and ElapsedMs, the time until
+# Traefik answered. .NET HttpClient is used because the curl shipped on Windows has no HTTP/2.
+function Invoke-H2cUnknownLengthRequest {
+    param(
+        [Parameter(Mandatory)][string]$Endpoint,
+        [Parameter(Mandatory)][string]$IP,
+        [string]$TraefikUrl = "http://localhost:8000",
+        [string]$Method = "POST",
+        [string]$BodyText = "",
+        [string]$ContentType = "",
+        [int]$StallSeconds = 0,
+        [int]$TimeoutSec = 30
+    )
+
+    $bodyWriter = [System.IO.Pipes.AnonymousPipeServerStream]::new([System.IO.Pipes.PipeDirection]::Out)
+    $bodyReader = [System.IO.Pipes.AnonymousPipeClientStream]::new([System.IO.Pipes.PipeDirection]::In, $bodyWriter.ClientSafePipeHandle)
+    $client = [System.Net.Http.HttpClient]::new([System.Net.Http.SocketsHttpHandler]::new())
+    $client.Timeout = [TimeSpan]::FromSeconds($TimeoutSec)
+    try {
+        # A pipe has no length, so HttpClient sends no Content-Length.
+        $request = [System.Net.Http.HttpRequestMessage]::new([System.Net.Http.HttpMethod]::new($Method), "$TraefikUrl$Endpoint")
+        $request.Version = [Version]"2.0"
+        $request.VersionPolicy = [System.Net.Http.HttpVersionPolicy]::RequestVersionExact
+        $null = $request.Headers.TryAddWithoutValidation("X-Forwarded-For", $IP)
+        $request.Content = [System.Net.Http.StreamContent]::new($bodyReader)
+        if ($ContentType) {
+            $null = $request.Content.Headers.TryAddWithoutValidation("Content-Type", $ContentType)
+        }
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($BodyText)
+        if ($bytes.Length -gt 0) {
+            $bodyWriter.Write($bytes, 0, $bytes.Length)
+            $bodyWriter.Flush()
+        }
+        if ($StallSeconds -le 0) {
+            $bodyWriter.Dispose()
+        }
+
+        # Send. With a stall, Traefik has StallSeconds to answer before the body ends.
+        $watch = [System.Diagnostics.Stopwatch]::StartNew()
+        $send = $client.SendAsync($request, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead)
+        $answeredMs = -1
+        if ($StallSeconds -gt 0) {
+            $answered = $false
+            try { $answered = $send.Wait([TimeSpan]::FromSeconds($StallSeconds)) } catch { $answered = $true }
+            if ($answered) {
+                $answeredMs = $watch.ElapsedMilliseconds
+            }
+            $bodyWriter.Dispose()
+        }
+        $response = $send.GetAwaiter().GetResult()
+        if ($answeredMs -lt 0) {
+            $answeredMs = $watch.ElapsedMilliseconds
+        }
+
+        # Collect the status, the headers, and whatever body the client could read.
+        $headerMap = @{}
+        foreach ($header in @($response.Headers) + @($response.Content.Headers)) {
+            $headerMap[$header.Key] = [string]::Join(", ", $header.Value)
+        }
+        $content = ""
+        try { $content = $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() } catch { $null = $_ }
+        return @{
+            StatusCode = [int]$response.StatusCode
+            Headers    = $headerMap
+            Content    = $content
+            ElapsedMs  = $answeredMs
+        }
+    }
+    finally {
+        $bodyWriter.Dispose()
+        $client.Dispose()
+    }
+}
+
 # Helper function to test HTTP request
 function Test-HttpRequest {
     param(

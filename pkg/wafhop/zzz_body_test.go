@@ -9,47 +9,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 )
 
-func TestIsBodyUnreadable(t *testing.T) {
-	realBody := func() io.ReadCloser { return io.NopCloser(strings.NewReader("data")) }
-	tests := []struct {
-		name          string
-		protoMajor    int
-		contentLength int64
-		body          io.ReadCloser
-		want          bool
-	}{
-		{name: "http2 grpc stream without content-length", protoMajor: 2, contentLength: -1, body: realBody(), want: true},
-		{name: "http3 stream without content-length", protoMajor: 3, contentLength: -1, body: realBody(), want: true},
-		{name: "http2 with content-length", protoMajor: 2, contentLength: 42, body: realBody(), want: false},
-		{name: "http1.1 chunked without content-length", protoMajor: 1, contentLength: -1, body: realBody(), want: false},
-		{name: "http2 without body", protoMajor: 2, contentLength: -1, body: nil, want: false},
-		{name: "http2 with http.NoBody", protoMajor: 2, contentLength: -1, body: http.NoBody, want: false},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req, _ := http.NewRequest(http.MethodPost, "http://localhost", nil)
-			req.ProtoMajor = tt.protoMajor
-			req.ContentLength = tt.contentLength
-			req.Body = tt.body
-			if got := IsBodyUnreadable(req); got != tt.want {
-				t.Errorf("IsBodyUnreadable() = %v, want %v", got, tt.want)
-			}
-		})
-	}
-}
-
-func TestIsMethodWithBody(t *testing.T) {
-	for method, want := range map[string]bool{
-		http.MethodPost: true, http.MethodPut: true, http.MethodPatch: true,
-		http.MethodDelete: false, http.MethodGet: false, http.MethodHead: false,
-	} {
-		if got := IsMethodWithBody(method); got != want {
-			t.Errorf("IsMethodWithBody(%q) = %v, want %v", method, got, want)
-		}
-	}
-}
+// testBodyReadTimeout is the read deadline for tests whose body never stalls.
+const testBodyReadTimeout = 5 * time.Second
 
 func readAllBody(t *testing.T, req *http.Request) string {
 	t.Helper()
@@ -62,7 +26,7 @@ func readAllBody(t *testing.T, req *http.Request) string {
 
 func TestReadBody_truncateKeepsTheRestForNext(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	got, err := ReadBody(req, 4, TruncateAtLimit)
+	got, err := ReadBody(req, 4, TruncateAtLimit, nil, testBodyReadTimeout)
 	if err != nil {
 		t.Fatalf("err=%v", err)
 	}
@@ -74,24 +38,13 @@ func TestReadBody_truncateKeepsTheRestForNext(t *testing.T) {
 	}
 }
 
-func TestReadBody_truncateZeroLimitReadsAll(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	got, err := ReadBody(req, 0, TruncateAtLimit)
-	if err != nil || string(got) != "0123456789" {
-		t.Fatalf("got %q err=%v", got, err)
-	}
-	if rest := readAllBody(t, req); rest != "0123456789" {
-		t.Fatalf("next reads %q", rest)
-	}
-}
-
 func TestReadBody_rejectOverLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	if _, err := ReadBody(req, 9, RejectOverLimit); !errors.Is(err, ErrBodyTooLarge) {
+	if _, err := ReadBody(req, 9, RejectOverLimit, nil, testBodyReadTimeout); !errors.Is(err, ErrBodyTooLarge) {
 		t.Fatalf("err=%v want ErrBodyTooLarge", err)
 	}
 	exact := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	got, err := ReadBody(exact, 10, RejectOverLimit)
+	got, err := ReadBody(exact, 10, RejectOverLimit, nil, testBodyReadTimeout)
 	if err != nil || string(got) != "0123456789" {
 		t.Fatalf("body at the limit: got %q err=%v", got, err)
 	}
@@ -105,12 +58,12 @@ func TestReadBody_secondLegReusesWholeBody(t *testing.T) {
 	src := &countingBody{Reader: strings.NewReader("payload")}
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", nil)
 	req.Body = src
-	first, err := ReadBody(req, 100, TruncateAtLimit)
+	first, err := ReadBody(req, 100, TruncateAtLimit, nil, testBodyReadTimeout)
 	if err != nil {
 		t.Fatalf("first leg: %v", err)
 	}
 	readsAfterFirst := src.reads
-	second, err := ReadBody(req, 100, RejectOverLimit)
+	second, err := ReadBody(req, 100, RejectOverLimit, nil, testBodyReadTimeout)
 	if err != nil {
 		t.Fatalf("second leg: %v", err)
 	}
@@ -131,17 +84,17 @@ func TestReadBody_secondLegReusesWholeBody(t *testing.T) {
 // A reused body still obeys the second leg's own limit.
 func TestReadBody_reuseAppliesThisLegLimit(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	if _, err := ReadBody(req, 0, TruncateAtLimit); err != nil {
+	if _, err := ReadBody(req, 100, TruncateAtLimit, nil, testBodyReadTimeout); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ReadBody(req, 5, RejectOverLimit); !errors.Is(err, ErrBodyTooLarge) {
+	if _, err := ReadBody(req, 5, RejectOverLimit, nil, testBodyReadTimeout); !errors.Is(err, ErrBodyTooLarge) {
 		t.Fatalf("err=%v want ErrBodyTooLarge", err)
 	}
 	req2 := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	if _, err := ReadBody(req2, 0, TruncateAtLimit); err != nil {
+	if _, err := ReadBody(req2, 100, TruncateAtLimit, nil, testBodyReadTimeout); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ReadBody(req2, 3, TruncateAtLimit)
+	got, err := ReadBody(req2, 3, TruncateAtLimit, nil, testBodyReadTimeout)
 	if err != nil || string(got) != "012" {
 		t.Fatalf("got %q err=%v", got, err)
 	}
@@ -150,10 +103,10 @@ func TestReadBody_reuseAppliesThisLegLimit(t *testing.T) {
 // After a truncated first read the second leg reads the rest, and next still gets every byte.
 func TestReadBody_secondLegAfterTruncation(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("0123456789"))
-	if _, err := ReadBody(req, 4, TruncateAtLimit); err != nil {
+	if _, err := ReadBody(req, 4, TruncateAtLimit, nil, testBodyReadTimeout); err != nil {
 		t.Fatal(err)
 	}
-	got, err := ReadBody(req, 100, RejectOverLimit)
+	got, err := ReadBody(req, 100, RejectOverLimit, nil, testBodyReadTimeout)
 	if err != nil || string(got) != "0123456789" {
 		t.Fatalf("got %q err=%v", got, err)
 	}
@@ -184,7 +137,7 @@ func TestReadBody_classifiesReadErrors(t *testing.T) {
 				req = req.WithContext(ctx)
 			}
 			req.Body = io.NopCloser(&failingReader{err: tt.err})
-			_, err := ReadBody(req, 100, RejectOverLimit)
+			_, err := ReadBody(req, 100, RejectOverLimit, nil, testBodyReadTimeout)
 			if !errors.Is(err, tt.want) {
 				t.Fatalf("err=%v want %v", err, tt.want)
 			}
@@ -230,12 +183,22 @@ func (f *failingReader) Read([]byte) (int, error) { return 0, f.err }
 func TestReadBody_maxInt64LimitReadsAll(t *testing.T) {
 	for _, mode := range []LimitMode{TruncateAtLimit, RejectOverLimit} {
 		req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("hello world"))
-		got, err := ReadBody(req, math.MaxInt64, mode)
+		got, err := ReadBody(req, math.MaxInt64, mode, nil, testBodyReadTimeout)
 		if err != nil || string(got) != "hello world" {
 			t.Fatalf("mode %v: got %q err=%v", mode, got, err)
 		}
 		if rest := readAllBody(t, req); rest != "hello world" {
 			t.Fatalf("mode %v: next reads %q", mode, rest)
 		}
+	}
+}
+
+// At the uncapped limit the client's Content-Length must not size the buffer before any byte arrives.
+func TestReadBody_maxInt64LimitIgnoresDeclaredLength(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("hello world"))
+	req.ContentLength = math.MaxInt64 / 2
+	got, err := ReadBody(req, math.MaxInt64, RejectOverLimit, nil, testBodyReadTimeout)
+	if err != nil || string(got) != "hello world" {
+		t.Fatalf("got %q err=%v", got, err)
 	}
 }

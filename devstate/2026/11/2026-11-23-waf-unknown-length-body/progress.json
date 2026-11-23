@@ -1,0 +1,47 @@
+{
+  "issueKey": "2026-11-23-waf-unknown-length-body",
+  "jobName": "2026-11-23-waf-unknown-length-body",
+  "startedAt": "2026-11-23T18:59:33.107Z",
+  "phases": {
+    "prepare": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T19:04:35.954Z"
+    },
+    "explore": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T19:17:11.777Z"
+    },
+    "propose": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T19:27:23.970Z"
+    },
+    "implement": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T20:05:32.282Z"
+    },
+    "codereview": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T20:19:39.880Z"
+    },
+    "devdocsimpact": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T20:30:43.682Z"
+    },
+    "archive": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T20:33:30.295Z"
+    },
+    "pullrequest": {
+      "work": true,
+      "card": true,
+      "at": "2026-11-23T21:25:08.110Z"
+    }
+  }
+}

@@ -22,6 +22,7 @@ type ownership struct {
 	URL                        string `json:"url"`
 	HTTPTimeoutSeconds         int64  `json:"httpTimeoutSeconds"`
 	BodyLimit                  int64  `json:"bodyLimit"`
+	BodyReadTimeoutSeconds     int64  `json:"bodyReadTimeoutSeconds"`
 	UnhealthyBackOffPeriodSecs int64  `json:"unhealthyBackOffPeriodSecs"`
 }
 
@@ -31,6 +32,7 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 		URL:                        cfg.ModsecURL,
 		HTTPTimeoutSeconds:         cfg.ModsecHTTPTimeoutSeconds,
 		BodyLimit:                  cfg.ModsecBodyLimit,
+		BodyReadTimeoutSeconds:     cfg.ModsecBodyReadTimeoutSeconds,
 		UnhealthyBackOffPeriodSecs: cfg.ModsecUnhealthyBackOffPeriodSecs,
 	}
 }

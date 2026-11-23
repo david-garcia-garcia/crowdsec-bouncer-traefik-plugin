@@ -518,6 +518,33 @@ A row with no predicate SHALL pass (it matches every request). `ValidateParams` 
 - **THEN** `ValidateParams` fails
 - **AND** `New` returns a nil handler and that error
 
+### Requirement: WAF body read timeouts are per leg and at least 1
+`Config` SHALL expose `AppsecBodyReadTimeoutSeconds` (`appsecBodyReadTimeoutSeconds`) and `ModsecBodyReadTimeoutSeconds` (`modsecBodyReadTimeoutSeconds`). `CreateConfig` and `configuration.New` SHALL default each to 30. `ValidateParams` SHALL reject either one below 1 (`<Field>: cannot be less than 1`); there is no value that disables the deadline. There SHALL be no shared, unprefixed body read timeout key. Setting one MUST NOT move the other.
+
+#### Scenario: Defaults are thirty
+- **WHEN** the operator omits both keys
+- **THEN** `CreateConfig` leaves each knob at 30
+- **AND** `ValidateParams` returns no error
+
+#### Scenario: Zero is invalid
+- **WHEN** `modsecBodyReadTimeoutSeconds` is 0
+- **THEN** `ValidateParams` returns an error that names `ModsecBodyReadTimeoutSeconds` and `cannot be less than 1`
+
+#### Scenario: One knob does not move the other
+- **WHEN** `appsecBodyReadTimeoutSeconds` is 5 and `modsecBodyReadTimeoutSeconds` is omitted
+- **THEN** the AppSec body read timeout is 5 and the ModSec one stays 30
+
+### Requirement: appsecBodyLimit is not range-checked
+`ValidateParams` MUST NOT reject any `appsecBodyLimit` value. A value of 0 or less SHALL mean the 10485760-byte default (`core_plugin_appsec_client`). `modsecBodyLimit` keeps its own check (`ModsecBodyLimit: cannot be less than 1`).
+
+#### Scenario: Negative AppSec body limit is accepted
+- **WHEN** `appsecBodyLimit` is -1 and the rest of the config is valid
+- **THEN** `ValidateParams` returns nil
+
+#### Scenario: Zero ModSec body limit is still rejected
+- **WHEN** `modsecEnabled` is true, `modsecUrl` is valid, and `modsecBodyLimit` is 0
+- **THEN** `ValidateParams` returns an error naming `ModsecBodyLimit`
+
 ### Requirement: Backoff periods are the only gate knobs
 `lapiUnhealthyBackOffPeriodSecs`, `appsecUnhealthyBackOffPeriodSecs`, and `modsecUnhealthyBackOffPeriodSecs` SHALL each default to 10. `0` SHALL disable that leg's gate. All three SHALL be in the `requiredInt0` check: a negative period SHALL fail `ValidateParams` with `<Field>: cannot be less than 0`. No leg SHALL have a ratio, threshold, or max-period knob. In `stream` and `alone` the LAPI period SHALL be accepted and ignored.
 

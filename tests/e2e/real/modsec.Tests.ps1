@@ -169,4 +169,38 @@ Describe "CrowdSec Bouncer ModSec CRS sidecar" {
             Get-ResponseHeader $blocked $script:Header | Should -Be "ban:modsec"
         }
     }
+
+    # HTTP/2 (h2c) bodies without Content-Length: read and inspected like any other, under
+    # modsecBodyReadTimeoutSeconds (upstream issue maxlerebourg/crowdsec-bouncer-traefik-plugin#405).
+    Context "Bodies without Content-Length over HTTP/2" -Tag "modsec" {
+        It "Should let the restic init shape through: an empty POST without Content-Length" {
+            $response = Invoke-H2cUnknownLengthRequest -Endpoint "/modsec-allow/restic-repo/?create=true" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl
+            $response.StatusCode | Should -Be 200 -Because "an empty body of unknown length is inspected and allowed, not dropped"
+            $response.Content | Should -Match "Hostname:"
+            Get-ResponseHeader $response $script:Header | Should -BeNullOrEmpty
+        }
+
+        It "Should send a body without Content-Length to CRS, which blocks the XSS payload" {
+            $since = Get-LogSince
+            $uri = "/modsec-allow/xss-no-length-$(Get-Random)"
+            $response = Invoke-H2cUnknownLengthRequest -Endpoint $uri -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
+                -BodyText "q=%3Cscript%3Ealert(1)%3C%2Fscript%3E" -ContentType "application/x-www-form-urlencoded"
+            $response.StatusCode | Should -Be 403 -Because "leaving out Content-Length must not skip CRS"
+            Get-ResponseHeader $response $script:Header | Should -Be "ban:modsec"
+            $wait = Wait-ForCondition -Description "CRS XSS rule in the sidecar log" -TimeoutSeconds 10 -Silent -Condition {
+                $script:Rules = Get-CrsRuleIds -Since $since -Uri $uri
+                return (@($script:Rules | Where-Object { $_ -like "941*" }).Count -gt 0)
+            }
+            $wait.Success | Should -Be $true -Because "the body must reach CRS; rule ids logged: $($script:Rules -join ',')"
+        }
+
+        It "Should answer 400 error:body-read-timeout at the deadline for a body that stalls" {
+            $response = Invoke-H2cUnknownLengthRequest -Endpoint "/modsec-stall/upload" -IP $script:ClientIP -TraefikUrl $script:TraefikUrl `
+                -BodyText "x" -ContentType "application/octet-stream" -StallSeconds 8
+            $response.StatusCode | Should -Be 400 -Because "modsecBodyReadTimeoutSeconds blocks whatever bouncerModsecFailureAction says"
+            Get-ResponseHeader $response $script:Header | Should -Be "error:body-read-timeout"
+            $response.Content | Should -Not -Match "Hostname:" -Because "the origin must not be called"
+            $response.ElapsedMs | Should -BeLessThan 6000 -Because "the plugin cuts the read at the 2 s deadline, before the body ends at 8 s"
+        }
+    }
 }

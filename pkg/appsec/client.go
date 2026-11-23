@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
@@ -38,6 +39,7 @@ type Client struct {
 	appsecHost      string
 	appsecPath      string
 	appsecBodyLimit int64
+	bodyReadTimeout time.Duration
 	transport       atomic.Value // *transport; not atomic.Pointer[T] (Yaegi v0.16)
 	log             *slog.Logger
 	pluginVersion   string
@@ -55,6 +57,8 @@ func Prepare(cfg *configuration.Config, log *slog.Logger, traefikName string) er
 	if !cfg.AppsecEnabled {
 		return nil
 	}
+	// 0 or a negative appsecBodyLimit means the default cap, so all three hash to one identity.
+	cfg.AppsecBodyLimit = configuration.EffectiveAppsecBodyLimit(cfg.AppsecBodyLimit)
 	if strings.TrimSpace(cfg.AppsecInstanceName) == "" {
 		cfg.AppsecInstanceName = traefikName
 	}
@@ -99,7 +103,8 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, m
 		appsecScheme:    config.AppsecScheme,
 		appsecHost:      config.AppsecHost,
 		appsecPath:      config.AppsecPath,
-		appsecBodyLimit: config.AppsecBodyLimit,
+		appsecBodyLimit: configuration.EffectiveAppsecBodyLimit(config.AppsecBodyLimit),
+		bodyReadTimeout: time.Duration(config.AppsecBodyReadTimeoutSeconds) * time.Second,
 		middlewareName:  middlewareName,
 		instanceName:    config.AppsecInstanceName,
 		sessionKey:      bindKey,
@@ -154,6 +159,12 @@ func (c *Client) Wake() {
 	c.sleeping = false
 	c.mu.Unlock()
 	c.log.Debug(MsgInstanceWaking, "incarnation", c.incarnation, "reason", "waking")
+}
+
+// BodyReadTimeoutSeconds is appsecBodyReadTimeoutSeconds: the total time this Client waits for a
+// body without Content-Length. The bouncer logs it when the deadline blocks a request.
+func (c *Client) BodyReadTimeoutSeconds() int64 {
+	return int64(c.bodyReadTimeout / time.Second)
 }
 
 // Incarnation is unique per Client create.

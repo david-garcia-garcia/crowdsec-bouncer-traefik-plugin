@@ -27,12 +27,13 @@ The sidecar only inspects. After the CRS request phases (headers and body), Apac
 | 3xx or 4xx | Blocks. The visitor gets the sidecar's response: its status, its page, and its headers except hop-by-hop ones and `Server`. Redirects are not followed. | `ban:modsec` |
 | 5xx, timeout, or unreachable | No verdict: applies `bouncerModsecFailureAction`, or `bouncerModsecBackOffAction` while the backoff gate skips the sidecar (see [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff)). | `ban:modsec-failure`, `captcha:modsec-failure`, `ban:modsec-backoff`, `captcha:modsec-backoff`, or none |
 | Not called: body over `modsecBodyLimit` | HTTP 413. | none |
+| Not called: a body without `Content-Length` that does not arrive within `modsecBodyReadTimeoutSeconds` | HTTP 400, whatever `bouncerModsecFailureAction` says. | `error:body-read-timeout` |
 
 Request bodies:
 
 - The plugin holds the body in memory, up to `modsecBodyLimit` (8 MiB by default), sends it to the sidecar with its `Content-Length`, and hands the same bytes to your application.
 - With AppSec on the same router, the body is read once and shared. `appsecBodyLimit` still cuts what AppSec sees; `modsecBodyLimit` rejects a larger body with 413.
-- A POST, PUT, or PATCH body streamed over HTTP/2 or HTTP/3 without a length (gRPC, for example) is never buffered. With `passthrough` the sidecar sees its headers only; with `ban` or `captcha` the failure action applies, and the backoff action while the backoff gate skips the sidecar.
+- A body without `Content-Length` (HTTP/1.1 chunked, or HTTP/2 and HTTP/3 without the header) is read and sent to the sidecar like any other, so leaving out `Content-Length` never skips CRS. It must arrive within [`modsecBodyReadTimeoutSeconds`](configuration.md#modsecbodyreadtimeoutseconds) (30 s by default), or the request gets HTTP 400. A gRPC stream or another body that never ends is always blocked: exclude its route with a `bypassModsec` rule (see [Run streaming request bodies through the WAF legs](how-to/streaming-request-bodies.md)).
 - WebSocket handshakes are inspected like any GET. After an allow, the upgraded connection goes straight to your application.
 
 The plugin itself has no list of methods that may carry a body. CRS decides: a body on `GET` or `HEAD` is blocked by rules 920170 and 920171 at paranoia level 1, and you can add your own rule for other methods (see [Tune CRS](#tune-crs)).

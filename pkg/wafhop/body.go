@@ -1,7 +1,8 @@
 // Package wafhop holds the inbound-request rules shared by the WAF legs (AppSec and ModSec).
-// It decides which client bodies may be buffered, buffers one under a leg's limit, tells a client
-// that left mid-upload apart from a broken body, and keeps connection-scoped headers off the WAF copy.
-// Each leg keeps its own settings (body limit, failure fallback); this package only holds the rules.
+// It buffers a client body under a leg's limit and, for a body of unknown length, under the leg's
+// total read deadline; tells a deadline, a client that left mid-upload, and a broken body apart; and
+// keeps connection-scoped headers off the WAF copy.
+// Each leg keeps its own settings (body limit, read timeout, failure fallback); this package only holds the rules.
 package wafhop
 
 import (
@@ -12,6 +13,7 @@ import (
 	"io"
 	"math"
 	"net/http"
+	"time"
 )
 
 // ErrClientDisconnected is a client that left (or canceled) while its body was being buffered.
@@ -22,6 +24,11 @@ var ErrClientDisconnected = errors.New("wafhop:clientDisconnected")
 // timeout on a slow HTTP/2 upload). The request never arrived whole, so it is not a WAF verdict and
 // not a WAF failure: the bouncer answers 400 without a ban.
 var ErrClientBodyRead = errors.New("wafhop:clientBodyRead")
+
+// ErrBodyReadTimeout is a body of unknown length that did not end, or reach the leg's limit, within the
+// leg's read timeout. It neither wraps nor is wrapped by ErrClientBodyRead, so errors.Is keeps the two
+// apart. The leg does not call its WAF; the bouncer answers 400 whatever the leg's failure action says.
+var ErrBodyReadTimeout = errors.New("wafhop:bodyReadTimeout")
 
 // ErrBodyTooLarge is a body longer than the limit under RejectOverLimit.
 var ErrBodyTooLarge = errors.New("wafhop:bodyTooLarge")
@@ -39,23 +46,6 @@ const (
 // HasBody reports a request body the server did not replace with http.NoBody.
 func HasBody(httpReq *http.Request) bool {
 	return httpReq.Body != nil && httpReq.Body != http.NoBody
-}
-
-// IsBodyUnreadable reports a streamed HTTP/2 or HTTP/3 body of unknown length (gRPC and other
-// streaming exchanges). Buffering it can block until the peer gives up, so no leg reads it.
-func IsBodyUnreadable(httpReq *http.Request) bool {
-	return HasBody(httpReq) && httpReq.ProtoMajor >= 2 && httpReq.ContentLength < 0
-}
-
-// IsMethodWithBody reports the methods whose uninspectable body is a drop candidate: POST, PUT, PATCH.
-// DELETE is deliberately absent: a DELETE body is worth inspecting when readable, but not worth a drop.
-func IsMethodWithBody(method string) bool {
-	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch:
-		return true
-	default:
-		return false
-	}
 }
 
 // IsClientGone reports a client disconnect or cancel behind err.
@@ -77,15 +67,24 @@ func IsInboundCanceled(httpReq *http.Request, err error) bool {
 
 // ReadBody buffers httpReq.Body for one WAF hop and puts an equivalent body back on httpReq for next.
 //
-// TruncateAtLimit returns at most limit bytes; limit 0 or less means no cap.
-// RejectOverLimit returns ErrBodyTooLarge for a body longer than limit; limit 0 or less means no cap.
-// Either way next later reads the whole client body.
+// TruncateAtLimit returns at most limit bytes. RejectOverLimit returns ErrBodyTooLarge for a body
+// longer than limit. Either way next later reads the whole client body. limit MUST be at least 1:
+// a non-positive limit is a caller bug, since every leg resolves its own default before it calls.
 //
 // A body an earlier leg already buffered whole is reused without a second read or copy.
+// A body of unknown length (ContentLength < 0: HTTP/1.1 chunked, HTTP/2 or HTTP/3 without the header)
+// is read under timeout, the total time to receive it up to limit. When the timeout fires, this call
+// cuts its own read through ctrl (falling back to closing the body when ctrl is nil or cannot reach the
+// connection) and returns
+// ErrBodyReadTimeout whatever error the cut produced. A body with a declared length starts no timer.
 // A client that left is ErrClientDisconnected. Any other read failure wraps ErrClientBodyRead.
-// The caller checks HasBody and IsBodyUnreadable first.
-func ReadBody(httpReq *http.Request, limit int64, mode LimitMode) ([]byte, error) {
-	data, err := bufferBody(httpReq, limit)
+func ReadBody(httpReq *http.Request, limit int64, mode LimitMode, ctrl *http.ResponseController, timeout time.Duration) ([]byte, error) {
+	data, timedOut, err := bufferBody(httpReq, limit, ctrl, timeout)
+	// The deadline is decided first: on HTTP/1.1 the cut also cancels the request context, which the
+	// disconnect check below would misread as a client that left.
+	if timedOut {
+		return nil, ErrBodyReadTimeout
+	}
 	if err != nil {
 		if IsClientGone(httpReq, err) {
 			return nil, ErrClientDisconnected
@@ -93,7 +92,7 @@ func ReadBody(httpReq *http.Request, limit int64, mode LimitMode) ([]byte, error
 		return nil, fmt.Errorf("%w: %s", ErrClientBodyRead, err.Error())
 	}
 	// A body reused from an earlier leg can be longer than this leg's limit, so check the length here.
-	if limit <= 0 || int64(len(data)) <= limit {
+	if int64(len(data)) <= limit {
 		return data, nil
 	}
 	if mode == RejectOverLimit {
@@ -102,29 +101,42 @@ func ReadBody(httpReq *http.Request, limit int64, mode LimitMode) ([]byte, error
 	return data[:limit], nil
 }
 
-// bufferBody reads at most limit+1 bytes (all of them when limit is 0 or less) and replaces
-// httpReq.Body with those bytes followed by the unread rest. More than limit bytes means the body is
-// longer than limit. A whole body an earlier leg buffered and nobody read since is returned as is.
-func bufferBody(httpReq *http.Request, limit int64) ([]byte, error) {
+// bufferBody reads at most limit+1 bytes and replaces httpReq.Body with those bytes followed by the
+// unread rest. More than limit bytes means the body is longer than limit. A whole body an earlier leg
+// buffered and nobody read since is returned as is and starts no timer. timedOut reports that the read
+// deadline fired during this call's read.
+func bufferBody(httpReq *http.Request, limit int64, ctrl *http.ResponseController, timeout time.Duration) (data []byte, timedOut bool, err error) {
 	if prior, ok := httpReq.Body.(*bufferedBody); ok && prior.complete && !prior.touched {
-		return prior.data, nil
+		return prior.data, false, nil
 	}
 	src := httpReq.Body
 	var buf bytes.Buffer
 	reader := io.Reader(src)
 	// At math.MaxInt64, limit+1 overflows and LimitReader would read nothing: read the whole body instead.
-	if limit > 0 && limit < math.MaxInt64 {
+	if limit < math.MaxInt64 {
 		reader = io.LimitReader(src, limit+1)
-		// Grow only under a cap: ContentLength is the client's word and must not size an unbounded buffer.
+		// Grow only under a real cap: ContentLength is the client's word and must not size an unbounded buffer.
 		if httpReq.ContentLength > 0 && httpReq.ContentLength <= limit {
 			buf.Grow(int(httpReq.ContentLength))
 		}
 	}
-	if _, err := buf.ReadFrom(reader); err != nil {
-		return nil, err
+
+	// Read the body. Only a body of unknown length runs under the deadline; this call owns the cut.
+	if httpReq.ContentLength < 0 {
+		timer := time.AfterFunc(timeout, func() { cutBodyRead(ctrl, src) })
+		_, err = buf.ReadFrom(reader)
+		// Stop reports false once the callback has run (or is running): the deadline fired.
+		timedOut = !timer.Stop()
+	} else {
+		_, err = buf.ReadFrom(reader)
 	}
-	data := buf.Bytes()
-	complete := limit <= 0 || int64(len(data)) <= limit
+	if timedOut || err != nil {
+		return nil, timedOut, err
+	}
+
+	// Put the buffered bytes, then the unread rest, back on the request for the next reader.
+	data = buf.Bytes()
+	complete := int64(len(data)) <= limit
 	replay := &bufferedBody{data: data, complete: complete, rest: src}
 	if complete {
 		replay.reader = bytes.NewReader(data)
@@ -132,7 +144,17 @@ func bufferBody(httpReq *http.Request, limit int64) ([]byte, error) {
 		replay.reader = io.MultiReader(bytes.NewReader(data), src)
 	}
 	httpReq.Body = replay
-	return data, nil
+	return data, false, nil
+}
+
+// cutBodyRead unblocks an in-flight body read when the read deadline fires. The connection read
+// deadline cuts HTTP/1.1 and HTTP/2; closing the body only cuts HTTP/2, so it is the fallback when
+// there is no controller or the controller cannot reach the connection. The success path never sets
+// a deadline, so Traefik's own readTimeout keeps bounding the rest of an oversize body.
+func cutBodyRead(ctrl *http.ResponseController, body io.Closer) {
+	if ctrl == nil || ctrl.SetReadDeadline(time.Now()) != nil {
+		_ = body.Close()
+	}
 }
 
 // bufferedBody is the client body after a leg buffered it: data, then the unread rest.

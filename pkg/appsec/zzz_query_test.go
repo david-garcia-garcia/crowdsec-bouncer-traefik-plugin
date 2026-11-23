@@ -11,12 +11,10 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	logger "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
 
 // Test_appsecQuery_clientDisconnected is a regression for
@@ -42,151 +40,6 @@ func Test_appsecQuery_clientDisconnected(t *testing.T) {
 	t.Run("unclassified read error with a live context is ErrClientBodyRead", assertUnclassifiedBodyReadIsClientBodyRead)
 }
 
-func Test_appsecQuery_streamingDoesNotBlock(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	done := make(chan struct{})
-	defer close(done)
-	finished := make(chan error, 1)
-	go func() {
-		_, err := client.Query(withTestAddress(newStreamingRequest(done)), Policy{FailureAction: configuration.FailureActionPassthrough})
-		finished <- err
-	}()
-	select {
-	case err := <-finished:
-		if err != nil {
-			t.Errorf("Query() on streaming request returned error: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Query() blocked on a streaming request body (issue #323 regression)")
-	}
-}
-
-func Test_appsecQuery_dropUnreadableBody(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	done := make(chan struct{})
-	defer close(done)
-	finished := make(chan error, 1)
-	go func() {
-		_, err := client.Query(withTestAddress(newStreamingRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
-		finished <- err
-	}()
-	select {
-	case err := <-finished:
-		if err == nil {
-			t.Error("Query() expected an error to block the request, got nil")
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Query() blocked on a streaming request body (issue #323 regression)")
-	}
-}
-
-// Test_appsecQuery_unreadableBodyMethods drives an HTTP/3 request without Content-Length through
-// Query for every method, so a change to the drop condition in Query fails here even when the
-// isBodyUnreadable / isMethodWithBody predicates stay untouched. Regression for
-// https://github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin/issues/385 (upstream PR #386):
-// a bodyless HTTP/3 DELETE must reach AppSec instead of being dropped.
-func Test_appsecQuery_unreadableBodyMethods(t *testing.T) {
-	tests := []struct {
-		method   string
-		wantDrop bool
-	}{
-		{method: http.MethodPost, wantDrop: true},
-		{method: http.MethodPut, wantDrop: true},
-		{method: http.MethodPatch, wantDrop: true},
-		{method: http.MethodDelete, wantDrop: false},
-		{method: http.MethodGet, wantDrop: false},
-		{method: http.MethodHead, wantDrop: false},
-		{method: http.MethodOptions, wantDrop: false},
-	}
-	for _, tt := range tests {
-		for _, failureAction := range []string{configuration.FailureActionBan, configuration.FailureActionPassthrough} {
-			// Passthrough never drops: the body is skipped and the headers still go to AppSec.
-			wantDrop := tt.wantDrop && failureAction != configuration.FailureActionPassthrough
-			t.Run(tt.method+"/"+failureAction, func(t *testing.T) {
-				assertUnreadableHTTP3Query(t, tt.method, failureAction, wantDrop)
-			})
-		}
-	}
-}
-
-// assertUnreadableHTTP3Query runs Query on an HTTP/3 request whose body blocks until the test ends.
-// A drop must fail without contacting AppSec; otherwise AppSec gets a bodyless GET carrying the verb.
-func assertUnreadableHTTP3Query(t *testing.T, method, failureAction string, wantDrop bool) {
-	t.Helper()
-	done := make(chan struct{})
-	defer close(done)
-	req, _ := http.NewRequest(method, "http://localhost/", blockingBody{done: done})
-	req.ProtoMajor = 3
-	req.ContentLength = -1
-	capture := &forwardCaptureRoundTripper{}
-	finished := make(chan error, 1)
-	go func() {
-		_, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{FailureAction: failureAction})
-		finished <- err
-	}()
-	var err error
-	select {
-	case err = <-finished:
-	case <-time.After(2 * time.Second):
-		t.Fatalf("Query() blocked reading the body of an HTTP/3 %s without content-length", method)
-	}
-	if wantDrop {
-		if err == nil {
-			t.Fatalf("Query() on an HTTP/3 %s without content-length returned nil, want a drop error", method)
-		}
-		if capture.method != "" {
-			t.Errorf("AppSec was contacted (%s) for a dropped HTTP/3 %s", capture.method, method)
-		}
-		return
-	}
-	if err != nil {
-		t.Fatalf("Query() on an HTTP/3 %s without content-length returned error: %v", method, err)
-	}
-	if capture.method != http.MethodGet {
-		t.Errorf("AppSec method %q want %q", capture.method, http.MethodGet)
-	}
-	if capture.body != "" {
-		t.Errorf("AppSec body %q want empty", capture.body)
-	}
-	if got := capture.header.Get(crowdsecAppsecVerbHeader); got != method {
-		t.Errorf("%s %q want %q", crowdsecAppsecVerbHeader, got, method)
-	}
-}
-
-func Test_appsecQuery_unreadableBodyGetNotDropped(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	done := make(chan struct{})
-	defer close(done)
-	finished := make(chan error, 1)
-	go func() {
-		_, err := client.Query(withTestAddress(newUnreadableGetRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
-		finished <- err
-	}()
-	select {
-	case err := <-finished:
-		if err != nil {
-			t.Errorf("Query() on an HTTP/3 GET without content-length returned error: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Query() blocked on an HTTP/3 GET request body (issue #351 regression)")
-	}
-}
-
 func Test_appsecQuery_reusesConnection(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusForbidden, http.StatusInternalServerError, http.StatusBadGateway, http.StatusServiceUnavailable, http.StatusGatewayTimeout} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
@@ -207,7 +60,7 @@ func Test_appsecQuery_reusesConnection(t *testing.T) {
 			const calls = 10
 			for i := 0; i < calls; i++ { //nolint:intrange
 				req, _ := http.NewRequest(http.MethodGet, "http://localhost/", nil)
-				_, _ = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough})
+				_, _ = client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 			}
 			mu.Lock()
 			defer mu.Unlock()
@@ -231,7 +84,7 @@ func Test_appsecQuery_userAgentIncludesPluginVersion(t *testing.T) {
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	client.pluginVersion = wantVersion
-	_, err := client.Query(buildTestRequest(), Policy{})
+	_, err := client.Query(buildTestRequest(), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -248,7 +101,7 @@ func Test_appsecQuery_allowJSONPasses(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -263,7 +116,7 @@ func Test_appsecQuery_emptyOKPasses(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -279,7 +132,7 @@ func Test_appsecQuery_challengeJSON(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -299,7 +152,7 @@ func Test_appsecQuery_captchaJSON(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -318,14 +171,14 @@ func Test_appsecQuery_emptyForbiddenErrors(t *testing.T) {
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query(buildTestRequest(), Policy{})
+	decision, err := client.Query(buildTestRequest(), Policy{}, nil)
 	if err == nil {
 		t.Fatal("Query() expected error for empty 403")
 	}
 	if decision != nil {
 		t.Fatalf("Query() returned decision: %#v", decision)
 	}
-	decision, err = client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err = client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err == nil {
 		t.Fatal("passthrough must not allow empty 403")
 	}
@@ -341,7 +194,7 @@ func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -350,39 +203,34 @@ func Test_appsecQuery_oversizedOKResponsePasses(t *testing.T) {
 	}
 }
 
-// Test_appsecQuery_zeroBodyLimitForwardsPost proves limit 0 POSTs the full body and restores it for origin.
-func Test_appsecQuery_zeroBodyLimitForwardsPost(t *testing.T) {
-	const payload = "hello-appsec-body"
-	var gotMethod string
-	var gotBody string
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		gotMethod = r.Method
-		body, _ := io.ReadAll(r.Body)
-		gotBody = string(body)
-		rw.WriteHeader(http.StatusOK)
-		_, _ = rw.Write([]byte(`{"action":"allow"}`))
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	client.appsecBodyLimit = 0
+// Test_appsecQuery_nonPositiveBodyLimitCapsAtDefault proves appsecBodyLimit 0 and -1 mean the 10 MiB
+// cap (not "no cap"): the Client holds 10485760 and a body past it is truncated for AppSec only.
+func Test_appsecQuery_nonPositiveBodyLimitCapsAtDefault(t *testing.T) {
+	for _, limit := range []int64{0, -1} {
+		cfg := testAppsecConfig("127.0.0.1:1")
+		cfg.AppsecBodyLimit = limit
+		client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+		if err != nil {
+			t.Fatal(err)
+		}
+		client.Close()
+		if client.appsecBodyLimit != configuration.DefaultAppsecBodyLimit {
+			t.Fatalf("appsecBodyLimit %d: Client cap %d want %d", limit, client.appsecBodyLimit, configuration.DefaultAppsecBodyLimit)
+		}
+	}
+	capture := &forwardCaptureRoundTripper{}
+	client := newForwardCaptureClient(capture)
+	payload := strings.Repeat("a", int(configuration.DefaultAppsecBodyLimit)+10)
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(payload))
-	_, err := client.Query(withTestAddress(req), Policy{})
-	if err != nil {
+	if _, err := client.Query(withTestAddress(req), Policy{}, nil); err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
-	if gotMethod != http.MethodPost {
-		t.Fatalf("AppSec method %q want POST", gotMethod)
-	}
-	if gotBody != payload {
-		t.Fatalf("AppSec body %q want %q", gotBody, payload)
+	if int64(len(capture.body)) != configuration.DefaultAppsecBodyLimit {
+		t.Fatalf("AppSec got %d bytes want %d", len(capture.body), configuration.DefaultAppsecBodyLimit)
 	}
 	restored, err := io.ReadAll(req.Body)
-	if err != nil {
-		t.Fatalf("origin body: %v", err)
-	}
-	if string(restored) != payload {
-		t.Fatalf("origin body %q want %q", restored, payload)
+	if err != nil || len(restored) != len(payload) {
+		t.Fatalf("origin body %d bytes err=%v want %d", len(restored), err, len(payload))
 	}
 }
 
@@ -394,7 +242,7 @@ func Test_appsecQuery_rebuildsContentLengthFromForwardedBytes(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(forwarded))
 	req.Header.Set("Content-Length", "999")
 	req.Header.Set("Transfer-Encoding", "chunked")
-	_, err := client.Query(withTestAddress(req), Policy{})
+	_, err := client.Query(withTestAddress(req), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -406,31 +254,6 @@ func Test_appsecQuery_rebuildsContentLengthFromForwardedBytes(t *testing.T) {
 	}
 	if capture.transferEncoding != "" {
 		t.Fatalf("Transfer-Encoding header %q want empty", capture.transferEncoding)
-	}
-}
-
-// Test_appsecQuery_unreadableBodyDeleteNotDropped proves an unreadable DELETE is not a drop.
-func Test_appsecQuery_unreadableBodyDeleteNotDropped(t *testing.T) {
-	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK)
-	}))
-	defer appsecServer.Close()
-	appsecURL, _ := url.Parse(appsecServer.URL)
-	client := newQueryClient(appsecURL, appsecServer.Client())
-	done := make(chan struct{})
-	defer close(done)
-	finished := make(chan error, 1)
-	go func() {
-		_, err := client.Query(withTestAddress(newUnreadableDeleteRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
-		finished <- err
-	}()
-	select {
-	case err := <-finished:
-		if err != nil {
-			t.Errorf("Query() on an HTTP/2 DELETE without content-length returned error: %v", err)
-		}
-	case <-time.After(2 * time.Second):
-		t.Fatal("Query() blocked on an HTTP/2 DELETE request body")
 	}
 }
 
@@ -459,7 +282,7 @@ func Test_appsecQuery_forwardsBodyOnlyForBodyMethods(t *testing.T) {
 			}
 			capture := &forwardCaptureRoundTripper{}
 			req := httptest.NewRequest(tt.method, "http://localhost/", strings.NewReader(payload))
-			if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}); err != nil {
+			if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}, nil); err != nil {
 				t.Fatalf("Query() returned error: %v", err)
 			}
 			if capture.method != wantMethod {
@@ -498,7 +321,7 @@ func Test_appsecQuery_stripsHopByHopHeaders(t *testing.T) {
 	}
 	req.Header.Set("Cookie", "session=keep")
 	req.Header.Set("X-Forwarded-For", "1.2.3.4")
-	if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}); err != nil {
+	if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}, nil); err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
 	for _, name := range hopByHop {
@@ -534,7 +357,7 @@ func Test_appsecQuery_forwardsHTTPVersion(t *testing.T) {
 			req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
 			req.ProtoMajor = tt.protoMajor
 			req.ProtoMinor = tt.protoMinor
-			if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}); err != nil {
+			if _, err := newForwardCaptureClient(capture).Query(withTestAddress(req), Policy{}, nil); err != nil {
 				t.Fatalf("Query() returned error: %v", err)
 			}
 			got := capture.header.Get(crowdsecAppsecHTTPVersionHeader)
@@ -545,28 +368,24 @@ func Test_appsecQuery_forwardsHTTPVersion(t *testing.T) {
 	}
 }
 
-// Test_isMethodWithForwardableBody proves the readable-forward set stays wider than the drop set.
+// Test_isMethodWithForwardableBody proves the methods whose body is copied to AppSec.
 func Test_isMethodWithForwardableBody(t *testing.T) {
 	tests := []struct {
 		method      string
 		wantForward bool
-		wantDropSet bool
 	}{
-		{method: http.MethodPost, wantForward: true, wantDropSet: true},
-		{method: http.MethodPut, wantForward: true, wantDropSet: true},
-		{method: http.MethodPatch, wantForward: true, wantDropSet: true},
-		{method: http.MethodDelete, wantForward: true, wantDropSet: false},
-		{method: http.MethodGet, wantForward: false, wantDropSet: false},
-		{method: http.MethodHead, wantForward: false, wantDropSet: false},
-		{method: http.MethodOptions, wantForward: false, wantDropSet: false},
+		{method: http.MethodPost, wantForward: true},
+		{method: http.MethodPut, wantForward: true},
+		{method: http.MethodPatch, wantForward: true},
+		{method: http.MethodDelete, wantForward: true},
+		{method: http.MethodGet, wantForward: false},
+		{method: http.MethodHead, wantForward: false},
+		{method: http.MethodOptions, wantForward: false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.method, func(t *testing.T) {
 			if got := isMethodWithForwardableBody(tt.method); got != tt.wantForward {
 				t.Errorf("isMethodWithForwardableBody(%q) = %v, want %v", tt.method, got, tt.wantForward)
-			}
-			if got := wafhop.IsMethodWithBody(tt.method); got != tt.wantDropSet {
-				t.Errorf("wafhop.IsMethodWithBody(%q) = %v, want %v", tt.method, got, tt.wantDropSet)
 			}
 		})
 	}
@@ -588,7 +407,7 @@ func Test_appsecQuery_originFormURIUsesConstructorScheme(t *testing.T) {
 	httpReq.URL.Scheme = ""
 	httpReq.URL.Host = ""
 	httpReq.Header.Set("X-Forwarded-Proto", "https")
-	_, err := newQueryClient(appsecURL, appsecServer.Client()).Query(clientrequest.New(httpReq, "1.2.3.4", net.ParseIP("1.2.3.4")), Policy{})
+	_, err := newQueryClient(appsecURL, appsecServer.Client()).Query(clientrequest.New(httpReq, "1.2.3.4", net.ParseIP("1.2.3.4")), Policy{}, nil)
 	if err != nil {
 		t.Fatalf("Query() returned error: %v", err)
 	}
@@ -607,7 +426,7 @@ func Test_appsecQuery_oversizedForbiddenResponseBlocks(t *testing.T) {
 	}))
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
-	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{})
+	decision, err := newQueryClient(appsecURL, appsecServer.Client()).Query(buildTestRequest(), Policy{}, nil)
 	if err == nil {
 		t.Fatal("Query() expected error, got nil")
 	}

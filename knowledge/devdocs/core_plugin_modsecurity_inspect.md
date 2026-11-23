@@ -3,7 +3,7 @@
 ## Language
 
 **Inspect copy**:
-The sidecar HTTP request this plugin builds from the inbound request: same method and `RequestURI`, `Host` set to inbound `req.Host`, headers as Traefik left them minus the shared hop-by-hop list and `Content-Length` (`wafhop.CopyEndToEndHeaders`), and the readable body with a `Content-Length` rebuilt from the forwarded bytes. Not an AppSec JSON forward.
+The sidecar HTTP request this plugin builds from the inbound request: same method and `RequestURI`, `Host` set to inbound `req.Host`, headers as Traefik left them minus the shared hop-by-hop list and `Content-Length` (`wafhop.CopyEndToEndHeaders`), and the buffered body (with or without a client `Content-Length`) with a `Content-Length` rebuilt from the forwarded bytes. Not an AppSec JSON forward.
 _Avoid_: `X-Crowdsec-Appsec-*`, setting `X-Real-IP`, appending `RemoteAddr` to `X-Forwarded-For`
 
 **Copied block**:
@@ -11,7 +11,7 @@ Sidecar HTTP 3xx or 4xx copied to the client by `modsecurity.WriteBlock` (end-to
 _Avoid_: following a sidecar 3xx, treating 5xx as a block page, writing the block inside `Inspect`
 
 **WAF failure**:
-The sidecar gave no verdict (`modsecurity.ErrUnavailable`): transport error or timeout, sidecar HTTP 5xx, a request that could not be built, an admission error, or a POST/PUT/PATCH body streamed without a length when the failure action is not `passthrough`. The sidecar 5xx body is not forwarded. The request follows the failure action. Not a copied block.
+The sidecar gave no verdict (`modsecurity.ErrUnavailable`): transport error or timeout, sidecar HTTP 5xx, a request that could not be built, or an admission error. Never a client body. The sidecar 5xx body is not forwarded. The request follows the failure action. Not a copied block.
 _Avoid_: copying the 5xx body, treating 5xx as CRS ban
 
 **Failure action**:
@@ -27,10 +27,10 @@ _Avoid_: `bouncerModsecFailMode`, `open`/`close`, an empty 502
 - Call `serveModSec` after AppSec. True means the response was written. False means ServeHTTP calls `next`.
 - Skip inspect when `ActionMatch.SkipModsec` or the route did not subscribe. Do not buffer the body, do not consult the Gate, and do not call the sidecar.
 - A missing subscribed Client applies that router's failure action (`applyModsecFailureAction`).
-- `Inspect(req, failureAction)` returns `(*http.Response, error)`. `nil, nil` is allow. A non-nil response is a block: set `ban:modsec` (when `bouncerRemediationHeadersCustomName` is set), `recordDropped` with origin `modsec` and remediation `ban`, then `modsecurity.WriteBlock(rw, resp)`, which closes it.
-- Errors: `modsecurity.ErrUnavailable` → failure action. `modsecurity.ErrGateSkip` → the router's backoff action `bouncerModsecBackOffAction` through `applyBackOffAction` (default `passthrough` → `next`; `ban` → `ban:modsec-backoff`, RemediationReason `MODSEC`, origin `plugin:modsec_failure`; `captcha` → `captcha:modsec-backoff`), never the failure action. `modsecurity.ErrBodyTooLarge` (= `wafhop.ErrBodyTooLarge`) → HTTP 413, sidecar not called. `wafhop.ErrClientDisconnected` and `wafhop.ErrClientBodyRead` → the shared bouncer handlers (no ban, no failure action).
+- `Inspect(req, ctrl)` returns `(*http.Response, error)`. `ctrl` is `http.NewResponseController(rw)` (`nil` in unit tests); the failure action is not an input. `nil, nil` is allow. A non-nil response is a block: set `ban:modsec` (when `bouncerRemediationHeadersCustomName` is set), `recordDropped` with origin `modsec` and remediation `ban`, then `modsecurity.WriteBlock(rw, resp)`, which closes it.
+- Errors: `modsecurity.ErrUnavailable` → failure action. `modsecurity.ErrGateSkip` → the router's backoff action `bouncerModsecBackOffAction` through `applyBackOffAction` (default `passthrough` → `next`; `ban` → `ban:modsec-backoff`, RemediationReason `MODSEC`, origin `plugin:modsec_failure`; `captcha` → `captcha:modsec-backoff`), never the failure action. `modsecurity.ErrBodyTooLarge` (= `wafhop.ErrBodyTooLarge`) → HTTP 413, sidecar not called. `wafhop.ErrBodyReadTimeout` → 400 `error:body-read-timeout` with the ModSec WARN (`handleBodyReadTimeoutServeHTTP`, timeout from `client.BodyReadTimeoutSeconds()`), sidecar not called. `wafhop.ErrClientDisconnected` and `wafhop.ErrClientBodyRead` → the shared bouncer handlers. None of the three bans or applies the failure action or the backoff action.
 - Order inside Inspect: body (shared rules, `core_plugin_wafhop_shared-request.md`) → Gate `Admit` → sidecar hop. AppSec `Query` uses the same order.
-- Body: there is no method list. Any readable body up to `modsecBodyLimit` goes to the sidecar, GET and OPTIONS included; CRS decides (920170/920171 block a body on GET/HEAD). An unreadable body (`wafhop.IsBodyUnreadable`) is never read: on POST, PUT, or PATCH it is `ErrUnavailable` unless the failure action is `passthrough`, which inspects headers only. While `Gate.BackingOff()` it is `ErrGateSkip` instead, and it never takes a ticket. A readable body goes through `wafhop.ReadBody(req, modsecBodyLimit, wafhop.RejectOverLimit)`. A whole body AppSec already buffered is reused.
+- Body: there is no method list and no length or HTTP-version check. Any body up to `modsecBodyLimit` goes to the sidecar, GET and OPTIONS included; CRS decides (920170/920171 block a body on GET/HEAD). Every body goes through `wafhop.ReadBody(req, c.bodyLimit, wafhop.RejectOverLimit, ctrl, c.bodyReadTimeout)`; a body without `Content-Length` is read under `modsecBodyReadTimeoutSeconds`, so leaving the header out no longer skips CRS. A whole body AppSec already buffered is reused with no timer.
 - Sidecar HTTP 2xx allows (drain, do not copy the sidecar body). Sidecar 3xx/4xx is a block. Sidecar 5xx is a WAF failure: drain, Record failure, return `ErrUnavailable`.
 - Failure action: `passthrough` returns false. `ban` writes the ban template with `bouncerRemediationStatusCode`, RemediationReason `MODSEC` (`configuration.ReasonMODSEC`), header `ban:modsec-failure`, origin `plugin:modsec_failure` (`lapi.OriginPluginModsecFailure`). `captcha` serves the router captcha with `captcha:modsec-failure`; a client that already cleared the gate continues.
 - Unreachable sidecar and sidecar 5xx log ERROR `crowdsec modsec sidecar unavailable` (`modsecurity.MsgUnavailable`) through `logger.Debounced` for 5 seconds, with `host` and `reason` (`unreachable` plus the transport error in `error`, or `status` plus `statusCode`). Keep that debounce: `modsecUnhealthyBackOffPeriodSecs` defaults to 0, so by default no gate bounds the line. The logged `error` is `transportCause(err)`, the `*url.Error` cause without the URL, because the sidecar URL carries the visitor's path and query. A Gate `Admit` error logs ERROR `fail to admit ModSec request` with `error`, like AppSec.
@@ -41,7 +41,7 @@ _Avoid_: `bouncerModsecFailMode`, `open`/`close`, an empty 502
 ## Pattern snippet
 
 ```go
-blocked, err := client.Inspect(req.Request, b.modsecFailureAction)
+blocked, err := client.Inspect(req.Request, http.NewResponseController(rw))
 switch {
 case err == nil && blocked == nil:
 	return false
@@ -52,6 +52,9 @@ case err == nil:
 	return true
 case errors.Is(err, modsecurity.ErrGateSkip):
 	return false
+case errors.Is(err, wafhop.ErrBodyReadTimeout):
+	b.handleBodyReadTimeoutServeHTTP(rw, req, legModsec, msgModsecBodyReadTimeout, client.BodyReadTimeoutSeconds())
+	return true
 case errors.Is(err, modsecurity.ErrBodyTooLarge):
 	http.Error(rw, "Request body too large", http.StatusRequestEntityTooLarge)
 	return true
@@ -73,7 +76,7 @@ default:
 
 ## Gotchas
 
-- The failure action applies to `ErrUnavailable` and a missing subscribed Client only. It does not apply to a copied 3xx/4xx, HTTP 413, a gate skip, or a client-body error.
+- The failure action applies to `ErrUnavailable` and a missing subscribed Client only. It does not apply to a copied 3xx/4xx, HTTP 413, a gate skip, a body read timeout, or a client-body error.
 - A gate skip on either leg continues without that leg and without its failure action. An AppSec skip still runs ModSec, and a ModSec skip still lets AppSec have run first. Failures before the trip still apply the failure action.
 - The default is `passthrough`, unlike LAPI and AppSec (`ban`). A sidecar outage lets traffic through unless the operator asks otherwise.
 - `CheckRedirect` must return `http.ErrUseLastResponse` so a sidecar 302 is a copied block, not a followed hop.

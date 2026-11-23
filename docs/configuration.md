@@ -111,6 +111,7 @@ http:
       plugin:
         bouncer:
           appsecBodyLimit: 10485760
+          appsecBodyReadTimeoutSeconds: 30
           appsecEnabled: false
           appsecHost: crowdsec:7422
           appsecHttpTimeoutSeconds: 1
@@ -365,7 +366,7 @@ What to do while the AppSec backoff gate skips AppSec (`appsecUnhealthyBackOffPe
 
 `string` · default `passthrough` (was `ban`)
 
-What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `passthrough`, `ban`, or `captcha`. With `passthrough`, a POST, PUT, or PATCH body streamed without a length is sent to AppSec with its headers only. While the backoff gate skips AppSec, [`bouncerAppsecBackOffAction`](#bouncerappsecbackoffaction) applies instead. Set `ban` to keep the earlier default. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+What to do when AppSec cannot give an answer (unreachable, HTTP 500, an unexpected status, or a response that cannot be read): `passthrough`, `ban`, or `captcha`. It does not cover the client's own body: a body that cannot be read, or that does not arrive within [`appsecBodyReadTimeoutSeconds`](#appsecbodyreadtimeoutseconds), gets HTTP 400 whatever this action says. While the backoff gate skips AppSec, [`bouncerAppsecBackOffAction`](#bouncerappsecbackoffaction) applies instead. Set `ban` to keep the earlier default. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
 
 #### `bouncerBanFilePath`
 
@@ -425,7 +426,7 @@ What to do while the ModSec backoff gate skips the sidecar (`modsecUnhealthyBack
 
 `string` · default `passthrough`
 
-What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreachable, or no connection published yet): `passthrough`, `ban`, or `captcha`, as for AppSec. A POST, PUT, or PATCH body streamed without a length is inspected on its headers only with `passthrough`, and gets this action otherwise. While the backoff gate skips the sidecar, [`bouncerModsecBackOffAction`](#bouncermodsecbackoffaction) applies instead. A 3xx or 4xx from the sidecar is a block, not a failure. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
+What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreachable, or no connection published yet): `passthrough`, `ban`, or `captcha`, as for AppSec. A body without `Content-Length` is read and inspected like any other, under [`modsecBodyReadTimeoutSeconds`](#modsecbodyreadtimeoutseconds), so leaving out `Content-Length` never skips CRS; a body that does not arrive in time gets HTTP 400, not this action. While the backoff gate skips the sidecar, [`bouncerModsecBackOffAction`](#bouncermodsecbackoffaction) applies instead. A 3xx or 4xx from the sidecar is a block, not a failure. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
 
 #### `bouncerOriginBasedDecisionRemap`
 
@@ -647,7 +648,18 @@ Timeout in seconds when contacting AppSec. Must be at least `1`. For example, `1
 
 `int64` · default `10485760` (10 MB)
 
-Send at most this many bytes of the request body to AppSec. `0` means no limit: the whole body is sent. Only POST, PUT, PATCH, and DELETE bodies are sent. `/crowdsec-internal/challenge/submit` must reach AppSec with the full form. The default 10MB is enough. A smaller positive limit cuts the proof short.
+Send at most this many bytes of the request body to AppSec. `0` or a negative value means the default 10 MB; there is no unlimited value. The bytes past the limit still reach your application, uninspected. Only POST, PUT, PATCH, and DELETE bodies are sent, with or without `Content-Length`. `/crowdsec-internal/challenge/submit` must reach AppSec with the full form. The default 10MB is enough. A smaller positive limit cuts the proof short.
+
+> [!NOTE]
+> Upgrade note: before this version `appsecBodyLimit: 0` sent the whole body. It now means 10 MB. If you need AppSec to see more, set an explicit positive value.
+
+#### `appsecBodyReadTimeoutSeconds`
+
+`int64` · default `30`
+
+Total time in seconds AppSec waits to receive a request body that has no `Content-Length` (HTTP/1.1 chunked, or HTTP/2 and HTTP/3 without the header), up to [`appsecBodyLimit`](#appsecbodylimit). Must be at least `1`. A body that has not ended, or reached the limit, by then is blocked with HTTP 400 and the verdict header `error:body-read-timeout`, whatever [`bouncerAppsecFailureAction`](#bouncerappsecfailureaction) says, and AppSec is not called. Bodies with a `Content-Length` are not affected. With the defaults, a client must send 10 MB in 30 s, about 2.8 Mbit/s. A body that never ends (gRPC client or bidirectional streaming, Connect streaming, an endless upload) is always blocked: exclude those routes with a `bypassAppsec` rule, see [Run streaming request bodies through the WAF legs](how-to/streaming-request-bodies.md).
+
+With ModSec on the same router, a body AppSec read whole is not read again. When [`modsecBodyLimit`](#modsecbodylimit) is larger than `appsecBodyLimit`, ModSec reads the rest under its own [`modsecBodyReadTimeoutSeconds`](#modsecbodyreadtimeoutseconds), so the longest wait is the sum of both timeouts.
 
 #### `appsecTlsCertificateAuthority`
 
@@ -700,6 +712,12 @@ Timeout in seconds for one sidecar call. Must be at least `1`. CRS can take seco
 `int64` · default `8388608` (8 MiB)
 
 Largest request body sent to the ModSecurity sidecar. A larger body gets HTTP 413 and the sidecar is not called. The whole body is held in memory, so there is no unlimited value: it must be at least `1`. Keep it at or below the sidecar's `MODSEC_REQ_BODY_NOFILES_LIMIT` (128 KiB in the image by default), or the sidecar answers 413 itself and the visitor gets that as a block.
+
+#### `modsecBodyReadTimeoutSeconds`
+
+`int64` · default `30`
+
+Total time in seconds ModSec waits to receive a request body that has no `Content-Length` (HTTP/1.1 chunked, or HTTP/2 and HTTP/3 without the header), up to [`modsecBodyLimit`](#modsecbodylimit). Must be at least `1`. A body that has not ended, or gone over the limit, by then is blocked with HTTP 400 and the verdict header `error:body-read-timeout`, whatever [`bouncerModsecFailureAction`](#bouncermodsecfailureaction) says, and the sidecar is not called. Bodies with a `Content-Length` are not affected. A body that never ends (gRPC client or bidirectional streaming, Connect streaming, an endless upload) is always blocked: exclude those routes with a `bypassModsec` rule, see [Run streaming request bodies through the WAF legs](how-to/streaming-request-bodies.md). With AppSec on the same router, see the note under [`appsecBodyReadTimeoutSeconds`](#appsecbodyreadtimeoutseconds).
 
 #### `modsecUnhealthyBackOffPeriodSecs`
 

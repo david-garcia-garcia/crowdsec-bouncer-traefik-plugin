@@ -67,7 +67,7 @@ func TestQuery_gateSkipDoesNotCallAppSecOrFailureAction(t *testing.T) {
 	client := gatedAppsecClient(t, u.Host, 30)
 
 	for i := range admission.TripFailures {
-		_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+		_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil)
 		if err == nil {
 			t.Fatalf("admitted 500 #%d must apply FailureAction", i+1)
 		}
@@ -76,7 +76,7 @@ func TestQuery_gateSkipDoesNotCallAppSecOrFailureAction(t *testing.T) {
 		}
 	}
 
-	_, skipErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	_, skipErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if !errors.Is(skipErr, ErrGateSkip) {
 		t.Fatalf("tripped gate want ErrGateSkip, got %v", skipErr)
 	}
@@ -93,11 +93,11 @@ func TestQuery_admittedMissStillUsesFailureAction(t *testing.T) {
 	u, _ := url.Parse(srv.URL)
 	client := gatedAppsecClient(t, u.Host, 30)
 
-	_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	_, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err != nil {
 		t.Fatalf("admitted 500 passthrough: %v", err)
 	}
-	_, banErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	_, banErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if banErr == nil || errors.Is(banErr, ErrGateSkip) {
 		t.Fatalf("admitted miss must use FailureAction, got %v", banErr)
 	}
@@ -136,7 +136,7 @@ func Test_appsecQuery_hopCancelDoesNotTripGate(t *testing.T) {
 		httpReq := httptest.NewRequest(http.MethodGet, "http://localhost/", nil).WithContext(ctx)
 		done := make(chan error, 1)
 		go func() {
-			_, hopErr := client.Query(withTestAddress(httpReq), Policy{FailureAction: configuration.FailureActionBan})
+			_, hopErr := client.Query(withTestAddress(httpReq), Policy{FailureAction: configuration.FailureActionBan}, nil)
 			done <- hopErr
 		}()
 		<-started
@@ -148,7 +148,7 @@ func Test_appsecQuery_hopCancelDoesNotTripGate(t *testing.T) {
 	mu.Lock()
 	block = false
 	mu.Unlock()
-	_, laterErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	_, laterErr := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if laterErr != nil {
 		t.Fatalf("later hop after cancels must reach AppSec, got %v", laterErr)
 	}
@@ -183,19 +183,19 @@ func TestQuery_backoffLogsStartedAndEndedOnce(t *testing.T) {
 	pol := Policy{FailureAction: configuration.FailureActionPassthrough}
 
 	for range admission.TripFailures {
-		_, _ = client.Query(buildTestRequest(), pol)
+		_, _ = client.Query(buildTestRequest(), pol, nil)
 	}
 	for i := range 3 {
-		if _, skipErr := client.Query(buildTestRequest(), pol); !errors.Is(skipErr, ErrGateSkip) {
+		if _, skipErr := client.Query(buildTestRequest(), pol, nil); !errors.Is(skipErr, ErrGateSkip) {
 			t.Fatalf("request %d want ErrGateSkip, got %v", i, skipErr)
 		}
 	}
 	healthy = true
 	now = now.Add(11 * time.Second)
-	if _, probeErr := client.Query(buildTestRequest(), pol); probeErr != nil {
+	if _, probeErr := client.Query(buildTestRequest(), pol, nil); probeErr != nil {
 		t.Fatalf("probe: %v", probeErr)
 	}
-	_, _ = client.Query(buildTestRequest(), pol)
+	_, _ = client.Query(buildTestRequest(), pol, nil)
 
 	if got := strings.Count(logs.String(), MsgBackoffStarted); got != 1 {
 		t.Fatalf("%q lines=%d want 1\n%s", MsgBackoffStarted, got, logs.String())
@@ -222,24 +222,30 @@ func trippedAppsecClient(t *testing.T, next *int) (*Client, *int) {
 	u, _ := url.Parse(srv.URL)
 	client := gatedAppsecClient(t, u.Host, 30)
 	for range admission.TripFailures {
-		_, _ = client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+		_, _ = client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	}
-	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}); !errors.Is(err, ErrGateSkip) {
+	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil); !errors.Is(err, ErrGateSkip) {
 		t.Fatalf("gate must be backing off, got %v", err)
 	}
 	return client, hits
 }
 
-// TestQuery_unreadableBodyWhileBackingOffIsGateSkip proves a streamed body is a gate skip, not the failure
-// action, while AppSec is backing off: the same rule as every other request, and as the ModSec leg.
-func TestQuery_unreadableBodyWhileBackingOffIsGateSkip(t *testing.T) {
+// TestQuery_bodyReadTimeoutWhileBackingOffIsNotAGateSkip proves a stalled body without Content-Length
+// is ErrBodyReadTimeout even while AppSec is backing off: the read happens before admission, and the
+// deadline blocks the request whatever the gate says.
+func TestQuery_bodyReadTimeoutWhileBackingOffIsNotAGateSkip(t *testing.T) {
 	status := http.StatusOK
-	client, _ := trippedAppsecClient(t, &status)
-	done := make(chan struct{})
-	defer close(done)
-	_, err := client.Query(withTestAddress(newStreamingRequest(done)), Policy{FailureAction: configuration.FailureActionBan})
-	if !errors.Is(err, ErrGateSkip) {
-		t.Fatalf("streamed body while backing off want ErrGateSkip, got %v", err)
+	client, hits := trippedAppsecClient(t, &status)
+	client.bodyReadTimeout = 50 * time.Millisecond
+	hitsBefore := *hits
+	req := newStreamingTestRequest(http.MethodPost)
+	defer func() { _ = req.Body.Close() }()
+	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
+	if !errors.Is(err, ErrBodyReadTimeout) {
+		t.Fatalf("stalled body while backing off want ErrBodyReadTimeout, got %v", err)
+	}
+	if *hits != hitsBefore {
+		t.Fatalf("AppSec called %d times for a stalled body, want 0", *hits-hitsBefore)
 	}
 }
 
@@ -256,14 +262,14 @@ func TestQuery_admissionErrorUsesFailureAction(t *testing.T) {
 	client := gatedAppsecClient(t, u.Host, 30)
 	client.GateForTest().Close()
 
-	decision, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough})
+	decision, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionPassthrough}, nil)
 	if err != nil || decision == nil || decision.Action != ActionAllow {
 		t.Fatalf("passthrough want allow, got %+v %v", decision, err)
 	}
-	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionCaptcha}); !errors.Is(err, ErrFailureCaptcha) {
+	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionCaptcha}, nil); !errors.Is(err, ErrFailureCaptcha) {
 		t.Fatalf("captcha want ErrFailureCaptcha, got %v", err)
 	}
-	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}); err == nil || errors.Is(err, ErrGateSkip) {
+	if _, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil); err == nil || errors.Is(err, ErrGateSkip) {
 		t.Fatalf("ban want a failure error, got %v", err)
 	}
 	if hits != 0 {
@@ -279,10 +285,10 @@ func TestQuery_bodyReadErrorDoesNotHoldProbe(t *testing.T) {
 	later := time.Now().Add(31 * time.Second)
 	client.GateForTest().Inner().SetNowForTest(func() time.Time { return later })
 
-	if _, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("i/o timeout"))), Policy{FailureAction: configuration.FailureActionBan}); err == nil || errors.Is(err, ErrGateSkip) {
+	if _, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("i/o timeout"))), Policy{FailureAction: configuration.FailureActionBan}, nil); err == nil || errors.Is(err, ErrGateSkip) {
 		t.Fatalf("body read error want a client error, got %v", err)
 	}
-	decision, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan})
+	decision, err := client.Query(buildTestRequest(), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if err != nil || decision == nil || decision.Action != ActionAllow {
 		t.Fatalf("next request must be the probe and pass, got %+v %v", decision, err)
 	}

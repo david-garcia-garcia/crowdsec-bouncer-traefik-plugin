@@ -18,6 +18,7 @@ import (
 // Override specific fields by modifying the returned config.
 func getTestConfig() *configuration.Config {
 	return &configuration.Config{
+		AppsecBodyReadTimeoutSeconds:        configuration.DefaultBodyReadTimeoutSeconds,
 		AppsecEnabled:                       false,
 		AppsecHost:                          "",
 		AppsecHTTPTimeoutSeconds:            10,
@@ -61,6 +62,7 @@ func getTestConfig() *configuration.Config {
 		LogFormat:                           "common",
 		LogLevel:                            "INFO",
 		ModsecBodyLimit:                     configuration.DefaultModsecBodyLimit,
+		ModsecBodyReadTimeoutSeconds:        configuration.DefaultBodyReadTimeoutSeconds,
 		ModsecHTTPTimeoutSeconds:            10,
 	}
 }

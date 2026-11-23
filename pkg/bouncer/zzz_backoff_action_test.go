@@ -123,7 +123,7 @@ func trippedAppSec(t *testing.T) (*appsec.Client, *int64) {
 	t.Cleanup(client.Close)
 	for range admission.TripFailures + 1 {
 		req := testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), testBackoffClientIP)
-		_, _ = client.Query(req, appsec.Policy{FailureAction: configuration.FailureActionBan})
+		_, _ = client.Query(req, appsec.Policy{FailureAction: configuration.FailureActionBan}, nil)
 	}
 	return client, &hits
 }
@@ -135,7 +135,7 @@ func trippedModSec(t *testing.T) (*modsecurity.Client, *int) {
 	hits := 0
 	client := failingModsec(t, 10, &hits)
 	for range admission.TripFailures + 1 {
-		_, _ = client.Inspect(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), configuration.FailureActionBan)
+		_, _ = client.Inspect(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), nil)
 	}
 	return client, &hits
 }

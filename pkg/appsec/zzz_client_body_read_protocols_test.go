@@ -44,7 +44,7 @@ func newQueryingFrontServer(t *testing.T, http2 bool, readTimeout time.Duration)
 	outcomes := make(chan queryOutcome, 1)
 	front := httptest.NewUnstartedServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		entered <- struct{}{}
-		_, err := client.Query(withTestAddress(r), Policy{FailureAction: configuration.FailureActionBan})
+		_, err := client.Query(withTestAddress(r), Policy{FailureAction: configuration.FailureActionBan}, nil)
 		outcomes <- queryOutcome{protoMajor: r.ProtoMajor, err: err}
 	}))
 	front.Config.ReadTimeout = readTimeout
