@@ -115,10 +115,10 @@ func bufferBody(httpReq *http.Request, limit int64, ctrl *http.ResponseControlle
 	// At math.MaxInt64, limit+1 overflows and LimitReader would read nothing: read the whole body instead.
 	if limit < math.MaxInt64 {
 		reader = io.LimitReader(src, limit+1)
-	}
-	// Grow only under the cap: ContentLength is the client's word and must not size a larger buffer.
-	if httpReq.ContentLength > 0 && httpReq.ContentLength <= limit {
-		buf.Grow(int(httpReq.ContentLength))
+		// Grow only under a real cap: ContentLength is the client's word and must not size an unbounded buffer.
+		if httpReq.ContentLength > 0 && httpReq.ContentLength <= limit {
+			buf.Grow(int(httpReq.ContentLength))
+		}
 	}
 
 	// Read the body. Only a body of unknown length runs under the deadline; this call owns the cut.

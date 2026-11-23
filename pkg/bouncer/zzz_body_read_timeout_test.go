@@ -239,3 +239,58 @@ func TestServeHTTP_resticShapeReachesOrigin(t *testing.T) {
 		}
 	}
 }
+
+// stalledHTTP1Outcome is what the handler and the client saw for one stalled HTTP/1.1 chunked body.
+type stalledHTTP1Outcome struct {
+	elapsed time.Duration
+	header  string
+	passed  bool
+}
+
+// TestServeHTTP_bodyReadTimeoutCutsHTTP1Chunked proves each leg cuts a real HTTP/1.1 chunked body that
+// stalls through the response controller built from rw: closing an HTTP/1.1 body does not unblock its
+// read, so without the controller the leg would wait for the body to end.
+func TestServeHTTP_bodyReadTimeoutCutsHTTP1Chunked(t *testing.T) {
+	for _, leg := range []string{legAppsec, legModsec} {
+		t.Run(leg, func(t *testing.T) {
+			var hits atomic.Int32
+			b, passed := bodyReadTimeoutTestBouncer(t, leg, configuration.FailureActionBan, nil, &hits)
+			outcomes := make(chan stalledHTTP1Outcome, 1)
+			server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+				started := time.Now()
+				continueAfterLAPIForTest(b, rw, testClientRequest(r, "203.0.113.40"))
+				outcomes <- stalledHTTP1Outcome{elapsed: time.Since(started), header: rw.Header().Get("X-Remediation"), passed: *passed}
+			}))
+			defer server.Close()
+			bodyReader, bodyWriter := io.Pipe()
+			defer func() { _ = bodyWriter.Close() }()
+			go func() { _, _ = bodyWriter.Write([]byte("partial")) }()
+			statuses := make(chan int, 1)
+			go func() {
+				req, _ := http.NewRequest(http.MethodPost, server.URL+"/upload", bodyReader)
+				res, err := server.Client().Do(req)
+				if err != nil {
+					statuses <- 0
+					return
+				}
+				_ = res.Body.Close()
+				statuses <- res.StatusCode
+			}()
+			var got stalledHTTP1Outcome
+			select {
+			case got = <-outcomes:
+			case <-time.After(10 * time.Second):
+				t.Fatal("the leg did not answer within 10s: the deadline did not cut the HTTP/1.1 read")
+			}
+			if got.elapsed > 3*time.Second {
+				t.Fatalf("answered after %v, want about 1s", got.elapsed)
+			}
+			if got.header != "error:body-read-timeout" || got.passed || hits.Load() != 0 {
+				t.Fatalf("header=%q passed=%v WAF calls=%d want error:body-read-timeout, no origin, no WAF call", got.header, got.passed, hits.Load())
+			}
+			if status := <-statuses; status != http.StatusBadRequest {
+				t.Fatalf("status=%d want 400", status)
+			}
+		})
+	}
+}

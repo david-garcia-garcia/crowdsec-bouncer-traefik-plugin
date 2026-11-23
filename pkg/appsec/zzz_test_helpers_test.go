@@ -107,8 +107,8 @@ func newStreamingTestRequest(method string) *http.Request {
 	return req
 }
 
-// newUnknownLengthGetRequest is an HTTP/3 GET whose body never ends: AppSec must not read it.
-func newUnknownLengthGetRequest(done <-chan struct{}) *http.Request {
+// newStalledUnknownLengthGetTestRequest is an HTTP/3 GET whose body never ends: AppSec must not read it.
+func newStalledUnknownLengthGetTestRequest(done <-chan struct{}) *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
 	req.ProtoMajor = 3
 	req.ContentLength = -1

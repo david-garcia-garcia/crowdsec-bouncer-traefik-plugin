@@ -50,7 +50,7 @@ func (s *stalledBody) Close() error {
 	return nil
 }
 
-func fail(format string, args ...interface{}) {
+func exitWithFailure(format string, args ...interface{}) {
 	fmt.Fprintf(os.Stderr, format+"\n", args...)
 	os.Exit(1)
 }
@@ -89,17 +89,17 @@ func serveStalledBody(legs int) (error, time.Duration) {
 
 func main() {
 	// Hard stop: a deadline that never fires would otherwise hang the interpreter.
-	time.AfterFunc(20*time.Second, func() { fail("body read deadline did not fire within 20s") })
+	time.AfterFunc(20*time.Second, func() { exitWithFailure("body read deadline did not fire within 20s") })
 
 	// HTTP/1.1 chunked body cut through http.NewResponseController: one leg, then a second leg
 	// that reads the stalled rest after the first leg stopped at its limit.
 	for _, legs := range []int{1, 2} {
 		err, elapsed := serveStalledBody(legs)
 		if !errors.Is(err, wafhop.ErrBodyReadTimeout) {
-			fail("HTTP/1.1 %%d leg(s): ReadBody error %%v, want ErrBodyReadTimeout", legs, err)
+			exitWithFailure("HTTP/1.1 %%d leg(s): ReadBody error %%v, want ErrBodyReadTimeout", legs, err)
 		}
 		if elapsed > 5*time.Second {
-			fail("HTTP/1.1 %%d leg(s): ReadBody returned after %%v, want about 1s", legs, elapsed)
+			exitWithFailure("HTTP/1.1 %%d leg(s): ReadBody returned after %%v, want about 1s", legs, elapsed)
 		}
 	}
 
@@ -109,7 +109,7 @@ func main() {
 	req.Body = &stalledBody{cut: make(chan struct{})}
 	_, err := wafhop.ReadBody(req, 100, wafhop.RejectOverLimit, nil, 200*time.Millisecond)
 	if !errors.Is(err, wafhop.ErrBodyReadTimeout) {
-		fail("nil controller ReadBody error %%v, want ErrBodyReadTimeout", err)
+		exitWithFailure("nil controller ReadBody error %%v, want ErrBodyReadTimeout", err)
 	}
 }
 `

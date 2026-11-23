@@ -70,7 +70,7 @@ func Test_appsecQuery_unknownLengthGetStaysHeadersOnly(t *testing.T) {
 	capture := &forwardCaptureRoundTripper{}
 	finished := make(chan error, 1)
 	go func() {
-		_, err := newForwardCaptureClient(capture).Query(withTestAddress(newUnknownLengthGetRequest(done)), Policy{FailureAction: configuration.FailureActionBan}, nil)
+		_, err := newForwardCaptureClient(capture).Query(withTestAddress(newStalledUnknownLengthGetTestRequest(done)), Policy{FailureAction: configuration.FailureActionBan}, nil)
 		finished <- err
 	}()
 	select {

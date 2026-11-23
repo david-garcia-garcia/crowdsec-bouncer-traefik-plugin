@@ -192,3 +192,13 @@ func TestReadBody_maxInt64LimitReadsAll(t *testing.T) {
 		}
 	}
 }
+
+// At the uncapped limit the client's Content-Length must not size the buffer before any byte arrives.
+func TestReadBody_maxInt64LimitIgnoresDeclaredLength(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("hello world"))
+	req.ContentLength = math.MaxInt64 / 2
+	got, err := ReadBody(req, math.MaxInt64, RejectOverLimit, nil, testBodyReadTimeout)
+	if err != nil || string(got) != "hello world" {
+		t.Fatalf("got %q err=%v", got, err)
+	}
+}
