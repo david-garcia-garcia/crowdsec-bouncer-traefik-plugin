@@ -28,7 +28,7 @@ Real e2e adds a `lapi-flaky` nginx proxy in front of LAPI and a `live` route tha
 In progress. 1 items remain.
 
 Priority: P2 — real operator and end-user pain during a LAPI or WAF outage (stalled requests, no per-router choice while a gate backs off), limited to outage windows and with failure actions as a partial workaround
-Reviewed head: b3cedb20
+Reviewed head: 87eebcf2
 Owner decision: None.
 
 ## Review scores
@@ -51,17 +51,30 @@ Owner decision: None.
 
 ## Specs
 Worktree:
-- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_lapi_admission-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — added
-- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_lapi_query-round-trip](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
-- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_lapi_admission-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — added
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_lapi_query-round-trip](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/archive/2026-11-23-add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+
+Completed:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/build_e2e_pester_crowdsec-stack/spec.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_appsec_client/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
+- [core_plugin_lapi_admission-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_lapi_admission-gate/spec.md) — added
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_lapi_failure-action/spec.md) — modified
+- [core_plugin_lapi_query-round-trip](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_lapi_query-round-trip/spec.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_lapi_reclaim-key/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_modsecurity_client/spec.md) — modified
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/specs/core_plugin_modsecurity_inspect/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -97,9 +110,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 1 added / 10 modified | Same list as ## Specs |
+| Specs in this PR | 2 added / 20 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | b3cedb20696ad6414298d89321372ebd894a73c5 | Card must match the branch you measured |
+| Reviewed head | 87eebcf2e426532d23efc766c81622d4d02dd0a2 | Card must match the branch you measured |
 
 ### Stored data model
 None.
