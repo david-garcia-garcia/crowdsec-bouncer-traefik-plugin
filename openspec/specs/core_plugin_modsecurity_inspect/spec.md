@@ -47,11 +47,16 @@ The plugin SHALL send a copy of the inbound request to `modsecUrl`. The sidecar 
 - **THEN** `Inspect` returns `ErrUnavailable` without calling the sidecar
 
 ### Requirement: Sidecar unavailability is logged once per window
-When the sidecar is unreachable or answers 5xx, `Inspect` SHALL log ERROR `crowdsec modsec sidecar unavailable` (`modsecurity.MsgUnavailable`) through `logger.Debounced` with a 5 second window keyed by the message text (process-wide), with attr `host` (the sidecar host, without query or userinfo) and `reason` (`unreachable` or `status`, plus `statusCode` for a status). An inbound cancel MUST NOT log this line.
+When the sidecar is unreachable or answers 5xx, `Inspect` SHALL log ERROR `crowdsec modsec sidecar unavailable` (`modsecurity.MsgUnavailable`) through `logger.Debounced` with a 5 second window keyed by the message text (process-wide), with attr `host` (the sidecar host, without query or userinfo) and `reason` (`unreachable` or `status`, plus `statusCode` for a status). For `unreachable` it SHALL add attr `error` with the transport error without the request URL, so the visitor's path and query stay off the log. An inbound cancel MUST NOT log this line. A Gate `Admit` error SHALL log ERROR `fail to admit ModSec request` with attr `error`.
 
 #### Scenario: An outage logs one line per window
 - **WHEN** the sidecar answers 503 to several requests within 5 seconds
 - **THEN** one `crowdsec modsec sidecar unavailable` line is logged
+
+#### Scenario: An unreachable sidecar log says why without the visitor URL
+- **WHEN** the sidecar refuses the connection for a request to `/visitor-path?token=visitor-secret`
+- **THEN** the `crowdsec modsec sidecar unavailable` line has attr `error` with the dial error
+- **AND** it contains neither `visitor-path` nor `visitor-secret`
 
 ### Requirement: Inspect copy reuses inbound identity owners
 The inspect copy SHALL set sidecar request `Host` to inbound `req.Host`. It SHALL copy Traefik's headers as Traefik left them, minus the shared hop-by-hop list and `Content-Length` (`core_plugin_wafhop_shared-request`). It MUST NOT set `X-Real-IP`. It MUST NOT append `RemoteAddr` to `X-Forwarded-For`. Plugin remediations and logs SHALL keep using `pkg/ip.GetRemoteIP` then `clientrequest.New`. Sidecar `REMOTE_ADDR` SHALL stay the Traefik-to-sidecar hop unless the CRS image is configured with `REMOTEIP_*` / `REAL_IP_*` (not this plugin).

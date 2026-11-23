@@ -149,9 +149,9 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		if wafhop.IsInboundCanceled(req.Request, err) {
 			return nil, ErrClientDisconnected
 		}
-		c.log.Error("appsecQuery:unreachable")
+		c.log.Error("appsecQuery:unreachable", "error", err)
 		c.gate.Record(ticket, false)
-		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable: "+err.Error())
 	}
 	// Drain every live response, including unexpected statuses, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
@@ -171,7 +171,7 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	// and does not use FailureAction. 500 uses FailureAction. 401 uses FailureAction and logs the
 	// protocol sentence. Any other code uses FailureAction and logs a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
-		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
+		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure", "statusCode", res.StatusCode)
 		c.gate.Record(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
@@ -192,7 +192,7 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	if err != nil {
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
 		if errors.Is(err, errAppsecReadBody) {
-			c.log.Info("appsecQuery:failure")
+			c.log.Info("appsecQuery:failure", "error", err)
 			c.gate.Record(ticket, false)
 			return resultForFailureAction(pol.FailureAction, err.Error())
 		}
