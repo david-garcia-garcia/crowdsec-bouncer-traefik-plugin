@@ -22,7 +22,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	}
 	lapiClient := b.loadedLAPI()
 	if lapiClient == nil {
-		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, headerReasonLAPIFailure, lapi.OriginPluginLapiFailure)
 	}
 	crowdsecMode := lapiClient.Mode()
 
@@ -58,15 +58,16 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 		}
 		logger.Trace(b.log, "serveLAPI", "isCrowdsecStreamHealthy", false, "ip", req.IPAddrString())
 		// Stream/alone never query LAPI per request. Miss is allow or failure action.
-		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail)
+		return b.applyLapiFailureAction(rw, req, match, configuration.ReasonTECH, headerReasonStreamUnhealthy, lapi.OriginPluginTechStreamFail)
 	}
 
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.NoneMode {
 		kind, origin, lookupErr := lapiClient.LiveLookup(req.IPAddrString(), scopes, b.defaultDecisionSeconds)
 		if lookupErr != nil {
 			b.log.Debug("serveLAPI:LiveLookup", "error", lookupErr.Error())
+			// A real decision outranks a failed or skipped query of the same lookup.
 			if !decisionscope.IsActiveRemediation(kind) {
-				return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure)
+				return b.answerLiveLookupError(rw, req, match, lookupErr)
 			}
 		}
 		kind, origin = b.appliedLAPIRemediation(match, kind, origin, 0)
@@ -79,17 +80,31 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	return true
 }
 
+// answerLiveLookupError answers a live/none lookup that returned no active remediation and an error.
+// A gate skip uses this router's LAPI backoff action; any other error is a failure and uses the failure
+// action. False means the response was not written, and ServeHTTP continues with AppSec.
+func (b *Bouncer) answerLiveLookupError(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, lookupErr error) bool {
+	if errors.Is(lookupErr, lapi.ErrGateSkip) {
+		// The live gate is backing off: LAPI was not called and the failure action does not apply.
+		return b.applyBackOffAction(rw, req, match, b.lapiBackOffAction, configuration.ReasonLAPI, headerReasonLAPIBackoff, lapi.OriginPluginLapiFailure)
+	}
+	return b.applyLapiFailureAction(rw, req, match, configuration.ReasonLAPI, headerReasonLAPIFailure, lapi.OriginPluginLapiFailure)
+}
+
 // applyLapiFailureAction applies this router's LAPI failure action.
-// Callers are a missing subscribed client, a live lookup error, and an unhealthy stream miss.
-// False means the response was not written, and ServeHTTP continues with AppSec.
-func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, banReason, origin string) bool {
+// Callers are a missing subscribed client, a live lookup error, and an unhealthy stream miss; each
+// passes its own header reason (lapi-failure or stream-unhealthy). A live gate skip is not a
+// failure: it uses applyBackOffAction. False means the response was not written, and ServeHTTP
+// continues with AppSec.
+func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, banReason, headerReason, origin string) bool {
 	switch b.lapiFailureAction {
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		return b.remediateUnderActionRules(rw, req, match, decisionscope.CaptchaValue, origin)
+		// A LAPI failure captcha downgrade keeps RemediationReason LAPI, stream-unhealthy included.
+		return b.captchaUnlessBypassed(rw, req, match, configuration.ReasonLAPI, headerReason, origin)
 	default:
-		b.banWarnCaptchaRule(rw, req, match, banReason, headerReasonFromOrigin(origin), origin)
+		b.banWarnCaptchaRule(rw, req, match, banReason, headerReason, origin)
 		return true
 	}
 }

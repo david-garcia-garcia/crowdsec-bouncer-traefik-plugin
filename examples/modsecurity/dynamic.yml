@@ -43,6 +43,8 @@ http:
         bouncer:
           bouncerEnabled: true
           bouncerModsecFailureAction: ban
+          # While the backoff gate skips the sidecar, ban too (the default backoff action is passthrough).
+          bouncerModsecBackOffAction: ban
           bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
           lapiInstanceName: shared
           appsecInstanceName: shared

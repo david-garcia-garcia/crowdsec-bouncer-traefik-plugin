@@ -121,6 +121,20 @@ func closeIdle(httpClient *http.Client) {
 	}
 }
 
+// statusError is a LAPI/CAPI answer whose status is not 2xx. Error() is the pre-formatted text
+// sendQuery has always returned, so stream logs and message assertions do not change. Only the
+// live/none path reads code (liveQueryHealthy); stream, alone, and CAPI login ignore the type.
+type statusError struct {
+	code int
+	msg  string
+}
+
+// Error returns the message sendQuery formatted for this status.
+func (e *statusError) Error() string {
+	return e.msg
+}
+
+// isReverseProxyError reports the 502/503/504 a proxy in front of LAPI answers while LAPI is down.
 func isReverseProxyError(statusCode int) bool {
 	return statusCode == http.StatusBadGateway ||
 		statusCode == http.StatusServiceUnavailable ||
@@ -247,7 +261,7 @@ func (c *Client) sendQuery(stringURL string, data []byte, mayRenewToken bool) ([
 	// Drain every live response, including 502/503/504, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
 	if isReverseProxyError(res.StatusCode) {
-		return nil, fmt.Errorf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)
+		return nil, &statusError{code: res.StatusCode, msg: fmt.Sprintf("crowdsecQuery:unreachable url:%s statusCode:%d", stringURL, res.StatusCode)}
 	}
 	if res.StatusCode == http.StatusUnauthorized && c.crowdsecMode == configuration.AloneMode && mayRenewToken {
 		if errToken := c.getToken(); errToken != nil {
@@ -258,7 +272,7 @@ func (c *Client) sendQuery(stringURL string, data []byte, mayRenewToken bool) ([
 
 	statusStr := strconv.Itoa(res.StatusCode)
 	if len(statusStr) < 1 || statusStr[0] != '2' {
-		return nil, fmt.Errorf("crowdsecQuery method:%s url:%s, statusCode:%d (expected: 2xx)", req.Method, stringURL, res.StatusCode)
+		return nil, &statusError{code: res.StatusCode, msg: fmt.Sprintf("crowdsecQuery method:%s url:%s, statusCode:%d (expected: 2xx)", req.Method, stringURL, res.StatusCode)}
 	}
 
 	body, err := io.ReadAll(res.Body)

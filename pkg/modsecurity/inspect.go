@@ -26,7 +26,7 @@ var (
 	// could not be built, or a streamed body it cannot see. The bouncer applies bouncerModsecFailureAction.
 	ErrUnavailable = errors.New("modsecInspect:unavailable")
 	// ErrGateSkip means the admission gate is backing off and the sidecar was not called.
-	// As for AppSec, the bouncer continues without ModSec and without the failure action.
+	// As for AppSec, the bouncer answers it with bouncerModsecBackOffAction, not the failure action.
 	ErrGateSkip = errors.New("modsecInspect:unhealthySkip")
 	// ErrBodyTooLarge means the body is over modsecBodyLimit. The bouncer answers 413.
 	ErrBodyTooLarge = wafhop.ErrBodyTooLarge

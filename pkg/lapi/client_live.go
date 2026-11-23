@@ -15,9 +15,10 @@ import (
 // remediation kind, never by the error alone:
 //
 //	active remediation + non-nil error  -> a real decision; remediate it
-//	non-active remediation + non-nil error -> LAPI failed; apply BouncerLapiFailureAction
+//	non-active remediation + ErrGateSkip -> the live gate is backing off; apply BouncerLapiBackOffAction
+//	non-active remediation + other error -> LAPI failed; apply BouncerLapiFailureAction
 //
-// Any query this lookup makes can fail that way: the IP query and every header-scope query.
+// Any query this lookup makes can fail or be skipped that way: the IP query and every header-scope query.
 func (c *Client) LiveLookup(remoteIP string, scopes map[string]string, defaultDecisionSeconds int64) (kind string, origin string, err error) {
 	return c.handleNoStreamCache(remoteIP, scopes, defaultDecisionSeconds)
 }

@@ -3,8 +3,10 @@
 # Admission gates (backoff) of both WAF legs against real outages (dynamic/waf-backoff.yml).
 #
 # A gate trips after 5 failures in a row. Until then each failure applies the leg's failure
-# action. After the trip the leg is skipped for the cooldown: no call and no failure action.
-# The next request after the cooldown is a probe; a successful probe reopens the leg.
+# action. After the trip the leg is skipped for the cooldown: no call, and each router answers
+# with its own backoff action (default passthrough), never the failure action. The gate is
+# shared by every router on the connection. The next request after the cooldown is a probe;
+# a successful probe reopens the leg.
 # Each transition is logged once per outage: "crowdsec <leg> backoff started" (WARN) and
 # "crowdsec <leg> backoff ended" (INFO).
 #
@@ -47,7 +49,7 @@ BeforeAll {
 
 Describe "WAF admission gates" {
     Context "AppSec gate with the shipped defaults" -Tag "modsec" {
-        It "Should ban each admitted failure, then skip AppSec without FailureAction after the trip" {
+        It "Should let every request through with the default actions, and stop calling AppSec after the trip" {
             $ip = "10.82.0.10"
             $since = Get-LogSince
             $responses = foreach ($i in 1..8) {
@@ -57,13 +59,11 @@ Describe "WAF admission gates" {
 
             $listenerHits = @(Get-ContainerLogLines -Container "waf-5xx-test" -Since $since -Contains @("GET /waf-backoff-default")).Count
 
-            # A fresh stack sees 5 bans (the default budget) then 3 skips. A rerun within the 30 s
-            # cooldown starts already tripped, so it sees fewer listener calls, never more.
+            # A fresh stack sees 5 listener calls (the default budget) then 3 skips. A rerun within
+            # the 10 s cooldown starts already tripped, so it sees fewer listener calls, never more.
             $listenerHits | Should -BeLessOrEqual $script:TripFailures -Because "the default budget trips the gate after 5 failures"
-            @($codes | Where-Object { $_ -eq 403 }).Count | Should -Be $listenerHits -Because "every admitted failure applies the default FailureAction ban, and only those"
-            $codes[-1] | Should -Be 200 -Because "after the trip AppSec is skipped and the request reaches the origin"
-            $firstPass = [array]::IndexOf($codes, 200)
-            @($codes[$firstPass..($codes.Count - 1)] | Where-Object { $_ -ne 200 }).Count | Should -Be 0 -Because "no request is banned once the gate skips AppSec"
+            @($codes | Where-Object { $_ -ne 200 }).Count | Should -Be 0 -Because "the default failure action and the default backoff action are both passthrough"
+            @($responses | Where-Object { Get-ResponseHeader $_ $script:Header }).Count | Should -Be 0 -Because "a passthrough sets no verdict header"
             $responses[-1].Content | Should -Match "Hostname:"
 
             if ($listenerHits -eq $script:TripFailures) {
@@ -107,10 +107,16 @@ Describe "WAF admission gates" {
                 Get-ResponseHeader $response $script:Header | Should -Be "ban:appsec-failure"
             }
 
-            # 2. Tripped: AppSec is skipped without the failure action. ModSec on the same router still runs.
+            # 2. Tripped: AppSec is skipped without the failure action, and this router's default
+            #    backoff action passthrough lets the request through. ModSec on the same router still runs.
             $clean = Invoke-Cycle -Endpoint "/appsec-cycle/clean" -IP $script:IP
-            $clean.StatusCode | Should -Be 200 -Because "a skipped AppSec does not ban"
+            $clean.StatusCode | Should -Be 200 -Because "the default backoff action passthrough does not ban"
             Get-ResponseHeader $clean $script:Header | Should -BeNullOrEmpty
+            # The second router on the same AppSec instance shares the tripped gate and answers with
+            # its own bouncerAppsecBackOffAction: ban. ban:appsec-backoff only comes from a gate skip.
+            $strict = Invoke-Cycle -Endpoint "/appsec-backoff-ban/clean" -IP $script:IP
+            $strict.StatusCode | Should -Be 403 -Because "the subscriber's backoff action is ban"
+            Get-ResponseHeader $strict $script:Header | Should -Be "ban:appsec-backoff" -Because "the shared gate skipped AppSec for the subscriber too"
             $sqli = Invoke-Cycle -Endpoint "/appsec-cycle/skip$($script:SqlInjection)" -IP $script:IP
             $sqli.StatusCode | Should -Be 403
             Get-ResponseHeader $sqli $script:Header | Should -Be "ban:modsec" -Because "ModSec keeps protecting while AppSec is skipped"

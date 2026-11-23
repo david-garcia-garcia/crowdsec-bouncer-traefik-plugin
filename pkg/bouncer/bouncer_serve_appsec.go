@@ -27,7 +27,7 @@ func (b *Bouncer) serveAppSec(rw http.ResponseWriter, req clientrequest.Request,
 	if b.answerAppSec(rw, req, match) {
 		return true
 	}
-	// Nothing answered (allow, failure-action passthrough, or a cleared captcha gate):
+	// Nothing answered (allow, failure- or backoff-action passthrough, or a cleared captcha gate):
 	// the challenge prefix still must not reach origin.
 	if !match.SkipAppsec && b.appsecLeg.subscribed && isCrowdsecChallengeCallbackPath(req.URL.Path) {
 		http.NotFound(rw, req.Request)
@@ -84,13 +84,13 @@ func (b *Bouncer) applyAppsecFailureAction(rw http.ResponseWriter, req clientreq
 
 // answerAppsecQueryError writes the response for an error from Query.
 // Query already applied the failure action: passthrough is not an error, captcha is ErrFailureCaptcha,
-// and every other error is a ban. A client that left or sent a broken body is not a ban.
-// False means a captcha kind did not write.
+// and every other error is a ban. A gate skip uses this router's backoff action instead.
+// A client that left or sent a broken body is not a ban. False means nothing was written.
 func (b *Bouncer) answerAppsecQueryError(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, err error) bool {
 	switch {
 	case errors.Is(err, appsec.ErrGateSkip):
 		// The admission gate is backing off: AppSec was not called and FailureAction does not apply.
-		return false
+		return b.applyBackOffAction(rw, req, match, b.appsecBackOffAction, configuration.ReasonAPPSEC, headerReasonAppsecBackoff, lapi.OriginPluginAppsecFailure)
 	case errors.Is(err, appsec.ErrClientDisconnected):
 		b.handleClientDisconnectedServeHTTP(rw, req, "appsec")
 		return true
