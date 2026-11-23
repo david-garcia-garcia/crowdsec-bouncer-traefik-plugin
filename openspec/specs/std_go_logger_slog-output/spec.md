@@ -6,17 +6,12 @@ Defines the plugin slog logger's output destination and format when constructed 
 
 ### Requirement: Logs go to stdout only
 
-Every logger constructed via `NewWithFormat` SHALL write to stdout. The plugin MUST NOT open, create, or append to a log file, and `Config` MUST NOT carry a log-file setting. A Traefik config that still sets `logFilePath` SHALL start normally: Traefik's plugin config decoder drops the unknown key. Tests MAY redirect loggers built afterwards with `logger.SetOutputForTest`; production code MUST NOT call it.
+Every logger constructed via `NewWithFormat` SHALL write to stdout. The plugin MUST NOT open, create, or append to a log file. Tests MAY redirect loggers built afterwards with `logger.SetOutputForTest`; production code MUST NOT call it.
 
 #### Scenario: Default destination
 
 - **WHEN** `NewWithFormat` is called outside a `SetOutputForTest` window
 - **THEN** the logger writes to stdout
-
-#### Scenario: Leftover logFilePath
-
-- **WHEN** a middleware's Traefik config still sets `logFilePath`
-- **THEN** `New` succeeds, no file is created at that path, and the logs go to stdout
 
 ### Requirement: Case-insensitive JSON format
 

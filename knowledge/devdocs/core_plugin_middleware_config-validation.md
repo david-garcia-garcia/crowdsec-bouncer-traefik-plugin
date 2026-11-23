@@ -131,4 +131,3 @@ if siteKey == "" {
 - CA parse still triggers on explicit `AppsecScheme == https`, not inherit-https.
 - A fully empty action rule, invalid name/action, or invalid RE2 fails `ValidateParams` with `BouncerActionRules`; do not ignore it. Empty lists pass. Leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader` / `modSecurityUrl` never reach `New`.
 - Enabled ModSec with an empty or relative URL, or with `modsecBodyLimit: 0`, fails. Disabled ModSec with an empty URL or a zero limit passes. `bouncerModsecFailureAction: open` (the old FailMode value) fails; `captcha` without a captcha instance name fails.
-- A leftover `logFilePath` never reaches `New`: Traefik's plugin decoder drops keys `Config` does not have, so the config starts and logs go to stdout.

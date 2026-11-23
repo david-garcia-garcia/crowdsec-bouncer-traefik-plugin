@@ -12,7 +12,7 @@ _Avoid_: CrowdsecBouncerTraefikPlugin; CrowdsecBounder; the HTML template name a
 
 ## Overview
 
-Call `logger.NewWithFormat` once in plugin `New`. JSON is case-insensitive. Any other format uses the text/common handler. Output is always stdout; there is no log-file setting.
+Call `logger.NewWithFormat` once in plugin `New`. JSON is case-insensitive. Any other format uses the text/common handler. Output is always stdout.
 
 ## How to use
 
