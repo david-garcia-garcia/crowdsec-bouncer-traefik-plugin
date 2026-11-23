@@ -162,7 +162,6 @@ type Config struct {
 	LapiTLSInsecureVerify               bool                         `json:"lapiTlsInsecureVerify,omitempty"`
 	LapiUpdateIntervalSeconds           int64                        `json:"lapiUpdateIntervalSeconds,omitempty"`
 	LapiUpdateMaxFailure                int64                        `json:"lapiUpdateMaxFailure,omitempty"`
-	LogFilePath                         string                       `json:"logFilePath,omitempty"`
 	LogFormat                           string                       `json:"logFormat,omitempty"`
 	LogLevel                            string                       `json:"logLevel,omitempty"`
 	ModsecBodyLimit                     int64                        `json:"modsecBodyLimit,omitempty"`
@@ -311,7 +310,6 @@ func New() *Config {
 		LapiTLSInsecureVerify:               false,
 		LapiUpdateIntervalSeconds:           60,
 		LapiUpdateMaxFailure:                0,
-		LogFilePath:                         "",
 		LogFormat:                           "common",
 		LogLevel:                            LogINFO,
 		ModsecBodyLimit:                     DefaultModsecBodyLimit,
@@ -755,18 +753,10 @@ func rejectMissingEnabledAppsecHost(config *Config, appsecScheme string) error {
 	return nil
 }
 
-// validateLogging rejects an unknown log level and an unwritable LogFilePath.
+// validateLogging rejects an unknown log level.
 func validateLogging(config *Config) error {
 	if !contains([]string{LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR}, strings.ToUpper(config.LogLevel)) {
 		return fmt.Errorf("LogLevel should be one of (%s,%s,%s,%s,%s)", LogTRACE, LogDEBUG, LogINFO, LogWARN, LogERROR)
-	}
-	if config.LogFilePath != "" {
-		// Prove the path is writable, then close so ValidateParams does not keep the check descriptor.
-		checkFile, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-		if err != nil {
-			return fmt.Errorf("LogFilePath is not writable %w", err)
-		}
-		_ = checkFile.Close()
 	}
 	return nil
 }

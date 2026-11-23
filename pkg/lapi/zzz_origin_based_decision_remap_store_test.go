@@ -11,7 +11,7 @@ import (
 )
 
 func TestStreamPutItemStoresLAPIKind(t *testing.T) {
-	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client, _ := NewTestClient(logger.New("ERROR"))
 	stored, ok := client.streamPutItem(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "CAPI"}, 60)
 	if !ok || stored.Kind != decisionscope.BannedValue || stored.Origin != "CAPI" {
 		t.Fatalf("CAPI ban must store ban, got %#v ok=%v", stored, ok)
@@ -23,7 +23,7 @@ func TestStreamPutItemStoresLAPIKind(t *testing.T) {
 }
 
 func TestStreamPutItemCopiesScenario(t *testing.T) {
-	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client, _ := NewTestClient(logger.New("ERROR"))
 	stored, ok := client.streamPutItem(Decision{
 		Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "lists", Scenario: "firehol_level1",
 	}, 60)

@@ -56,7 +56,7 @@ func TestHandleStreamTicker_SlowPollSkipsBusyTicks(t *testing.T) {
 	}
 	cfg := testStreamConfig(parsed.Host, 0)
 	cfg.LapiUpdateIntervalSeconds = 1
-	client, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "slow-poll", "test")
+	client, err := Open(context.Background(), cfg, logger.New("ERROR"), "slow-poll", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,7 +78,7 @@ func TestHandleStreamTicker_LeaseValidOverlapOneFetch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	store := decisionstore.NewMemory(logger.New("ERROR"))
 	client := newSharedStreamPoller(t, store, parsed.Host)
 	attachTestTransport(client, server.Client(), "test-key")
 
@@ -114,7 +114,7 @@ func TestStreamHealthy_ConcurrentWithPollWrite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	store := decisionstore.NewMemory(logger.New("ERROR"))
 	client := newSharedStreamPoller(t, store, parsed.Host)
 	atomic.StoreInt64(&client.isCrowdsecStreamHealthy, 1)
 	attachTestTransport(client, server.Client(), "test-key")
@@ -143,13 +143,13 @@ func TestHandleStreamTicker_SleepThenWakeWhileInFlight(t *testing.T) {
 	cfg := testStreamConfig(parsed.Host, 0)
 	cfg.LapiUpdateIntervalSeconds = 60
 	ctx, cancel := context.WithCancel(context.Background())
-	first, err := Open(ctx, cfg, logger.New("ERROR", ""), "inflight-wake", "test")
+	first, err := Open(ctx, cfg, logger.New("ERROR"), "inflight-wake", "test")
 	if err != nil {
 		t.Fatal(err)
 	}
 	cancel()
 	waitClientSleeping(t, first)
-	second, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "inflight-wake", "test")
+	second, err := Open(context.Background(), cfg, logger.New("ERROR"), "inflight-wake", "test")
 	if err != nil {
 		t.Fatal(err)
 	}

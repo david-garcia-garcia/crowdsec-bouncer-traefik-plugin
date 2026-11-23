@@ -186,7 +186,6 @@ func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 		cfg := cfgCaptchaOwnerAt(t, "shared")
 		cfg.CaptchaFilePath = ""
 		cfg.LogLevel = "WARN"
-		cfg.LogFilePath = logFile
 
 		h, err := New(ctx, testNextOK(), cfg, "cs-owner")
 		if err != nil {
@@ -228,7 +227,6 @@ func TestNew_EmptyCaptchaFilePathWarnsAndBans(t *testing.T) {
 		sub.CaptchaEnabled = false
 		sub.CaptchaFilePath = "/captcha.html"
 		sub.LogLevel = "WARN"
-		sub.LogFilePath = logFile
 
 		h, err := New(ctx, testNextOK(), sub, "cs-bounce")
 		if err != nil {

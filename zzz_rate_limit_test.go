@@ -347,12 +347,12 @@ func TestNew_RateLimitDeadRedisBufferedKeepsTheLocalLimit(t *testing.T) {
 	}
 }
 
-// countRateLimitOwnerLines is how many lines of logFilePath carry msg at level for subscriber app-a of
+// countRateLimitOwnerLines is how many lines of logPath carry msg at level for subscriber app-a of
 // rate-limit instance shared.
-func countRateLimitOwnerLines(t *testing.T, logFilePath, msg, level string) int {
+func countRateLimitOwnerLines(t *testing.T, logPath, msg, level string) int {
 	t.Helper()
 	total := 0
-	for _, entry := range readLogEntries(t, logFilePath, msg) {
+	for _, entry := range readLogEntries(t, logPath, msg) {
 		// fmt.Sprint, not comma-ok assertions: yaegi runs this file.
 		if fmt.Sprint(entry["level"]) == level && fmt.Sprint(entry["traefikName"]) == "app-a" && fmt.Sprint(entry["instanceName"]) == "shared" {
 			total++
@@ -370,35 +370,40 @@ func countRateLimitOwnerLines(t *testing.T, logFilePath, msg, level string) int 
 func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	bouncer.ResetRateLimitOwnerWarningsForTest()
 	t.Cleanup(bouncer.ResetRateLimitOwnerWarningsForTest)
-	logFilePath := newTestLogFile(t)
+	logPath := newTestLogFile(t)
 	const warnMsg = "crowdsec bouncer rate limit owner unavailable"
 	const infoMsg = "crowdsec bouncer rate limit owner available"
+	// The owner logs to the same captured file, so it logs JSON too.
+	jsonOwner := func() *configuration.Config {
+		config := cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests)
+		config.LogFormat = "json"
+		return config
+	}
 
 	// Subscribe before any owner publishes.
 	subscriberConfig := cfgRateLimitSubscriber("shared")
 	subscriberConfig.LogLevel = "INFO"
 	subscriberConfig.LogFormat = "json"
-	subscriberConfig.LogFilePath = logFilePath
 	appA, err := New(context.Background(), testNextOK(), subscriberConfig, "app-a")
 	if err != nil {
 		t.Fatal(err)
 	}
-	warnedBeforeOwner := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN")
+	warnedBeforeOwner := countRateLimitOwnerLines(t, logPath, warnMsg, "WARN")
 	if warnedBeforeOwner > 1 {
 		t.Fatalf("subscribe before publish logged %d WARN lines, want at most one", warnedBeforeOwner)
 	}
 	t.Logf("subscribe before publish: %d WARN (1 under Yaegi, 0 in compiled Go)", warnedBeforeOwner)
 
 	// The owner publishes: one INFO per WARN before it.
-	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
+	if _, err := New(context.Background(), testNextOK(), jsonOwner(), "rl-owner"); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRateLimitOwnerLines(t, logFilePath, infoMsg, "INFO"); got != warnedBeforeOwner {
+	if got := countRateLimitOwnerLines(t, logPath, infoMsg, "INFO"); got != warnedBeforeOwner {
 		t.Fatalf("first bind: INFO lines=%d want %d", got, warnedBeforeOwner)
 	}
 
 	// The owner is dropped: one WARN, and requests pass without another.
-	dropped := cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests)
+	dropped := jsonOwner()
 	dropped.RateLimitEnabled = false
 	dropped.RateLimitInstanceName = ""
 	if _, err := New(context.Background(), testNextOK(), dropped, "rl-owner"); err != nil {
@@ -407,7 +412,7 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	if status := serveTestRequests(appA, "203.0.113.70", 5); status != http.StatusOK {
 		t.Fatalf("no owner: status %d, want 200", status)
 	}
-	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
+	if got := countRateLimitOwnerLines(t, logPath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
 		t.Fatalf("owner dropped: WARN lines=%d want %d", got, warnedBeforeOwner+1)
 	}
 
@@ -416,18 +421,18 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	if _, err := New(context.Background(), testNextOK(), subscriberConfig, "app-a"); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
+	if got := countRateLimitOwnerLines(t, logPath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
 		t.Fatalf("app-a rebuilt without the owner: WARN lines=%d want %d", got, warnedBeforeOwner+1)
 	}
 
 	// The owner returns: one INFO although both app-a instances bind, and the limit answers again.
-	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
+	if _, err := New(context.Background(), testNextOK(), jsonOwner(), "rl-owner"); err != nil {
 		t.Fatal(err)
 	}
-	if got := countRateLimitOwnerLines(t, logFilePath, infoMsg, "INFO"); got != warnedBeforeOwner+1 {
+	if got := countRateLimitOwnerLines(t, logPath, infoMsg, "INFO"); got != warnedBeforeOwner+1 {
 		t.Fatalf("owner restored: INFO lines=%d want %d", got, warnedBeforeOwner+1)
 	}
-	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
+	if got := countRateLimitOwnerLines(t, logPath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
 		t.Fatalf("owner restored: WARN lines=%d want %d", got, warnedBeforeOwner+1)
 	}
 }

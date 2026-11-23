@@ -8,7 +8,7 @@ import (
 )
 
 func TestValidateOriginBasedDecisionRemap(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	ok := getMinimalConfig()
 	ok.BouncerOriginBasedDecisionRemap = map[string]map[string]string{
 		"CAPI":                 {"ban": "captcha"},

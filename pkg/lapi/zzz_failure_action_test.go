@@ -22,7 +22,7 @@ func newTestLiveClient(t *testing.T, server *httptest.Server) *Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client, _ := NewTestClient(logger.New("ERROR"))
 	client.crowdsecScheme = serverURL.Scheme
 	client.crowdsecHost = serverURL.Host
 	client.crowdsecPath = "/"

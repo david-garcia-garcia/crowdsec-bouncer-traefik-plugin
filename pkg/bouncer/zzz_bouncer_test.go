@@ -56,7 +56,7 @@ func TestClientRequestRemoteIPIsCanonical(t *testing.T) {
 // TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan fails if ServeHTTP keeps the raw
 // header on remoteIP: lookup keys on that string and misses the canonical slot.
 func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	lapiClient, store := lapi.NewTestClient(log)
 	store.Put(decisionstore.Decision{Scope: decisionscope.ScopeIP, Value: "2001:db8::1", Kind: decisionscope.BannedValue, DurationSec: 60})
 	clientChecker, err := ip.NewChecker(log, nil)
@@ -96,7 +96,7 @@ func TestServeHTTP_NonCanonicalHeaderHitsCanonicalIpBan(t *testing.T) {
 }
 
 func TestServeHTTP_PackedMemoryBanRecordsCrowdsecOrigin(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	lapiClient, store := lapi.NewTestClient(log)
 	lapi.AttachTestMetricsReporter(lapiClient)
 	lapi.SeedLiveSnapshotForTest(store, "203.0.113.10", decisionscope.BannedValue, "crowdsec", 60)
@@ -275,9 +275,9 @@ func testBouncerWithAppsec(t *testing.T, handler http.HandlerFunc, banTemplate *
 		remediationCustomHeader: "X-Remediation",
 		banTemplate:             banTemplate,
 		banTemplateContentType:  "text/html; charset=utf-8",
-		log:                     logger.New("DEBUG", ""),
+		log:                     logger.New("DEBUG"),
 	}
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("DEBUG")))
 	return b, appsecServer
 }
 
@@ -325,7 +325,7 @@ func testChallengeDropped(t *testing.T, method, path string) (requests, bytes in
 		_, _ = w.Write([]byte(`{"action":"challenge","http_status":200,"user_body_content":"<html>challenge</html>"}`))
 	}, nil)
 	t.Cleanup(appsecServer.Close)
-	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR"))
 	lapi.AttachTestMetricsReporter(lapiClient)
 	bindTestLAPI(b, lapiClient)
 	rw := httptest.NewRecorder()
@@ -586,9 +586,9 @@ func TestHandleNextServeHTTPAllowCallsNext(t *testing.T) {
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			nextCalled = true
 		}),
-		log: logger.New("ERROR", ""),
+		log: logger.New("ERROR"),
 	}
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	continueAfterLAPIForTest(b, httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 	if !nextCalled {
 		t.Fatal("next handler should be called for allow")
@@ -614,9 +614,9 @@ func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
-			log: logger.New("ERROR", ""),
+			log: logger.New("ERROR"),
 		}
-		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 		return b, &nextCalled
 	}
 
@@ -643,7 +643,7 @@ func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
 		b := &Bouncer{
 			appsecLeg:           legBinding{subscribed: true},
 			appsecFailureAction: configuration.FailureActionPassthrough,
-			log:                 logger.New("ERROR", ""),
+			log:                 logger.New("ERROR"),
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
@@ -670,7 +670,7 @@ func TestHandleNextServeHTTPAllowKeepsChallengePathsFromOrigin(t *testing.T) {
 	t.Run("appsec not subscribed custom.js", func(t *testing.T) {
 		nextCalled := false
 		b := &Bouncer{
-			log: logger.New("ERROR", ""),
+			log: logger.New("ERROR"),
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
@@ -719,7 +719,7 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 	}
 	var logBuf bytes.Buffer
 	traceLog := slog.New(slog.NewJSONHandler(&logBuf, &slog.HandlerOptions{Level: logger.LevelTrace}))
-	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR"))
 	lapi.AttachTestMetricsReporter(lapiClient)
 	nextCalled := false
 	b := &Bouncer{
@@ -732,7 +732,7 @@ func TestHandleNextServeHTTP_clientDisconnected(t *testing.T) {
 		log:                     traceLog,
 	}
 	bindTestLAPI(b, lapiClient)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/upload", failingBodyForDisconnectTest{err: context.Canceled})
 	req.ContentLength = 100
 	rw := &statusWatchRecorder{ResponseRecorder: httptest.NewRecorder()}
@@ -783,7 +783,7 @@ func newBodyReadTestBouncer(t *testing.T, failureAction string) (*Bouncer, *lapi
 	if err != nil {
 		t.Fatal(err)
 	}
-	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR"))
 	lapi.AttachTestMetricsReporter(lapiClient)
 	nextCalled := new(bool)
 	b := &Bouncer{
@@ -793,10 +793,10 @@ func newBodyReadTestBouncer(t *testing.T, failureAction string) (*Bouncer, *lapi
 		appsecFailureAction:     failureAction,
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
-		log:                     logger.New("ERROR", ""),
+		log:                     logger.New("ERROR"),
 	}
 	bindTestLAPI(b, lapiClient)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	return b, lapiClient, nextCalled, appsecHits
 }
 
@@ -863,7 +863,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			passthroughCalled = true
 		}),
-		log:               logger.New("ERROR", ""),
+		log:               logger.New("ERROR"),
 		lapiFailureAction: configuration.FailureActionPassthrough,
 	}
 	bindTestLAPI(passthrough, shared)
@@ -872,7 +872,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 			t.Error("ban bouncer must not call next")
 		}),
 		remediationStatusCode: http.StatusForbidden,
-		log:                   logger.New("ERROR", ""),
+		log:                   logger.New("ERROR"),
 		lapiFailureAction:     configuration.FailureActionBan,
 	}
 	bindTestLAPI(ban, shared)
@@ -903,7 +903,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				nextCalled = true
 			}),
-			log:               logger.New("ERROR", ""),
+			log:               logger.New("ERROR"),
 			lapiFailureAction: configuration.FailureActionPassthrough,
 		}
 		passReq := testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
@@ -921,7 +921,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 				t.Error("next handler should not be called")
 			}),
 			remediationStatusCode: http.StatusForbidden,
-			log:                   logger.New("ERROR", ""),
+			log:                   logger.New("ERROR"),
 			lapiFailureAction:     configuration.FailureActionBan,
 		}
 		recorder := httptest.NewRecorder()
@@ -950,9 +950,9 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 				nextCalled = true
 			}),
 			appsecFailureAction: configuration.FailureActionPassthrough,
-			log:                 logger.New("ERROR", ""),
+			log:                 logger.New("ERROR"),
 		}
-		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+		bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 		continueAfterLAPIForTest(b, httptest.NewRecorder(), testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/protected", nil), "192.0.2.10"))
 		if !nextCalled {
 			t.Fatal("passthrough on AppSec 500 should call next")
@@ -974,7 +974,7 @@ func TestHandleNextServeHTTPAppsecFailureAction(t *testing.T) {
 
 func TestNewForwardedHeadersInsecureHeaderName(t *testing.T) {
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	t.Run("default custom name becomes X-Real-Ip", func(t *testing.T) {
 		cfg := configuration.New()
 		cfg.LapiMode = configuration.StreamMode

@@ -22,12 +22,12 @@ func newTestQueryClient(t *testing.T, server *httptest.Server, mode string) *Cli
 	if err != nil {
 		t.Fatal(err)
 	}
-	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client, _ := NewTestClient(logger.New("ERROR"))
 	client.crowdsecScheme = serverURL.Scheme
 	client.crowdsecHost = serverURL.Host
 	client.crowdsecPath = "/"
 	client.crowdsecMode = mode
-	client.log = logger.New("ERROR", "")
+	client.log = logger.New("ERROR")
 	client.pluginVersion = "test"
 	client.crowdsecMachineID = "machine"
 	client.crowdsecPassword = "password"

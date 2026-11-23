@@ -32,7 +32,7 @@ func testBypassHealthRequest() *http.Request {
 
 func testBypassOriginBouncer(t *testing.T) (*Bouncer, *bool) {
 	t.Helper()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func testBypassOriginBouncer(t *testing.T) (*Bouncer, *bool) {
 }
 
 func TestBouncerNew_compilesActionRules(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := configuration.New()
 	cfg.BouncerActionRules = []httprule.ActionRule{
 		{Name: "healthz", Action: []string{httprule.ActionBypassAppsec}, Rule: httprule.Rule{Path: "^/healthz$"}},
@@ -78,7 +78,7 @@ func TestBouncerNew_compilesActionRules(t *testing.T) {
 }
 
 func TestBouncerNew_emptyActionRulesMatchNothing(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := configuration.New()
 	got, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, Subscriptions{}, log)
 	if err != nil {
@@ -91,7 +91,7 @@ func TestBouncerNew_emptyActionRulesMatchNothing(t *testing.T) {
 }
 
 func TestBouncerNew_invalidActionRules(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := configuration.New()
 	cfg.BouncerActionRules = []httprule.ActionRule{{Name: "x", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "("}}}
 	_, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}), "test", cfg, Subscriptions{}, log)
@@ -185,7 +185,7 @@ func TestServeHTTP_lapiBypassSkipsLiveAndNoneLookup(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			log := logger.New("ERROR", "")
+			log := logger.New("ERROR")
 			store := decisionstore.NewMemory(log)
 			lapiClient, err := lapi.New(&configuration.Config{
 				LapiHTTPTimeoutSeconds:           10,
@@ -229,7 +229,7 @@ func TestServeHTTP_appsecBypassSkipsQuery(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, passed := testBypassOriginBouncer(t)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	b.actionRules = mustPathAction(t, "appsec", "^/health$", httprule.ActionBypassAppsec)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
@@ -253,7 +253,7 @@ func TestServeHTTP_nonMatchingAppsecBypassStillQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, passed := testBypassOriginBouncer(t)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	b.actionRules = mustPathAction(t, "appsec", "^/nomatch$", httprule.ActionBypassAppsec)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
@@ -282,7 +282,7 @@ func TestServeHTTP_lapiBypassDoesNotSkipAppsec(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	b.actionRules = mustPathAction(t, "lapi", "^/health$", httprule.ActionBypassLapi)
 	b.ServeHTTP(httptest.NewRecorder(), testBypassHealthRequest())
 	if !*passed {
@@ -411,7 +411,7 @@ func TestServeHTTP_queryStringNotInPath(t *testing.T) {
 		t.Fatal(err)
 	}
 	b, passed := testBypassOriginBouncer(t)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	b.actionRules = mustPathAction(t, "appsec", "^/health$", httprule.ActionBypassAppsec)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health?a=1", nil)
 	req.Host = "example.com"
@@ -443,7 +443,7 @@ func TestServeHTTP_allMatchingSkipsLapiAndAppsec(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	b.actionRules = mustCompileActions(t, []httprule.ActionRule{
 		{Name: "lapi", Action: []string{httprule.ActionBypassLapi}, Rule: httprule.Rule{Path: "^/health$"}},
 		{Name: "appsec", Action: []string{httprule.ActionBypassAppsec}, Rule: httprule.Rule{Path: "^/health$"}},
@@ -477,7 +477,7 @@ func TestServeHTTP_captchaPlusBypassSkipsBothThenCaptchas(t *testing.T) {
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60,
 	})
 	bindTestLAPI(b, lapiClient)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	bindTestCaptcha(b, client)
 	b.actionRules = mustPathAction(t, "challenge-health", "^/health$", httprule.ActionCaptcha, httprule.ActionBypass)
 	rw := httptest.NewRecorder()
@@ -557,7 +557,7 @@ func TestServeHTTP_nonEmptyAppsecChallengeDoesNotOverrideCaptchaRule(t *testing.
 	lapi.AttachTestMetricsReporter(lapiClient)
 	lapiClient.SetStreamHealthyForTest(true)
 	bindTestLAPI(b, lapiClient)
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	bindTestCaptcha(b, client)
 	b.actionRules = mustPathAction(t, "challenge-health", "^/health$", httprule.ActionCaptcha)
 	rw := httptest.NewRecorder()

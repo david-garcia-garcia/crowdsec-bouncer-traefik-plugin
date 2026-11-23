@@ -12,25 +12,26 @@ _Avoid_: CrowdsecBouncerTraefikPlugin; CrowdsecBounder; the HTML template name a
 
 ## Overview
 
-Call `logger.NewWithFormat` once in plugin `New`. JSON is case-insensitive. Any other format uses the text/common handler. A non-empty writable `LogFilePath` reuses one process-lifetime file per cleaned path.
+Call `logger.NewWithFormat` once in plugin `New`. JSON is case-insensitive. Any other format uses the text/common handler. Output is always stdout; there is no log-file setting.
 
 ## How to use
 
-- Construct via `NewWithFormat(logLevel, logFilePath, logFormat)`. Do not call `slog.New` for the process logger.
+- Construct via `NewWithFormat(logLevel, logFormat)`, or `New(logLevel)` for common format. Do not call `slog.New` for the process logger.
 - Keep `component` as `CrowdsecBouncer`. Do not restore `CrowdsecBouncerTraefikPlugin`. Do not use `CrowdsecBounder`.
 - Pass `"json"` (any case) for JSON. Anything else is common/text.
-- Pass empty `logFilePath` for stdout. A writable path reuses the shared file. An unwritable path warns and falls back to stdout.
+- Do not add a file destination. Rotation and shipping belong to Traefik's or the container runtime's log handling.
+- Tests that read log lines call `logger.SetOutputForTest(w)` before building the logger and run the returned restore in `t.Cleanup`. Loggers built earlier keep their writer. Root-package tests use `newTestLogFile`, which redirects to a temp file.
 - Nest identity with `log.With` after construction (`std_go_logger_nested`). Request-path Trace stays on that child (`std_go_logger_debug-attrs`).
 
 ## Pattern snippet
 
 ```go
-log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+log := logger.NewWithFormat(config.LogLevel, config.LogFormat)
 ```
 
 ## Key files
 
-- `pkg/logger/logger.go` — `NewWithFormat`, `ReplaceAttr`, shared files
+- `pkg/logger/logger.go` — `NewWithFormat`, `ReplaceAttr`, `SetOutputForTest`
 - `pkg/logger/debounce.go` — `Debounced`, `ResetDebounceForTest`
 - `plugin.go` — process logger construction
 

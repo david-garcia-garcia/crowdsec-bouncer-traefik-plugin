@@ -203,7 +203,6 @@ http:
           lapiTlsInsecureVerify: false
           lapiUpdateIntervalSeconds: 60
           lapiUpdateMaxFailure: 0
-          logFilePath: ""
           logFormat: common
           logLevel: DEBUG
           rateLimitAlgorithm: slidingWindow
@@ -890,6 +889,8 @@ captchaEnabled: true
 
 ### Logging
 
+The plugin writes its logs to stdout, next to Traefik's own. Send them to a file, rotate them, or ship them with Traefik's or the container runtime's log handling (for example the Docker logging driver or journald).
+
 #### `logLevel`
 
 `string` · default `INFO`
@@ -901,12 +902,6 @@ captchaEnabled: true
 `string` · default `common`
 
 `common` (text) or `json`.
-
-#### `logFilePath`
-
-`string` · default `""`
-
-Write logs to this file instead of stdout/stderr. Must be writable by Traefik.
 
 ## Read a value from a file
 

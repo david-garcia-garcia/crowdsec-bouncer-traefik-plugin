@@ -153,8 +153,8 @@ func testLegServers(t *testing.T) (lapiHost, modsecURL string) {
 }
 
 // cfgNoLegs is a middleware config that owns nothing and does not bounce.
-// logFilePath, when set, receives JSON logs at TRACE.
-func cfgNoLegs(logFilePath string) *configuration.Config {
+// traced logs JSON at TRACE; otherwise it logs at ERROR.
+func cfgNoLegs(traced bool) *configuration.Config {
 	config := getTestConfig()
 	config.BouncerEnabled = false
 	config.LapiEnabled = false
@@ -162,10 +162,9 @@ func cfgNoLegs(logFilePath string) *configuration.Config {
 	config.BouncerForwardedHeadersTrustedIPs = []string{"127.0.0.1/32"}
 	config.BouncerForwardedHeadersCustomName = "X-Forwarded-For"
 	config.LogLevel = "ERROR"
-	if logFilePath != "" {
+	if traced {
 		config.LogLevel = "TRACE"
 		config.LogFormat = "json"
-		config.LogFilePath = logFilePath
 	}
 	return config
 }
@@ -173,7 +172,7 @@ func cfgNoLegs(logFilePath string) *configuration.Config {
 // newTestOwner runs New for a middleware that owns only fixture's leg, or nothing when variant is empty.
 func newTestOwner(t *testing.T, fixture testLegFixture, traefikName, variant string) {
 	t.Helper()
-	config := cfgNoLegs("")
+	config := cfgNoLegs(false)
 	if variant != "" {
 		fixture.own(config, variant)
 	}
@@ -182,10 +181,10 @@ func newTestOwner(t *testing.T, fixture testLegFixture, traefikName, variant str
 	}
 }
 
-// readBindingTraces returns the bound / unbound lines logFilePath holds, in order.
-func readBindingTraces(t *testing.T, logFilePath string) []testBindingTrace {
+// readBindingTraces returns the bound / unbound lines logPath holds, in order.
+func readBindingTraces(t *testing.T, logPath string) []testBindingTrace {
 	t.Helper()
-	content, err := os.ReadFile(logFilePath) // #nosec G304 -- test-created temp file
+	content, err := os.ReadFile(logPath) // #nosec G304 -- test-created temp file
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,10 +218,10 @@ func (trace testBindingTrace) isFor(msg, traefikName, leg string) bool {
 	return trace.msg == msg && trace.traefikName == traefikName && trace.leg == leg && trace.instanceName == testLegInstanceName
 }
 
-// readLogEntries returns every JSON line logFilePath holds whose msg is msg.
-func readLogEntries(t *testing.T, logFilePath, msg string) []map[string]interface{} {
+// readLogEntries returns every JSON line logPath holds whose msg is msg.
+func readLogEntries(t *testing.T, logPath, msg string) []map[string]interface{} {
 	t.Helper()
-	content, err := os.ReadFile(logFilePath) // #nosec G304 -- test-created temp file
+	content, err := os.ReadFile(logPath) // #nosec G304 -- test-created temp file
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -306,18 +305,18 @@ func TestNew_LegBindingTraces(t *testing.T) {
 	lapiHost, modsecURL := testLegServers(t)
 	for _, fixture := range testLegFixtures(t, lapiHost, modsecURL) {
 		t.Run(fixture.leg, func(t *testing.T) {
-			logFilePath := newTestLogFile(t)
+			logPath := newTestLogFile(t)
 			subscriberName := fixture.leg + "-subscriber"
 			ownerName := fixture.leg + "-owner"
 
 			// Subscribe before any owner publishes.
-			subscriberConfig := cfgNoLegs(logFilePath)
+			subscriberConfig := cfgNoLegs(true)
 			subscriberConfig.BouncerEnabled = true
 			fixture.subscribe(subscriberConfig)
 			if _, err := New(context.Background(), testNextOK(), subscriberConfig, subscriberName); err != nil {
 				t.Fatal(err)
 			}
-			beforePublish := readBindingTraces(t, logFilePath)
+			beforePublish := readBindingTraces(t, logPath)
 			assertBeforePublishTraces(t, beforePublish, subscriberName, fixture.leg)
 
 			// Publish A, replace A by B (new ownership key, same alias), then drop the leg.
@@ -326,7 +325,7 @@ func TestNew_LegBindingTraces(t *testing.T) {
 			publishedB := publishedIncarnation(fixture)
 			newTestOwner(t, fixture, ownerName, "")
 
-			boundB := assertReplaceTraces(t, readBindingTraces(t, logFilePath)[len(beforePublish):], subscriberName, fixture.leg)
+			boundB := assertReplaceTraces(t, readBindingTraces(t, logPath)[len(beforePublish):], subscriberName, fixture.leg)
 			if boundB != publishedB {
 				t.Fatalf("bound incarnation %s, alias published %s", boundB, publishedB)
 			}
@@ -352,10 +351,10 @@ func assertRollbackAliases(t *testing.T, fixtures []testLegFixture, takenIndex i
 	}
 }
 
-// assertOneNameTakenError checks that logFilePath holds exactly one ERROR naming leg and the rejected publisher.
-func assertOneNameTakenError(t *testing.T, logFilePath, leg, rejected string) {
+// assertOneNameTakenError checks that logPath holds exactly one ERROR naming leg and the rejected publisher.
+func assertOneNameTakenError(t *testing.T, logPath, leg, rejected string) {
 	t.Helper()
-	takenLines := readLogEntries(t, logFilePath, "crowdsec instance name taken")
+	takenLines := readLogEntries(t, logPath, "crowdsec instance name taken")
 	if len(takenLines) != 1 {
 		t.Fatalf("instance name taken lines %v, want one", takenLines)
 	}
@@ -374,11 +373,11 @@ func TestNew_ClaimRollbackClearsEarlierLegs(t *testing.T) {
 	for takenIndex := 1; takenIndex < len(fixtures); takenIndex++ {
 		taken := fixtures[takenIndex]
 		t.Run(taken.leg, func(t *testing.T) {
-			logFilePath := newTestLogFile(t)
+			logPath := newTestLogFile(t)
 			const mixedName = "mixed-owner"
 
 			// mixed-owner first publishes every leg but the taken one; another owner then takes that name.
-			published := cfgNoLegs("")
+			published := cfgNoLegs(false)
 			for i, fixture := range fixtures {
 				if i != takenIndex {
 					fixture.own(published, "a")
@@ -390,7 +389,7 @@ func TestNew_ClaimRollbackClearsEarlierLegs(t *testing.T) {
 			newTestOwner(t, taken, "taker", "a")
 
 			// The same middleware now also owns the taken leg: the claim fails and rolls back.
-			mixed := cfgNoLegs(logFilePath)
+			mixed := cfgNoLegs(true)
 			for _, fixture := range fixtures {
 				fixture.own(mixed, "a")
 			}
@@ -399,7 +398,7 @@ func TestNew_ClaimRollbackClearsEarlierLegs(t *testing.T) {
 			}
 
 			assertRollbackAliases(t, fixtures, takenIndex)
-			assertOneNameTakenError(t, logFilePath, taken.leg, mixedName)
+			assertOneNameTakenError(t, logPath, taken.leg, mixedName)
 		})
 	}
 }

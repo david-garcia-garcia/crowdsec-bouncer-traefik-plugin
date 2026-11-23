@@ -24,7 +24,7 @@ const testForcedDecisionHeader = "X-Crowdsec-Decision"
 func testForcedDecisionBouncer(t *testing.T, log *slog.Logger, captchaClient *captcha.Client, trusted []string, seedBan bool) (*Bouncer, *lapi.Client, *bool) {
 	t.Helper()
 	if log == nil {
-		log = logger.New("ERROR", "")
+		log = logger.New("ERROR")
 	}
 	lapiClient, store := lapi.NewTestClient(log)
 	lapi.AttachTestMetricsReporter(lapiClient)
@@ -246,7 +246,7 @@ func TestServeHTTP_forcedDecisionAppsecOnlyCaptcha(t *testing.T) {
 }
 
 func TestBouncerNew_compilesActionHeaderRules(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := configuration.New()
 	cfg.LapiMode = configuration.StreamMode
 	cfg.BouncerActionRules = decisionHeaderRules()

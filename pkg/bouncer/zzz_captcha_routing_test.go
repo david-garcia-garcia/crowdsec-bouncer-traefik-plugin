@@ -31,7 +31,7 @@ func testCaptchaClient(t *testing.T, jsURL, challengeURL, validateURL string, ht
 	}
 	client := &captcha.Client{}
 	err := client.New(
-		logger.New("ERROR", ""),
+		logger.New("ERROR"),
 		httpClient,
 		configuration.CustomProvider,
 		jsURL,
@@ -61,7 +61,7 @@ func testCaptchaRoutingBouncer(t *testing.T, client *captcha.Client) (*Bouncer, 
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 			originCalled = true
 		}),
-		log:                     logger.New("ERROR", ""),
+		log:                     logger.New("ERROR"),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",
@@ -178,7 +178,7 @@ func TestHandleRemediationServeHTTP_vendorTokenPostWithoutMarkerReachesOrigin(t 
 			}
 			originBody = string(raw)
 		}),
-		log:                     logger.New("ERROR", ""),
+		log:                     logger.New("ERROR"),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",
@@ -222,7 +222,7 @@ func TestHandleRemediationServeHTTP_overMaxPostAfterSolveReachesOriginIntact(t *
 			}
 			originBody = string(raw)
 		}),
-		log:                     logger.New("ERROR", ""),
+		log:                     logger.New("ERROR"),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplateContentType:  "text/html; charset=utf-8",

@@ -92,7 +92,7 @@ func newTestRateLimitClient(t *testing.T, cfg *configuration.Config, counter rat
 // newTestRateLimitRoute builds router name through New, subscribed to the rate limit, with a ban template.
 func newTestRateLimitRoute(t *testing.T, name string, cfg *configuration.Config, next *recordedNextRequest) *Bouncer {
 	t.Helper()
-	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { next.called = true }), name, cfg, Subscriptions{RateLimit: true}, logger.New("ERROR", ""))
+	b, err := New(http.HandlerFunc(func(http.ResponseWriter, *http.Request) { next.called = true }), name, cfg, Subscriptions{RateLimit: true}, logger.New("ERROR"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +148,7 @@ func (fixture *testRateLimitFixture) bindCountingAppSec(t *testing.T) *atomic.In
 	if err != nil {
 		t.Fatal(err)
 	}
-	bindTestAppSec(fixture.b, appsec.NewTestClient(serverURL, server.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(fixture.b, appsec.NewTestClient(serverURL, server.Client(), logger.New("ERROR")))
 	return &queries
 }
 

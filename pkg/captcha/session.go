@@ -40,7 +40,6 @@ type ownership struct {
 	EnterpriseKeyType            string `json:"enterpriseKeyType"`
 	EnterpriseMinScore           string `json:"enterpriseMinScore"`
 	EnterpriseProjectID          string `json:"enterpriseProjectId"`
-	LogFilePath                  string `json:"logFilePath"`
 	LogFormat                    string `json:"logFormat"`
 	LogLevel                     string `json:"logLevel"`
 }
@@ -71,7 +70,6 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 		EnterpriseKeyType:            cfg.CaptchaEnterpriseKeyType,
 		EnterpriseMinScore:           cfg.CaptchaEnterpriseMinScore,
 		EnterpriseProjectID:          cfg.CaptchaEnterpriseProjectID,
-		LogFilePath:                  cfg.LogFilePath,
 		LogFormat:                    cfg.LogFormat,
 		LogLevel:                     cfg.LogLevel,
 	}

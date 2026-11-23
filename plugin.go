@@ -217,7 +217,7 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 	// Shallow copy: Config's []string and map[string]string fields still alias the caller's.
 	config := *rawConfig
 	config.LogLevel = strings.ToUpper(config.LogLevel)
-	log := logger.NewWithFormat(config.LogLevel, config.LogFilePath, config.LogFormat)
+	log := logger.NewWithFormat(config.LogLevel, config.LogFormat)
 
 	if err = configuration.ValidateParams(&config, log); err != nil {
 		log.Error("New:validateParams", "error", err)

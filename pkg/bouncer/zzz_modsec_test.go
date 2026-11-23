@@ -20,7 +20,7 @@ import (
 
 func testModsecBouncer(t *testing.T, failureAction string, rules []httprule.ActionRule) (*Bouncer, *bool) {
 	t.Helper()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	clientChecker, err := ip.NewChecker(log, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -222,7 +222,7 @@ func TestServeHTTP_appsecGateSkipStillRunsModsec(t *testing.T) {
 	cfg.AppsecScheme = "http"
 	cfg.AppsecTLSInsecureVerify = true
 	cfg.AppsecUnhealthyBackOffPeriodSecs = 30
-	appsecClient, err := appsec.New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+	appsecClient, err := appsec.New(cfg, logger.New("ERROR"), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}

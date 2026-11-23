@@ -137,7 +137,7 @@ func Test_appsecQuery_failureActionOnUnreachable(t *testing.T) {
 
 // Test_appsecQuery_failureActionOnResponseBodyReadError proves a body io error uses FailureAction.
 func Test_appsecQuery_failureActionOnResponseBodyReadError(t *testing.T) {
-	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: failBodyRoundTripper{}}, logger.New("INFO", ""))
+	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: failBodyRoundTripper{}}, logger.New("INFO"))
 	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
 
 	decision, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})

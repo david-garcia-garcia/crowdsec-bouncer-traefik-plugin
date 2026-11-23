@@ -1,20 +1,23 @@
-// Package logger implements utility routines to write to stdout and stderr.
-// It supports trace, debug, info, warn and error level using Go's standard log/slog
+// Package logger builds the plugin's slog logger. It supports trace, debug, info, warn and error
+// levels and writes to stdout; Traefik or the container runtime owns where those lines go next.
 package logger
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 )
 
-// sharedLogFiles holds process-lifetime log files keyed by cleaned path.
+// output is where loggers built from now on write. It is stdout outside tests.
 //
-//nolint:gochecknoglobals // intentional process-wide cache for Traefik reload semantics
-var sharedLogFiles sync.Map
+//nolint:gochecknoglobals // test-only redirect of a process-wide sink; guarded by outputMu
+var (
+	outputMu sync.Mutex
+	output   io.Writer = os.Stdout
+)
 
 // Custom log levels following slog best practices.
 // LevelTrace is below Debug (slog.Level(-8)), matching the Go slog custom-levels example.
@@ -32,12 +35,12 @@ func Trace(log *slog.Logger, msg string, args ...any) {
 }
 
 // New creates a Log wrapper with default format (common).
-func New(logLevel string, logFilePath string) *slog.Logger {
-	return NewWithFormat(logLevel, logFilePath, "common")
+func New(logLevel string) *slog.Logger {
+	return NewWithFormat(logLevel, "common")
 }
 
 // NewWithFormat creates a Log wrapper with specified format (common or json).
-func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
+func NewWithFormat(logLevel, logFormat string) *slog.Logger {
 	// Determine log level
 	var level slog.Level
 	switch logLevel {
@@ -56,7 +59,9 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 		level = LevelInfo
 	}
 
-	output := logOutput(logFilePath)
+	outputMu.Lock()
+	writer := output
+	outputMu.Unlock()
 
 	// Create handler based on format with custom level names
 	var handler slog.Handler
@@ -87,61 +92,26 @@ func NewWithFormat(logLevel, logFilePath, logFormat string) *slog.Logger {
 	}
 
 	if strings.EqualFold(logFormat, "json") {
-		handler = slog.NewJSONHandler(output, opts)
+		handler = slog.NewJSONHandler(writer, opts)
 	} else {
 		// Common format (default)
-		handler = slog.NewTextHandler(output, opts)
+		handler = slog.NewTextHandler(writer, opts)
 	}
 
 	// Create logger with component attribute
 	return slog.New(handler).With("component", "CrowdsecBouncer")
 }
 
-// logOutput returns stdout or a process-lifetime shared file for logFilePath.
-func logOutput(logFilePath string) *os.File {
-	if logFilePath == "" {
-		return os.Stdout
+// SetOutputForTest makes loggers built after the call write to w instead of stdout, until the
+// returned restore runs. Loggers built earlier keep their writer. Test-only.
+func SetOutputForTest(w io.Writer) (restore func()) {
+	outputMu.Lock()
+	previous := output
+	output = w
+	outputMu.Unlock()
+	return func() {
+		outputMu.Lock()
+		output = previous
+		outputMu.Unlock()
 	}
-
-	path := filepath.Clean(logFilePath)
-	if existing, ok := sharedLogFiles.Load(path); ok {
-		if file, isFile := existing.(*os.File); isFile {
-			return file
-		}
-	}
-
-	logFile, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-	if err != nil {
-		slog.Warn("LogFilePath is not writable, using stdout", "error", err)
-		return os.Stdout
-	}
-
-	actual, loaded := sharedLogFiles.LoadOrStore(path, logFile)
-	if loaded {
-		_ = logFile.Close()
-	}
-	if file, ok := actual.(*os.File); ok {
-		return file
-	}
-	return os.Stdout
-}
-
-// ResetSharedLogFilesForTest closes and clears process-lifetime log files. Test-only.
-func ResetSharedLogFilesForTest() {
-	sharedLogFiles.Range(func(key, value any) bool {
-		if file, ok := value.(*os.File); ok {
-			_ = file.Close()
-		}
-		sharedLogFiles.Delete(key)
-		return true
-	})
-}
-
-func sharedLogFileCountForTest() int {
-	count := 0
-	sharedLogFiles.Range(func(_, _ any) bool {
-		count++
-		return true
-	})
-	return count
 }

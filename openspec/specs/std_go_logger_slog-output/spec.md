@@ -1,22 +1,22 @@
 ## Purpose
 
-Defines how the plugin slog logger selects output destination and format when constructed via `NewWithFormat`.
+Defines the plugin slog logger's output destination and format when constructed via `NewWithFormat`.
 
 ## Requirements
 
-### Requirement: Shared log file per path
+### Requirement: Logs go to stdout only
 
-When `LogFilePath` is non-empty and writable, the logger package SHALL reuse one process-lifetime open file for each distinct cleaned path across all `NewWithFormat` calls. Repeated construction with the same path MUST NOT open additional file descriptors for that path.
+Every logger constructed via `NewWithFormat` SHALL write to stdout. The plugin MUST NOT open, create, or append to a log file, and `Config` MUST NOT carry a log-file setting. A Traefik config that still sets `logFilePath` SHALL start normally: Traefik's plugin config decoder drops the unknown key. Tests MAY redirect loggers built afterwards with `logger.SetOutputForTest`; production code MUST NOT call it.
 
-#### Scenario: Reload reuses existing file
+#### Scenario: Default destination
 
-- **WHEN** `NewWithFormat` is called twice with the same writable `LogFilePath`
-- **THEN** both loggers write to the same underlying open file without a second successful open for that path
+- **WHEN** `NewWithFormat` is called outside a `SetOutputForTest` window
+- **THEN** the logger writes to stdout
 
-#### Scenario: Unwritable path falls back
+#### Scenario: Leftover logFilePath
 
-- **WHEN** `LogFilePath` is set but not writable
-- **THEN** the logger writes to stdout and emits a warning (unchanged behavior)
+- **WHEN** a middleware's Traefik config still sets `logFilePath`
+- **THEN** `New` succeeds, no file is created at that path, and the logs go to stdout
 
 ### Requirement: Case-insensitive JSON format
 
@@ -24,7 +24,7 @@ When the format argument equals `"json"` case-insensitively, the logger SHALL us
 
 #### Scenario: Uppercase JSON format
 
-- **WHEN** `NewWithFormat` is called with format `"JSON"` and empty file path
+- **WHEN** `NewWithFormat` is called with format `"JSON"`
 - **THEN** log output is valid JSON with `"level":"INFO"` (or equivalent level string) for an info message
 
 #### Scenario: Common format default

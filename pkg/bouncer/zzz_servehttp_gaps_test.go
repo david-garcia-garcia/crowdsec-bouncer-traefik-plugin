@@ -166,7 +166,7 @@ func TestHandleNextServeHTTP_UnpublishedAppSecUsesFailureAction(t *testing.T) {
 			appsecLeg:             legBinding{subscribed: true},
 			appsecFailureAction:   action,
 			remediationStatusCode: http.StatusForbidden,
-			log:                   logger.New("ERROR", ""),
+			log:                   logger.New("ERROR"),
 			next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
 				passed = true
 			}),

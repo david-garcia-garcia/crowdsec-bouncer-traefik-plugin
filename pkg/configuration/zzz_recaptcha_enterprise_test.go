@@ -27,7 +27,7 @@ func newEnterpriseCaptchaConfig(t *testing.T, keyType string) *Config {
 }
 
 func TestValidateParams_RecaptchaEnterprise(t *testing.T) {
-	log := logger.New("INFO", "")
+	log := logger.New("INFO")
 	tests := []struct {
 		name            string
 		config          *Config
