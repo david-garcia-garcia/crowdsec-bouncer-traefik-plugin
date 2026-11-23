@@ -17,8 +17,8 @@ Not yet.
 In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: f6b9e4a6
-Owner decision: Required. See Explore Decisions.
+Reviewed head: e8791aed
+Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
@@ -32,17 +32,29 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-11-23-backoff-action-per-leg pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | add-backoff-action-and-lapi-live-gate | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [build_e2e_pester_crowdsec-stack](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_lapi_admission-gate](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — added
+- [core_plugin_lapi_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_lapi_query-round-trip](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_lapi_reclaim-key](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/openspec/changes/add-backoff-action-and-lapi-live-gate/proposal.md) — modified
+
 
 ## Deviations from the ask
-- taken: add `lapiUnhealthyBackOffPeriodSecs` to the LAPI session identity (`pkg/lapi/session.go`), like AppSec does in `pkg/appsec/session.go`. → add it to the LAPI `ownership` payload (`OwnershipKey`), only in `live` / `none`; `streamSession` / `SessionHex` stay unchanged. — `pkg/lapi/identity.go` — AppSec's identity is its Client Open key; the LAPI equivalent is `ownership`, which reclaims the `lapi.Client` that holds the gate. `SessionHex` keys the DecisionStore, so a cooldown change there would drop the cache and the stream cursor.. Requester: not asked.
+- taken: add `lapiUnhealthyBackOffPeriodSecs` to the LAPI session identity (`pkg/lapi/session.go`), like AppSec does in `pkg/appsec/session.go`. → add it to the LAPI `ownership` payload (`OwnershipKey`), only in `live` / `none`; `streamSession` / `SessionHex` stay unchanged. — `pkg/lapi/identity.go` — AppSec's identity is its Client Open key; the LAPI equivalent is `ownership`, which reclaims the `lapi.Client` that holds the gate. `SessionHex` keys the DecisionStore, so a cooldown change there would drop the cache and the stream cursor.. Requester: confirmed.
 
 
 ## Follow-up issues
@@ -53,10 +65,7 @@ None.
 Ticket 2026-11-23-backoff-action-per-leg on branch 2026-11-23-backoff-action-per-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236; CI not seen.
 
 ## Explore Decisions
-| Question | Rank | Decision | By |
-| --- | --- | --- | --- |
-| Can the real e2e stack stop LAPI for a live-backoff test without breaking other suites? | additive asked — new compose service, new route, new cases; existing suites keep their routes; requirement section 7 asks for the LAPI live backoff case when the stack allows it | assumed — yes, without stopping `crowdsec`. Add compose service `lapi-flaky` (`nginx:alpine`, container `lapi-flaky-test`, `config/lapi-flaky.conf` with `resolver 127.0.0.11` and a `set $lapi http://crowdsec:8080` `proxy_pass`, the `appsec-flaky.conf` shape). Add one `live` middleware/router `/lapi-cycle` in a file-provider YAML with `lapiHost: lapi-flaky:80`, its own key `BOUNCER_KEY_LAPI_BACKOFF` (next free `c51a1c7000000000000000000000001f`; `…1a`–`…1e` are taken in `tests/e2e`; registered in the crowdsec env list), `lapiUnhealthyBackOffPeriodSecs: 10`, `lapiHttpTimeoutSeconds: 2`, `lapiMetricsUpdateIntervalSeconds: 0`, `reclaimGraceSeconds: 2`, JSON log, verdict header. Cycle: one fresh `X-Forwarded-For` per request (live caches a clean answer for `lapiDefaultDecisionSeconds`); stop `lapi-flaky-test`, 5 × `ban:lapi-failure`, then fast `ban:lapi-backoff` (assert elapsed well under the 2 s timeout), exactly one `crowdsec lapi backoff started`; start it, wait for 200, exactly one `crowdsec lapi backoff ended`; `AfterAll` starts the container. Place it in `waf_backoff.Tests.ps1` (domain `modsec`, which already owns stop/start cycles) or a new `lapi_backoff.Tests.ps1` registered in `PesterDomains.ps1` `lapi`; propose picks. Non-default WAF BackOffAction: a second router subscribing to the `/appsec-cycle` AppSec instance by name with `bouncerAppsecBackOffAction: ban`, proving the shared gate and the per-router action in the same outage. | explore |
-
+None.
 
 ## Findings
 None.
@@ -69,9 +78,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 1 added / 10 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f6b9e4a6625fc764860a9c3968007d0115963743 | Card must match the branch you measured |
+| Reviewed head | e8791aed074d7b82e9e5d45badf722ac1970eea1 | Card must match the branch you measured |
 
 ### Stored data model
 None.
