@@ -3,13 +3,13 @@ Reported upstream as [maxlerebourg/crowdsec-bouncer-traefik-plugin#405](https://
 
 Both WAF legs read the client body before they judge a request. `wafhop.IsBodyUnreadable` puts any HTTP/2 or HTTP/3 request that has a body but no `Content-Length` (`ContentLength < 0`) into an "unreadable" class, and nothing in that class is ever read. For POST, PUT and PATCH, each leg then hands the request to its failure action, which is meant for "the WAF gave no answer":
 
-- **AppSec** (`bouncerAppsecFailureAction`, default `ban`): the request gets a 403 and AppSec is never queried. `restic init` against `rest-server` sends `POST <repo>/?create=true` over HTTP/2 with an empty body and no `Content-Length`, so it is silently banned. With `passthrough`, AppSec gets the headers only and the body reaches origin uninspected.
+- **AppSec** (`bouncerAppsecFailureAction`, default `ban` until [#236](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236), `passthrough` since): with `ban`, the request gets a 403 and AppSec is never queried. `restic init` against `rest-server` sends `POST <repo>/?create=true` over HTTP/2 with an empty body and no `Content-Length`, so it is silently banned. With `passthrough`, now the default, AppSec gets the headers only and the body reaches origin uninspected.
 - **ModSec** (`bouncerModsecFailureAction`, default `passthrough`): the sidecar gets the headers only. With default settings, any client that leaves out `Content-Length` on HTTP/2 or HTTP/3 gets its body past CRS uninspected.
 - **DELETE**, and any other method outside POST/PUT/PATCH, without `Content-Length` goes headers-only on both legs whatever the failure action. The same DELETE with the header has its body inspected.
 
 `Content-Length` is optional in HTTP/2 and HTTP/3, so the client decides whether its body gets inspected. Because one failure action covers both "the WAF failed" and "the client sent no length", an operator cannot let restic through without also failing open when the WAF is down. HTTP/1.1 chunked bodies, which also have no length, are read today with no plugin deadline at all.
 
-If nothing changes, ModSec's default setup has a body-inspection bypass that any client can trigger, AppSec's default setup blocks legitimate HTTP/2 clients that send no length, and the only workaround for one of these problems opens the other.
+If nothing changes, both WAFs' default setups have a body-inspection bypass that any client can trigger (ModSec's, and AppSec's since #236 made `passthrough` its default), AppSec with `ban` blocks legitimate HTTP/2 clients that send no length, and the only workaround for one of these problems opens the other.
 
 Priority: P1 — production is unsafe today: with ModSec's default failure action, any HTTP/2 or HTTP/3 client can skip body inspection by leaving out `Content-Length`.
 
@@ -53,20 +53,20 @@ Proof:
 **Operators.** Breaking: `appsecBodyLimit` 0 or negative now means 10 MiB (0 used to mean no cap, negative was a validation error); bodies without `Content-Length` (HTTP/1.1 chunked, HTTP/2, HTTP/3) are now read, capped and inspected on both legs, so ModSec inspects bodies it used to pass headers-only; each leg's new `appsecBodyReadTimeoutSeconds` / `modsecBodyReadTimeoutSeconds` (default 30, minimum 1) answers a body that does not arrive in time with HTTP 400 `error:body-read-timeout` and a WARN, whatever the failure action says, so routes that stream request bodies (gRPC client/bidi, Connect streaming, slow uploads) need a `bouncerActionRules` `bypassAppsec` / `bypassModsec` (or `bypass`) rule or a higher timeout; and the failure actions no longer cover the client's body.
 **Admin users.** None.
 **Developers.** `appsec.Client.Query` gains a `*http.ResponseController` parameter, `modsecurity.Client.Inspect` takes one instead of `failureAction`, `wafhop.ReadBody` takes the controller and a timeout and requires `limit >= 1`, `wafhop.IsBodyUnreadable` / `IsMethodWithBody` are removed, and the new `ErrBodyReadTimeout` (in `wafhop`, aliased in `appsec`) must be handled apart from `ErrClientBodyRead`.
-**End users.** A client that sends a body without `Content-Length`, such as `restic init` over HTTP/2, now reaches the application after inspection instead of getting a silent 403, and a request body that never ends within the timeout gets HTTP 400.
+**End users.** A client that sends a body without `Content-Length`, such as `restic init` over HTTP/2, now reaches the application after inspection instead of getting a silent 403 (AppSec `ban`) or skipping inspection (`passthrough`), and a request body that never ends within the timeout gets HTTP 400.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P1 — production is unsafe today: with ModSec's default failure action, any HTTP/2 or HTTP/3 client can skip body inspection by leaving out `Content-Length`.
-Reviewed head: 4916b386
+Reviewed head: 91719a6d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45267836741 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -76,7 +76,7 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-23-waf-unknown-length-body pushed | `git` |
 | OpenSpec | waf-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 45267836741 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45267836741 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45267836741 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -109,7 +109,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-23-waf-unknown-length-body on branch 2026-11-23-waf-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237; CI not seen.
+Ticket 2026-11-23-waf-unknown-length-body on branch 2026-11-23-waf-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237; CI build 45267836741 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45267836741.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -138,7 +138,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 14 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4916b38676eacf611791323c3c765feba774d5ea | Card must match the branch you measured |
+| Reviewed head | 91719a6d3248874da049888415b8eee164a5cb44 | Card must match the branch you measured |
 
 ### Stored data model
 None.
