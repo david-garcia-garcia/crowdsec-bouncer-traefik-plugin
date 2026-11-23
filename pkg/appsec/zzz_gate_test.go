@@ -41,11 +41,11 @@ func TestNew_defaultBackoffBuildsGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	if cfg.AppsecUnhealthyBackOffPeriodSecs != configuration.DefaultAppsecUnhealthyBackOffPeriodSecs {
-		t.Fatalf("period=%d want %d", cfg.AppsecUnhealthyBackOffPeriodSecs, configuration.DefaultAppsecUnhealthyBackOffPeriodSecs)
+	if cfg.AppsecUnhealthyBackOffPeriodSecs != 10 {
+		t.Fatalf("period=%d want 10", cfg.AppsecUnhealthyBackOffPeriodSecs)
 	}
 	if client.GateForTest() == nil {
-		t.Fatal("default AppSec backoff 30 must build a gate")
+		t.Fatal("default AppSec backoff 10 must build a gate")
 	}
 }
 

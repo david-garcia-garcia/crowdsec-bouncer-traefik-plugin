@@ -1,5 +1,6 @@
 # CI partition of tests/e2e/real/*.Tests.ps1.
-# lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics).
+# lapi: request decisions from LAPI (stream and live modes, ban, scopes, trusted IPs, metrics), and
+#   the live-mode backoff gate through a real LAPI outage and recovery (stops and starts lapi-flaky-test).
 # appsec: AppSec, captcha, the Redis decision cache, and the Redis rate limit (its shared leg and captcha buckets included).
 # lifecycle: instance severance (late bind, reclaim, name collisions).
 # modsec: the WAF legs. ModSec alone (CRS block, body, failure actions, WebSocket, skip), AppSec and
@@ -20,6 +21,7 @@ $script:PesterDomainFiles = @{
         'header_scopes.Tests.ps1'
         'failure_action.Tests.ps1'
         'usage_metrics.Tests.ps1'
+        'lapi_backoff.Tests.ps1'
     )
     appsec = @(
         'appsec.Tests.ps1'

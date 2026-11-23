@@ -729,3 +729,29 @@ func TestOpenDecisionStore_CreatedByWriteOnce(t *testing.T) {
 		t.Fatalf("Wake must keep createdBy foo: %p %p %q", first, second, first.CreatedBy())
 	}
 }
+
+// TestOwnershipKey_liveGatePeriodReopensClientKeepsStore puts the live/none gate cooldown on the
+// Client Open key only, and only in live and none.
+func TestOwnershipKey_liveGatePeriodReopensClientKeepsStore(t *testing.T) {
+	for _, mode := range []string{configuration.LiveMode, configuration.NoneMode} {
+		short := testStreamConfig("lapi.example:8080", 0)
+		short.LapiMode = mode
+		short.LapiUnhealthyBackOffPeriodSecs = 10
+		long := testStreamConfig("lapi.example:8080", 0)
+		long.LapiMode = mode
+		long.LapiUnhealthyBackOffPeriodSecs = 30
+		if OwnershipKey(short, "router") == OwnershipKey(long, "router") {
+			t.Fatalf("%s: a gate period change must open a new Client", mode)
+		}
+		if SessionHex(short) != SessionHex(long) {
+			t.Fatalf("%s: a gate period change must keep the DecisionStore", mode)
+		}
+	}
+	short := testStreamConfig("lapi.example:8080", 0)
+	short.LapiUnhealthyBackOffPeriodSecs = 10
+	long := testStreamConfig("lapi.example:8080", 0)
+	long.LapiUnhealthyBackOffPeriodSecs = 30
+	if OwnershipKey(short, "router") != OwnershipKey(long, "router") {
+		t.Fatal("stream ignores the gate period and must keep its Client")
+	}
+}

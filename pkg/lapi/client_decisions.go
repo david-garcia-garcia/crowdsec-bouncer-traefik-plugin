@@ -2,8 +2,11 @@ package lapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"net/url"
 	"sync/atomic"
 	"time"
@@ -91,7 +94,20 @@ func (c *Client) streamDeleteItem(item Decision) (decisionstore.Decision, bool) 
 }
 
 // queryLiveDecisions GETs LAPI decisions for rawQuery and returns the strongest kind and origin.
+// The live/none gate admits the GET first: a denial returns ErrGateSkip and sends nothing, and an
+// admitted GET records its health on the gate before the body is parsed.
 func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
+	// Admission never waits on the inbound request: the live GET does not carry its context either.
+	ticket, admitErr := c.gate.Admit(context.Background())
+	if admitErr != nil {
+		c.log.Error("fail to admit LAPI live query", "error", admitErr)
+		return liveResult{}, fmt.Errorf("handleNoStreamCache:admission %w", admitErr)
+	}
+	if !ticket.Admitted {
+		return liveResult{}, ErrGateSkip
+	}
+
+	// One live GET, recorded as LAPI health whatever the body holds.
 	routeURL := url.URL{
 		Scheme:   c.crowdsecScheme,
 		Host:     c.crowdsecHost,
@@ -99,9 +115,12 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 		RawQuery: rawQuery,
 	}
 	body, err := c.crowdsecQuery(routeURL.String(), nil)
+	c.gate.Record(ticket, liveQueryHealthy(err))
 	if err != nil {
 		return liveResult{}, err
 	}
+
+	// Parse: a parse error is still a failed lookup, but LAPI answered, so the gate saw a success.
 	if bytes.Equal(body, []byte("null")) {
 		return liveResult{kind: decisionscope.NoBannedValue}, nil
 	}
@@ -128,6 +147,22 @@ func (c *Client) queryLiveDecisions(rawQuery string) (liveResult, error) {
 		scenario: picked.Scenario,
 		duration: parsedDuration,
 	}, nil
+}
+
+// liveQueryHealthy reports whether a live GET outcome shows LAPI answering: no error, or a 4xx
+// other than 429 (a wrong key is a configuration error, not an outage, and the failure action
+// still applies to it). A transport error, a missing transport, a body read error, 429, and any
+// 5xx are failures that spend the gate budget.
+func liveQueryHealthy(err error) bool {
+	if err == nil {
+		return true
+	}
+	// sendQuery returns statusError unwrapped. errors.As panics on an interpreted type under Yaegi v0.16.
+	status, ok := err.(*statusError) //nolint:errorlint // see above
+	if !ok {
+		return false
+	}
+	return status.code >= http.StatusBadRequest && status.code < http.StatusInternalServerError && status.code != http.StatusTooManyRequests
 }
 
 // liveResult is one live/none LAPI query: kind, metrics origin, raw scenario, and decision TTL.
@@ -182,7 +217,10 @@ func (c *Client) mergeLiveScope(chosen liveResult, scope, identifier string, isL
 	}
 	headerChosen, headerErr := c.queryLiveDecisions("scope=" + url.QueryEscape(scope) + "&value=" + url.QueryEscape(identifier))
 	if headerErr != nil {
-		c.log.Warn("handleNoStreamCache:scopeQuery", "scope", scope, "error", headerErr)
+		// A gate skip already logged its one backoff WARN; a line per skipped request would defeat it.
+		if !errors.Is(headerErr, ErrGateSkip) {
+			c.log.Warn("handleNoStreamCache:scopeQuery", "scope", scope, "error", headerErr)
+		}
 		return chosen, headerErr
 	}
 	c.cacheLiveScope(scope, identifier, headerChosen, isLiveMode, defaultDecisionSeconds)

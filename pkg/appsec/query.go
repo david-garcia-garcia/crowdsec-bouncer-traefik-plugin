@@ -60,7 +60,8 @@ var ErrClientDisconnected = wafhop.ErrClientDisconnected
 // Query does not call AppSec and does not apply FailureAction; the bouncer answers 400 without a ban.
 var ErrClientBodyRead = wafhop.ErrClientBodyRead
 
-// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction.
+// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction;
+// the bouncer answers it with bouncerAppsecBackOffAction.
 var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
@@ -72,7 +73,7 @@ var errUnreadableBody = errors.New("appsecQuery:unreadableBody")
 
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
 func resultForFailureAction(action, errMsg string) (*Response, error) {
-	switch configuration.EffectiveFailureAction(action) {
+	switch configuration.EffectiveAppsecFailureAction(action) {
 	case configuration.FailureActionPassthrough:
 		return appsecAllow(), nil
 	case configuration.FailureActionCaptcha:
@@ -262,7 +263,7 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
 	case wafhop.IsBodyUnreadable(httpReq):
-		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
+		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveAppsecFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
 			return nil, errUnreadableBody
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)

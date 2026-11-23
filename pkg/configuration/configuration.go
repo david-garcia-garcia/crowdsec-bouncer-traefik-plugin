@@ -64,7 +64,11 @@ const (
 	// DefaultModsecBodyLimit is 8 MiB when modsecBodyLimit is omitted.
 	DefaultModsecBodyLimit int64 = 8 * 1024 * 1024
 	// DefaultAppsecUnhealthyBackOffPeriodSecs is the AppSec gate cooldown when omitted.
-	DefaultAppsecUnhealthyBackOffPeriodSecs int64 = 30
+	DefaultAppsecUnhealthyBackOffPeriodSecs int64 = 10
+	// DefaultModsecUnhealthyBackOffPeriodSecs is the ModSec gate cooldown when omitted.
+	DefaultModsecUnhealthyBackOffPeriodSecs int64 = 10
+	// DefaultLapiUnhealthyBackOffPeriodSecs is the LAPI live/none gate cooldown when omitted.
+	DefaultLapiUnhealthyBackOffPeriodSecs int64 = 10
 	// RateLimitStoreRedis is the only rate-limit store in this version.
 	RateLimitStoreRedis = "redis"
 )
@@ -90,6 +94,7 @@ type Config struct {
 	AppsecTLSInsecureVerify             bool                         `json:"appsecTlsInsecureVerify,omitempty"`
 	AppsecUnhealthyBackOffPeriodSecs    int64                        `json:"appsecUnhealthyBackOffPeriodSecs,omitempty"`
 	BouncerActionRules                  []httprule.ActionRule        `json:"bouncerActionRules,omitempty"`
+	BouncerAppsecBackOffAction          string                       `json:"bouncerAppsecBackOffAction,omitempty"`
 	BouncerAppsecFailureAction          string                       `json:"bouncerAppsecFailureAction,omitempty"`
 	BouncerBanFilePath                  string                       `json:"bouncerBanFilePath,omitempty"`
 	BouncerClientTrustedIPs             []string                     `json:"bouncerClientTrustedIps,omitempty"`
@@ -98,7 +103,9 @@ type Config struct {
 	BouncerForwardedHeadersCustomName   string                       `json:"bouncerForwardedHeadersCustomName,omitempty"`
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
+	BouncerLapiBackOffAction            string                       `json:"bouncerLapiBackOffAction,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
+	BouncerModsecBackOffAction          string                       `json:"bouncerModsecBackOffAction,omitempty"`
 	BouncerModsecFailureAction          string                       `json:"bouncerModsecFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
 	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
@@ -160,6 +167,7 @@ type Config struct {
 	LapiTLSClientKey                    string                       `json:"lapiTlsClientKey,omitempty"`
 	LapiTLSClientKeyFile                string                       `json:"lapiTlsClientKeyFile,omitempty"`
 	LapiTLSInsecureVerify               bool                         `json:"lapiTlsInsecureVerify,omitempty"`
+	LapiUnhealthyBackOffPeriodSecs      int64                        `json:"lapiUnhealthyBackOffPeriodSecs,omitempty"`
 	LapiUpdateIntervalSeconds           int64                        `json:"lapiUpdateIntervalSeconds,omitempty"`
 	LapiUpdateMaxFailure                int64                        `json:"lapiUpdateMaxFailure,omitempty"`
 	LogFilePath                         string                       `json:"logFilePath,omitempty"`
@@ -196,7 +204,9 @@ func contains(source []string, target string) bool {
 	return false
 }
 
-// validateFailureAction accepts empty (treated as ban at runtime), passthrough, ban, or captcha.
+// validateFailureAction accepts empty (resolved per leg at runtime by the matching
+// Effective* resolver), passthrough, ban, or captcha. It validates both the failure
+// action and the backoff action of a leg.
 // captcha is legal only when this router has a captcha instance name after owner-fill.
 func validateFailureAction(name, action string, captchaInstanceReady bool) error {
 	if action == "" {
@@ -211,6 +221,26 @@ func validateFailureAction(name, action string, captchaInstanceReady bool) error
 	return nil
 }
 
+// validateGatedLegActions validates the failure action and the backoff action of LAPI, AppSec, and
+// ModSec with validateFailureAction, in that order. Errors name the Go field.
+func validateGatedLegActions(config *Config) error {
+	captchaInstanceReady := captchaInstanceNameReadyAfterOwnerFill(config)
+	fieldActions := [][2]string{
+		{"BouncerLapiFailureAction", config.BouncerLapiFailureAction},
+		{"BouncerAppsecFailureAction", config.BouncerAppsecFailureAction},
+		{"BouncerModsecFailureAction", config.BouncerModsecFailureAction},
+		{"BouncerLapiBackOffAction", config.BouncerLapiBackOffAction},
+		{"BouncerAppsecBackOffAction", config.BouncerAppsecBackOffAction},
+		{"BouncerModsecBackOffAction", config.BouncerModsecBackOffAction},
+	}
+	for _, fieldAction := range fieldActions {
+		if err := validateFailureAction(fieldAction[0], fieldAction[1], captchaInstanceReady); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // captchaInstanceNameReadyAfterOwnerFill is true when CaptchaInstanceName is set,
 // or when CaptchaEnabled will fill an empty name to the Traefik name.
 func captchaInstanceNameReadyAfterOwnerFill(config *Config) bool {
@@ -220,17 +250,54 @@ func captchaInstanceNameReadyAfterOwnerFill(config *Config) bool {
 	return config.CaptchaEnabled
 }
 
-// EffectiveFailureAction maps empty config to ban (plugin default).
-func EffectiveFailureAction(action string) string {
+// EffectiveLapiFailureAction maps empty config to ban: a LAPI outage never lets a
+// banned IP through unless the operator asks otherwise.
+func EffectiveLapiFailureAction(action string) string {
 	if action == "" {
 		return FailureActionBan
 	}
 	return action
 }
 
-// EffectiveModsecFailureAction maps empty config to passthrough: unlike LAPI and AppSec,
+// EffectiveLapiBackOffAction maps empty config to ban: while the LAPI live/none gate
+// backs off, a request is not let through unless the operator asks otherwise.
+func EffectiveLapiBackOffAction(action string) string {
+	if action == "" {
+		return FailureActionBan
+	}
+	return action
+}
+
+// EffectiveAppsecFailureAction maps empty config to passthrough, the CreateConfig default:
+// an AppSec outage lets traffic through unless the operator asks otherwise.
+func EffectiveAppsecFailureAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
+// EffectiveAppsecBackOffAction maps empty config to passthrough: while the AppSec gate
+// backs off, the request continues as if AppSec were not configured.
+func EffectiveAppsecBackOffAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
+// EffectiveModsecFailureAction maps empty config to passthrough: unlike LAPI,
 // a ModSec sidecar outage lets traffic through unless the operator asks otherwise.
 func EffectiveModsecFailureAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
+// EffectiveModsecBackOffAction maps empty config to passthrough: while the ModSec gate
+// backs off, the request continues as if ModSec were not configured.
+func EffectiveModsecBackOffAction(action string) string {
 	if action == "" {
 		return FailureActionPassthrough
 	}
@@ -259,7 +326,8 @@ func New() *Config {
 		AppsecTLSInsecureVerify:             false,
 		AppsecUnhealthyBackOffPeriodSecs:    DefaultAppsecUnhealthyBackOffPeriodSecs,
 		BouncerActionRules:                  []httprule.ActionRule{},
-		BouncerAppsecFailureAction:          FailureActionBan,
+		BouncerAppsecBackOffAction:          FailureActionPassthrough,
+		BouncerAppsecFailureAction:          FailureActionPassthrough,
 		BouncerBanFilePath:                  "",
 		BouncerClientTrustedIPs:             []string{},
 		BouncerDecisionScopeHeaders:         map[string]string{},
@@ -267,7 +335,9 @@ func New() *Config {
 		BouncerForwardedHeadersCustomName:   "X-Forwarded-For",
 		BouncerForwardedHeadersInsecure:     false,
 		BouncerForwardedHeadersTrustedIPs:   []string{},
+		BouncerLapiBackOffAction:            FailureActionBan,
 		BouncerLapiFailureAction:            FailureActionBan,
+		BouncerModsecBackOffAction:          FailureActionPassthrough,
 		BouncerModsecFailureAction:          FailureActionPassthrough,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
 		BouncerRedisUnreachableBlock:        true,
@@ -309,6 +379,7 @@ func New() *Config {
 		LapiScheme:                          HTTP,
 		LapiStreamScopes:                    []string{},
 		LapiTLSInsecureVerify:               false,
+		LapiUnhealthyBackOffPeriodSecs:      DefaultLapiUnhealthyBackOffPeriodSecs,
 		LapiUpdateIntervalSeconds:           60,
 		LapiUpdateMaxFailure:                0,
 		LogFilePath:                         "",
@@ -317,7 +388,7 @@ func New() *Config {
 		ModsecBodyLimit:                     DefaultModsecBodyLimit,
 		ModsecEnabled:                       false,
 		ModsecHTTPTimeoutSeconds:            10,
-		ModsecUnhealthyBackOffPeriodSecs:    0,
+		ModsecUnhealthyBackOffPeriodSecs:    DefaultModsecUnhealthyBackOffPeriodSecs,
 		RateLimitAlgorithm:                  ratelimit.AlgorithmSlidingWindow,
 		RateLimitBuckets:                    []ratelimit.BucketRule{},
 		RateLimitEnabled:                    false,
@@ -918,6 +989,7 @@ func validateParamsRequired(config *Config) error {
 		"AppsecBodyLimit":                  config.AppsecBodyLimit,
 		"AppsecUnhealthyBackOffPeriodSecs": config.AppsecUnhealthyBackOffPeriodSecs,
 		"LapiMetricsUpdateIntervalSeconds": config.LapiMetricsUpdateIntervalSeconds,
+		"LapiUnhealthyBackOffPeriodSecs":   config.LapiUnhealthyBackOffPeriodSecs,
 		"ModsecUnhealthyBackOffPeriodSecs": config.ModsecUnhealthyBackOffPeriodSecs,
 		"ReclaimGraceSeconds":              config.ReclaimGraceSeconds,
 	}
@@ -943,14 +1015,7 @@ func validateParamsRequired(config *Config) error {
 	if config.LapiUpdateMaxFailure < -1 {
 		return errors.New("LapiUpdateMaxFailure: cannot be less than -1")
 	}
-	captchaInstanceReady := captchaInstanceNameReadyAfterOwnerFill(config)
-	if err := validateFailureAction("BouncerLapiFailureAction", config.BouncerLapiFailureAction, captchaInstanceReady); err != nil {
-		return err
-	}
-	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {
-		return err
-	}
-	if err := validateFailureAction("BouncerModsecFailureAction", config.BouncerModsecFailureAction, captchaInstanceReady); err != nil {
+	if err := validateGatedLegActions(config); err != nil {
 		return err
 	}
 	if _, err := httprule.NewActionSet(config.BouncerActionRules); err != nil {

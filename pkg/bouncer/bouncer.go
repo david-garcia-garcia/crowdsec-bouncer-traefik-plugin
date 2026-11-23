@@ -20,6 +20,7 @@ import (
 type Bouncer struct {
 	appsecLeg                legBinding // *appsec.Client
 	appsecFailureAction      string
+	appsecBackOffAction      string // per-router answer while the shared AppSec gate backs off
 	actionRules              *httprule.ActionSet
 	banTemplate              *template.Template
 	banTemplateContentType   string
@@ -32,9 +33,11 @@ type Bouncer struct {
 	forwardedHeadersInsecure bool
 	lapiLeg                  legBinding // *lapi.Client
 	lapiFailureAction        string     // per-router LAPI fallback (not on Client identity)
+	lapiBackOffAction        string     // per-router answer while the shared live/none LAPI gate backs off
 	modsecFailureAction      string
-	redisUnreachableBlock    bool  // per-router Redis fail-closed
-	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
+	modsecBackOffAction      string // per-router answer while the shared ModSec gate backs off
+	redisUnreachableBlock    bool   // per-router Redis fail-closed
+	defaultDecisionSeconds   int64  // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
 	bindingMu                sync.Mutex // serializes bind / unbind traces of every leg
 	name                     string
@@ -98,7 +101,8 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		captchaLeg:               legBinding{leg: "captcha", instanceName: config.CaptchaInstanceName, subscribed: subscriptions.Captcha},
 		modsecLeg:                legBinding{leg: "modsec", instanceName: config.ModsecInstanceName, subscribed: subscriptions.ModSec},
 		rateLimitLeg:             legBinding{leg: "ratelimit", instanceName: config.RateLimitInstanceName, subscribed: subscriptions.RateLimit},
-		appsecFailureAction:      configuration.EffectiveFailureAction(config.BouncerAppsecFailureAction),
+		appsecFailureAction:      configuration.EffectiveAppsecFailureAction(config.BouncerAppsecFailureAction),
+		appsecBackOffAction:      configuration.EffectiveAppsecBackOffAction(config.BouncerAppsecBackOffAction),
 		actionRules:              actionRules,
 		banTemplate:              banTemplate,
 		banTemplateContentType:   banTemplateContentType,
@@ -107,8 +111,10 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		enabled:                  config.BouncerEnabled,
 		forwardedCustomHeader:    forwardedCustomHeader,
 		forwardedHeadersInsecure: config.BouncerForwardedHeadersInsecure,
-		lapiFailureAction:        configuration.EffectiveFailureAction(config.BouncerLapiFailureAction),
+		lapiFailureAction:        configuration.EffectiveLapiFailureAction(config.BouncerLapiFailureAction),
+		lapiBackOffAction:        configuration.EffectiveLapiBackOffAction(config.BouncerLapiBackOffAction),
 		modsecFailureAction:      configuration.EffectiveModsecFailureAction(config.BouncerModsecFailureAction),
+		modsecBackOffAction:      configuration.EffectiveModsecBackOffAction(config.BouncerModsecBackOffAction),
 		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
 		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
@@ -120,6 +126,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
+	routeHandler.warnStricterBackOffActions(config, subscriptions)
 	// A router rebuilt without the rate limit drops the owner-unavailable WARN its name still has pending.
 	if !subscriptions.RateLimit {
 		pendingRateLimitOwnerWarnings.forget(name)
