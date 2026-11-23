@@ -288,10 +288,11 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `captcha:solved` | 302 after a successful solve (token pass or second-tab captcha-form POST) |
 | `error:client-disconnected` | Client gone during an AppSec or ModSec body copy |
 | `error:client-body-read` | Client body could not be read whole during an AppSec or ModSec body copy (HTTP 400) |
+| `error:body-read-timeout` | A body of unknown length did not arrive within the leg's `appsecBodyReadTimeoutSeconds` or `modsecBodyReadTimeoutSeconds` (HTTP 400), whatever the leg's failure action |
 
 LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). A metrics origin that starts with `plugin:ratelimit:` SHALL map to reason `ratelimit` with the rest of the origin (the bucket name) as the third field, after the same CR/LF/TAB strip. Bucket names cannot contain `:`, so the value still splits into at most three fields. Origin `plugin:ratelimit_failure` SHALL map to closed reason `ratelimit-failure` (no third field). Origin `plugin:ratelimit` (no bucket) SHALL map to reason `ratelimit` with no third field. Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
 
-The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and captcha challenge-page values. `pkg/captcha` MUST NOT own the closed table. Challenge page SHALL receive the already-formatted value. Pass 302 and Check-true form POST SHALL write `captcha:solved` with no third field.
+The bouncer SHALL format ban, AppSec relay, disconnect, client-body, captcha-downgrade, and captcha challenge-page values. `pkg/captcha` MUST NOT own the closed table. Challenge page SHALL receive the already-formatted value. Pass 302 and Check-true form POST SHALL write `captcha:solved` with no third field.
 
 #### Scenario: LAPI crowdsec origin on a ban
 - **WHEN** `bouncerRemediationHeadersCustomName` is `X-Remediation`
@@ -381,6 +382,11 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **WHEN** `bouncerRemediationHeadersCustomName` is set
 - **AND** only a `log` bucket is over its limit
 - **THEN** the response from the backend does not carry the remediation header
+
+#### Scenario: Body read timeout header
+- **WHEN** `bouncerRemediationHeadersCustomName` is `X-Remediation`
+- **AND** a WAF leg's body read deadline expires
+- **THEN** the response header `X-Remediation` is `error:body-read-timeout`
 
 ### Requirement: Action rules fold every matching row
 
@@ -749,3 +755,37 @@ The rate-limit step SHALL NOT increment `processed` a second time.
 - **WHEN** a middleware sets `rateLimitEnabled` and leaves `bouncerEnabled` false
 - **THEN** it publishes its rate-limit client
 - **AND** requests through it reach `next` without being charged
+
+### Requirement: Body read deadline on a WAF leg is a 400, not a ban
+When AppSec `Query` or ModSec `Inspect` returns `ErrBodyReadTimeout`, the bouncer SHALL answer HTTP 400 `Bad Request` and MUST NOT call `next`, whatever that leg's failure action says. It SHALL NOT write a ban template or `bouncerRemediationStatusCode`, SHALL NOT count a dropped request, and SHALL NOT record the leg's gate. With `bouncerRemediationHeadersCustomName` set, the header SHALL be `error:body-read-timeout` (no third field).
+
+#### Scenario: Passthrough does not let a stalled AppSec body through
+- **WHEN** `bouncerAppsecFailureAction` is `passthrough`
+- **AND** a POST without `Content-Length` does not arrive within `appsecBodyReadTimeoutSeconds`
+- **THEN** the response is HTTP 400
+- **AND** origin is not called
+- **AND** no dropped request is counted
+
+#### Scenario: The deadline is not a ban on either leg
+- **WHEN** the AppSec or ModSec body read deadline expires
+- **AND** that leg's failure action is `ban` or `captcha`
+- **THEN** the response is HTTP 400, not the ban template and not a captcha page
+- **AND** if `bouncerRemediationHeadersCustomName` is `X-Remediation` the response header value is `error:body-read-timeout`
+
+#### Scenario: A bypass rule skips the read
+- **WHEN** a matching action rule carries `bypassAppsec` (or `bypassModsec` for ModSec)
+- **AND** the request body has no `Content-Length` and never ends
+- **THEN** that leg does not read the body and starts no deadline
+
+### Requirement: Body read deadline is logged at WARN once per window per leg
+On `ErrBodyReadTimeout` the bouncer SHALL log WARN through `logger.Debounced` with a 5 second window, keyed by the message text, so each leg logs at most one line per window. AppSec SHALL use `AppSec request body not received within appsecBodyReadTimeoutSeconds; request blocked. Exclude streaming routes with a bouncerActionRules bypassAppsec (or bypass) rule`. ModSec SHALL use the same text with `ModSec`, `modsecBodyReadTimeoutSeconds`, and `bypassModsec`.
+
+#### Scenario: Two timeouts in one window log once
+- **WHEN** two AppSec body reads hit the deadline within 5 seconds
+- **THEN** one WARN line with the AppSec message is logged
+- **AND** both requests are answered HTTP 400
+
+#### Scenario: The WARN names the request without the query string
+- **WHEN** the AppSec body read deadline expires for `POST https://example.com/upload?token=secret`
+- **THEN** the WARN carries attrs `ip` (the client address chosen by `pkg/ip.GetRemoteIP`), `method`, `host`, `path` `/upload`, and `timeoutSeconds`
+- **AND** it does not contain `secret`
