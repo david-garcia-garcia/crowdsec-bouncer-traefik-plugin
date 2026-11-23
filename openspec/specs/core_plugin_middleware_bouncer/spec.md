@@ -253,7 +253,7 @@ When the bouncer writes the operator ban page, the response SHALL set `Cache-Con
 
 ### Requirement: Structured remediation header values
 
-When `bouncerRemediationHeadersCustomName` is non-empty, each remediating response this bouncer writes SHALL set that header to a structured value `kind:reason` or `kind:reason:origin`. `:` is the field separator. Consumers SHALL split at most three fields. There is no space after `:`. Empty header name SHALL still omit the header. Pass, skip-to-next from action rules, trusted IP, failure-action passthrough, remap-to-pass, widget-asset passthrough, valid gate-cookie origin GET, disabled bouncer, and startup 503 MUST NOT set this header. The plugin MUST NOT emit `allow: pass`. The plugin MUST NOT add a public config key for this header.
+When `bouncerRemediationHeadersCustomName` is non-empty, each remediating response this bouncer writes SHALL set that header to a structured value `kind:reason` or `kind:reason:origin`. `:` is the field separator. Consumers SHALL split at most three fields. There is no space after `:`. Empty header name SHALL still omit the header. Pass, skip-to-next from action rules, trusted IP, failure-action passthrough, backoff-action passthrough, remap-to-pass, widget-asset passthrough, valid gate-cookie origin GET, disabled bouncer, and startup 503 MUST NOT set this header. The plugin MUST NOT emit `allow: pass`. The plugin MUST NOT add a public config key for this header.
 
 Closed reasons never take a third field, except `lapi` (the metrics origin) and `ratelimit` (the bucket name). The closed vocabulary is:
 
@@ -263,23 +263,29 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `ban:lapi` | CrowdSec decision type ban, empty metrics origin |
 | `ban:lapi:<origin>` | CrowdSec decision type ban; third field is header-safe metrics origin |
 | `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban |
+| `ban:lapi-backoff` | LAPI live/none gate backing off, backoff action `ban` (no GET sent) |
 | `ban:stream-unhealthy` | Stream miss + unhealthy, fail-closed ban |
 | `ban:cache-fail` | Redis/cache fail-closed |
 | `ban:appsec` | AppSec JSON `action: ban` |
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-action-empty` | AppSec action other than `allow` / `ban` / `captcha` / `challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-failure` | AppSec down / unusable verdict, fail-closed ban |
+| `ban:appsec-backoff` | AppSec gate backing off, backoff action `ban` (AppSec not called) |
 | `ban:modsec` | CRS sidecar copied 3xx/4xx block |
 | `ban:modsec-failure` | ModSec sidecar down / unpublished, failure action `ban` (RemediationReason `MODSEC`) |
+| `ban:modsec-backoff` | ModSec gate backing off, backoff action `ban` (sidecar not called; RemediationReason `MODSEC`) |
 | `ban:ratelimit:<bucket>` | A rate-limit bucket with `action: ratelimit` answered, or a `captcha` bucket answered as `ratelimit` (`bypassCaptcha`, or no usable captcha); third field is the bucket name |
 | `ban:ratelimit-failure` | Rate-limit counter could not answer, failure action `ban` |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client) |
 | `captcha:rules` | Matching action rule applied captcha |
 | `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec decision type captcha (same origin encoding) |
 | `captcha:lapi-failure` | LAPI fail-closed captcha |
+| `captcha:lapi-backoff` | LAPI live/none gate backing off, backoff action `captcha` |
 | `captcha:stream-unhealthy` | Stream fail-closed captcha |
 | `captcha:appsec-failure` | AppSec fail-closed captcha |
+| `captcha:appsec-backoff` | AppSec gate backing off, backoff action `captcha` |
 | `captcha:modsec-failure` | ModSec sidecar down / unpublished, failure action `captcha` |
+| `captcha:modsec-backoff` | ModSec gate backing off, backoff action `captcha` |
 | `captcha:ratelimit:<bucket>` | Router captcha page for a rate-limit bucket with `action: captcha`; third field is the bucket name |
 | `captcha:ratelimit-failure` | Rate-limit counter could not answer, failure action `captcha` |
 | `captcha:ratelimit` | Router captcha page for a challenge-marker POST that the rate-limit leg's captcha gate answered with the challenge again (no bucket answered) |
@@ -289,7 +295,7 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `error:client-disconnected` | Client gone during an AppSec or ModSec body copy |
 | `error:client-body-read` | Client body could not be read whole during an AppSec or ModSec body copy (HTTP 400) |
 
-LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). A metrics origin that starts with `plugin:ratelimit:` SHALL map to reason `ratelimit` with the rest of the origin (the bucket name) as the third field, after the same CR/LF/TAB strip. Bucket names cannot contain `:`, so the value still splits into at most three fields. Origin `plugin:ratelimit_failure` SHALL map to closed reason `ratelimit-failure` (no third field). Origin `plugin:ratelimit` (no bucket) SHALL map to reason `ratelimit` with no third field. Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
+LAPI third field SHALL be the usage-metrics origin already returned by `LookupRemediation` / `LiveLookup` (`MetricsOrigin`), after strip of CR/LF/TAB and rewriting only the prefix `lists:` → `lists_`. Empty origin omits the third field. The plugin MUST NOT globally replace remaining colons. The plugin MUST NOT change `MetricsOrigin` or DecisionStore packing. Plugin origins, including `plugin:rules:<name>`, and AppSec specials are reason tokens, never a third field. A metrics origin that starts with `plugin:rules:` SHALL map to closed reason `rules` (no third field). A metrics origin that starts with `plugin:ratelimit:` SHALL map to reason `ratelimit` with the rest of the origin (the bucket name) as the third field, after the same CR/LF/TAB strip. Bucket names cannot contain `:`, so the value still splits into at most three fields. Origin `plugin:ratelimit_failure` SHALL map to closed reason `ratelimit-failure` (no third field). Origin `plugin:ratelimit` (no bucket) SHALL map to reason `ratelimit` with no third field. A `*-backoff` reason SHALL be passed to the writer by the leg that answered the gate skip, never derived from the metrics origin: a backoff answer shares its leg's failure origin (`plugin:lapi_failure`, `plugin:appsec_failure`, `plugin:modsec_failure`), and that origin SHALL keep mapping to `<leg>-failure`. Client address stays `pkg/ip.GetRemoteIP` on `clientRequest`; this header MUST NOT reconstruct identity.
 
 The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and captcha challenge-page values. `pkg/captcha` MUST NOT own the closed table. Challenge page SHALL receive the already-formatted value. Pass 302 and Check-true form POST SHALL write `captcha:solved` with no third field.
 
@@ -361,6 +367,22 @@ The bouncer SHALL format ban, AppSec relay, disconnect, captcha-downgrade, and c
 - **AND** the sidecar is unreachable and `bouncerModsecFailureAction` is `ban`
 - **THEN** the header value is `ban:modsec-failure`
 - **AND** the usage-metrics origin is `plugin:modsec_failure`
+
+#### Scenario: Backoff ban is labelled per leg
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** the LAPI, AppSec, or ModSec gate is backing off and that leg's backoff action is `ban`
+- **THEN** the header value is `ban:lapi-backoff`, `ban:appsec-backoff`, or `ban:modsec-backoff`
+- **AND** the usage-metrics origin is that leg's failure origin
+
+#### Scenario: Backoff captcha is labelled per leg
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** the AppSec gate is backing off, `bouncerAppsecBackOffAction` is `captcha`, and the router serves its captcha page
+- **THEN** the header value is `captcha:appsec-backoff`
+
+#### Scenario: Backoff passthrough sets no header
+- **WHEN** `bouncerRemediationHeadersCustomName` is set
+- **AND** a gate is backing off and that leg's backoff action is `passthrough`
+- **THEN** the response from the backend does not carry the remediation header
 
 #### Scenario: Rate-limit deny carries the bucket name
 - **WHEN** `bouncerRemediationHeadersCustomName` is set
@@ -645,9 +667,12 @@ The captcha sources that continue instead of writing SHALL be:
 
 - a LAPI decision whose applied kind is captcha (cache lookup and live lookup);
 - the LAPI failure action `captcha` (missing subscribed client, live lookup error, unhealthy stream);
+- the LAPI backoff action `captcha` (live/none gate skip);
 - an AppSec `captcha` verdict;
 - the AppSec failure action `captcha` (missing client, or a query failure);
+- the AppSec backoff action `captcha` (gate skip);
 - the ModSec failure action `captcha` (missing client, or no sidecar verdict);
+- the ModSec backoff action `captcha` (gate skip);
 - the rate-limit failure action `captcha` (counter error);
 - a captcha challenge-form POST that AppSec let through;
 - a captcha challenge-form POST that the rate-limit step hands to the captcha gate.
@@ -658,7 +683,7 @@ When a captcha-bypass flag is set, `ActionMatch.CaptchaName` SHALL be empty even
 
 A rate-limit bucket with `action: captcha` is the one exception: on a request a `bypassCaptcha` row matches, that bucket SHALL answer as a `ratelimit` bucket (`rateLimitStatusCode`, `Retry-After`, `ban:ratelimit:<bucket>`) instead of letting the request through, so a rate limit does not become unlimited (`core_plugin_ratelimit_buckets`).
 
-Everything that is not this router's captcha gate SHALL be unchanged: a `ban` row; a LAPI ban; a fail-closed ban from the LAPI leg; an AppSec `ban` verdict or failure-action `ban`; an AppSec `challenge` (relayed when it carries a page, `ban:appsec-challenge-empty` when it does not, although its header value starts with `captcha:`); and any other AppSec action.
+Everything that is not this router's captcha gate SHALL be unchanged: a `ban` row; a LAPI ban; a fail-closed ban from the LAPI leg (failure action or backoff action `ban`); an AppSec `ban` verdict, failure-action `ban`, or backoff-action `ban`; a ModSec failure-action or backoff-action `ban`; an AppSec `challenge` (relayed when it carries a page, `ban:appsec-challenge-empty` when it does not, although its header value starts with `captcha:`); and any other AppSec action.
 
 A row with a `path` predicate SHALL apply `bypassCaptcha` on every request its regex matches. The single-reading path requirement ("Action-rule skips need a single-reading path") covers `bypass`, `bypassLapi`, `bypassAppsec`, and `bypassModsec` only. On a path with more than one reading, a row `{action: [bypassCaptcha, bypassLapi]}` SHALL still bypass the captcha and SHALL NOT skip LAPI. The operator relies on Traefik for the path: Traefik resolves `.` and `..` segments and decodes `%2e` before the plugin runs, and by default does not reject `%2F`, `%5C`, `%3B`, or double encoding (`knowledge/research/ext_traefik_entrypoints_request-path/`).
 
@@ -689,6 +714,15 @@ A row with a `path` predicate SHALL apply `bypassCaptcha` on every request its r
 - **WHEN** the same rule matches, the LAPI failure action is `captcha`, and no LAPI client is published
 - **THEN** no captcha page is written
 - **AND** the AppSec leg runs, then `next`
+
+#### Scenario: Backoff action captcha continues
+- **WHEN** the same rule matches, the LAPI gate is backing off, and `bouncerLapiBackOffAction` is `captcha`
+- **THEN** no captcha page is written
+- **AND** the AppSec leg runs, then `next`
+
+#### Scenario: Backoff action ban still bans
+- **WHEN** the same rule matches, the LAPI gate is backing off, and `bouncerLapiBackOffAction` is `ban`
+- **THEN** ServeHTTP remediates as ban with `ban:lapi-backoff`
 
 #### Scenario: Router without a usable captcha is not banned
 - **WHEN** the same rule matches, the client has an active LAPI `captcha` decision, and this router did not subscribe to a captcha
@@ -749,3 +783,46 @@ The rate-limit step SHALL NOT increment `processed` a second time.
 - **WHEN** a middleware sets `rateLimitEnabled` and leaves `bouncerEnabled` false
 - **THEN** it publishes its rate-limit client
 - **AND** requests through it reach `next` without being charged
+
+### Requirement: A gate skip answers with that leg's backoff action
+When the LAPI, AppSec, or ModSec Client reports a gate skip, the router SHALL apply its own `bouncer<Leg>BackOffAction`, resolved in `bouncer.New` like the failure action. `ban` SHALL write the ban template with that leg's RemediationReason. `captcha` SHALL serve the router's captcha gate; with no usable captcha client it SHALL ban (`ban:captcha-downgrade`). The failure action MUST NOT apply to a skip.
+
+#### Scenario: Two routers on one gate answer differently
+- **WHEN** two routers subscribe to the same AppSec instance and its gate is backing off
+- **AND** one router sets `bouncerAppsecBackOffAction: ban` and the other omits it
+- **THEN** the first router answers `ban:appsec-backoff`
+- **AND** the second router passes the request on
+
+#### Scenario: Captcha backoff without a usable captcha bans
+- **WHEN** the ModSec gate is backing off and `bouncerModsecBackOffAction` is `captcha`
+- **AND** the router's captcha instance is not published
+- **THEN** the response is a ban with `ban:captcha-downgrade`
+
+### Requirement: A backoff ban outranks a captcha action rule
+A backoff-action `ban` on any leg SHALL prevail over a matching `captcha` action rule, as that leg's failure-action `ban` does. It SHALL keep that leg's failure origin, not `plugin:rules:`, and SHALL log WARN `warnCaptchaSuperseded` with attrs `name` and `ip`.
+
+#### Scenario: LAPI backoff ban beats a captcha rule
+- **WHEN** a matching row is `{name: gate, action: [captcha]}`
+- **AND** the LAPI gate is backing off and `bouncerLapiBackOffAction` is `ban`
+- **THEN** the response is a ban with `ban:lapi-backoff` and origin `plugin:lapi_failure`
+- **AND** WARN `warnCaptchaSuperseded` is logged with `name` `gate`
+
+### Requirement: A backoff action stricter than the failure action warns at startup
+`bouncer.New` SHALL log one WARN `crowdsec bouncer backoff action stricter than failure action` per subscribed leg (LAPI, AppSec, ModSec) when that leg's effective backoff action ranks above its effective failure action (passthrough < captcha < ban). Attrs SHALL be `leg`, `failureAction`, `backOffAction`. It MUST NOT fail `New`. A router that opens LAPI itself in `stream` or `alone` SHALL NOT warn for LAPI.
+
+#### Scenario: LAPI passthrough with the default backoff ban warns
+- **WHEN** a router subscribes to a LAPI instance, sets `bouncerLapiFailureAction: passthrough`, and omits `bouncerLapiBackOffAction`
+- **THEN** `New` succeeds
+- **AND** one WARN names `leg` `lapi`, `failureAction` `passthrough`, `backOffAction` `ban`
+
+#### Scenario: Defaults do not warn
+- **WHEN** a router subscribes to LAPI, AppSec, and ModSec and sets no failure or backoff action
+- **THEN** no stricter-than WARN is logged
+
+#### Scenario: Stream owner does not warn for LAPI
+- **WHEN** a router opens LAPI in `stream` mode with `bouncerLapiFailureAction: passthrough`
+- **THEN** no stricter-than WARN is logged for LAPI
+
+#### Scenario: Unsubscribed leg does not warn
+- **WHEN** a router does not subscribe to ModSec and sets `bouncerModsecBackOffAction: ban`
+- **THEN** no stricter-than WARN is logged for ModSec
