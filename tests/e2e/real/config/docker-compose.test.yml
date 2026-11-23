@@ -50,6 +50,7 @@ services:
       - waf-5xx
       - waf-flaky
       - appsec-flaky
+      - lapi-flaky
       - echo-ws
 
   # Always-pass siteverify so Pester can POST a dummy form and assert the gate cookie.
@@ -358,6 +359,7 @@ services:
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.lapiHttpTimeoutSeconds=2"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.lapiKey=40796d93c2958f9e58345514e67740e5"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.lapiMode=none"
+      - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.lapiUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.logformat=json"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-lapi-fail-ban.plugin.bouncer.reclaimgraceseconds=2"
@@ -375,6 +377,7 @@ services:
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.lapiHttpTimeoutSeconds=2"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.lapiKey=c51a1c70000000000000000000000011"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.lapiMode=none"
+      - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.lapiUnhealthyBackOffPeriodSecs=0"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.logformat=json"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.loglevel=DEBUG"
       - "traefik.http.middlewares.bouncer-lapi-fail-pass.plugin.bouncer.reclaimgraceseconds=2"
@@ -598,6 +601,18 @@ services:
     labels:
       - "traefik.enable=false"
 
+  # LAPI proxy for the LAPI live backoff lifecycle (see lapi-flaky.conf).
+  lapi-flaky:
+    image: nginx:alpine
+    container_name: "lapi-flaky-test"
+    restart: unless-stopped
+    depends_on:
+      - crowdsec
+    volumes:
+      - ./lapi-flaky.conf:/etc/nginx/conf.d/default.conf:ro
+    labels:
+      - "traefik.enable=false"
+
   waf-5xx:
     image: nginx:alpine
     container_name: "waf-5xx-test"
@@ -672,6 +687,7 @@ services:
       BOUNCER_KEY_BYPASS_CAPTCHA: "c51a1c7000000000000000000000001c"
       BOUNCER_KEY_BYPASS_CAPTCHA_PATHS: "c51a1c7000000000000000000000001d"
       BOUNCER_KEY_RATE_LIMIT: "c51a1c7000000000000000000000001e"
+      BOUNCER_KEY_LAPI_BACKOFF: "c51a1c7000000000000000000000001f"
       # Disable aggressive collections that cause 150k decision issue
       DISABLE_COLLECTIONS: "crowdsecurity/iptables crowdsecurity/linux crowdsecurity/sshd"
       # Enable debugging

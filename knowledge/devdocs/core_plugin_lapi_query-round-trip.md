@@ -23,6 +23,8 @@ _Avoid_: retry loop, recursive `crowdsecQuery`, bodyless replay
 - Check `isReverseProxyError(res.StatusCode)` below that defer, not beside the transport error. Do not add a `nil` response guard there: the branch is reachable only when `err == nil`.
 - Use `%w` only where there is a cause. Name a reverse-proxy status with `statusCode:%d` so `%!w(<nil>)` never reaches an operator.
 - Keep `crowdsecQuery:` as the message prefix. It is the operator-facing name of the exchange, not the Go identifier.
+- Return a non-2xx (the reverse-proxy branch and the generic non-2xx branch) as `*statusError{code, msg}` with `msg` pre-formatted, so `Error()` keeps the exact text. Only the live/none path reads `code` (`liveQueryHealthy`); stream, alone, `getToken`, and the replay ignore the type.
+- Read `statusError` with a type assertion, not `errors.As`: `errors.As` on an interpreted type panics under Yaegi v0.16. `sendQuery` never wraps it.
 
 ## Pattern snippet
 

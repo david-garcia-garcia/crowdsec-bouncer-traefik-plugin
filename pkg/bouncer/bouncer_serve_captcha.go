@@ -53,6 +53,16 @@ func (b *Bouncer) bypassesCaptcha(req clientrequest.Request, match httprule.Acti
 	return true
 }
 
+// captchaUnlessBypassed serves this router's captcha gate for a failure or backoff action, unless a
+// bypassCaptcha rule matched. banReason is the ban template reason on a downgrade, headerReason labels
+// the page. False means a bypassCaptcha rule, a widget asset, or a cleared gate, and the caller continues.
+func (b *Bouncer) captchaUnlessBypassed(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, banReason, headerReason, origin string) bool {
+	if b.bypassesCaptcha(req, match) {
+		return false
+	}
+	return b.handleCaptchaKindServeHTTP(rw, req, banReason, headerReason, origin)
+}
+
 // serveAppsecCaptchaGate serves this router's captcha gate for AppSec: a captcha verdict, or a captcha form POST AppSec let through.
 // False means a widget asset, a cleared gate, or a bypassCaptcha rule, and the caller continues.
 func (b *Bouncer) serveAppsecCaptchaGate(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {

@@ -65,7 +65,8 @@ var ErrClientBodyRead = wafhop.ErrClientBodyRead
 // answers 400 whatever the failure action says.
 var ErrBodyReadTimeout = wafhop.ErrBodyReadTimeout
 
-// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction.
+// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction;
+// the bouncer answers it with bouncerAppsecBackOffAction.
 var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
@@ -73,7 +74,7 @@ var errAppsecReadBody = errors.New("appsecQuery:readBody")
 
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
 func resultForFailureAction(action, errMsg string) (*Response, error) {
-	switch configuration.EffectiveFailureAction(action) {
+	switch configuration.EffectiveAppsecFailureAction(action) {
 	case configuration.FailureActionPassthrough:
 		return appsecAllow(), nil
 	case configuration.FailureActionCaptcha:

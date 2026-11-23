@@ -20,7 +20,7 @@ const legModsec = "modsec"
 const originModsec = "modsec"
 
 // serveModSec runs the CRS sidecar inspect after LAPI and AppSec. True means the response was written.
-// False means allow, a gate skip, or a failure action that lets the request through: ServeHTTP calls next.
+// False means allow, or a failure or backoff action that lets the request through: ServeHTTP calls next.
 func (b *Bouncer) serveModSec(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	if match.SkipModsec || !b.modsecLeg.subscribed {
 		return false
@@ -40,7 +40,7 @@ func (b *Bouncer) serveModSec(rw http.ResponseWriter, req clientrequest.Request,
 		return true
 	case errors.Is(err, modsecurity.ErrGateSkip):
 		// The admission gate is backing off: the sidecar was not called and the failure action does not apply.
-		return false
+		return b.applyBackOffAction(rw, req, match, b.modsecBackOffAction, configuration.ReasonMODSEC, headerReasonModsecBackoff, lapi.OriginPluginModsecFailure)
 	case errors.Is(err, wafhop.ErrBodyReadTimeout):
 		b.handleBodyReadTimeoutServeHTTP(rw, req, legModsec, msgModsecBodyReadTimeout, client.BodyReadTimeoutSeconds())
 		return true

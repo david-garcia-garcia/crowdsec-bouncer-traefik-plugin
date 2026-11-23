@@ -193,37 +193,50 @@ AppSec reclaim identity JSON SHALL be produced only by the marshaler in `pkg/app
 - **WHEN** `Query` forwards a request whose `ProtoMajor` is 0
 - **THEN** `X-Crowdsec-Appsec-Http-Version` is absent
 
-### Requirement: AppSec Client owns the admission gate
-When `appsecUnhealthyBackOffPeriodSecs` is greater than 0, `appsec.Client` SHALL hold one `backendbackoff.Gate` from dest utilities `v1.0.7` and MUST NOT copy that package into this repository. Default period SHALL be 30. `0` SHALL build no gate. A negative period SHALL fail `New`. The period SHALL be the only gate knob: the trip rule SHALL be fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30; each failure spends one unit of a budget of 5, each success earns back `0.30/0.70`, so 5 failures in a row trip), and the cooldown SHALL stay at the period (max cooldown equals the base, no exponential growth). Query SHALL read the client body first and then `Allow` before the AppSec hop, so a client body error or disconnect never holds an admitted ticket (a held half-open probe would delay recovery by one cooldown). An admission error other than inbound cancel SHALL apply FailureAction. Denied Allow SHALL NOT call AppSec, SHALL NOT apply `bouncerAppsecFailureAction`, and SHALL continue (then ModSec if subscribed). An admitted transport failure, HTTP 500, any listener status other than 200, 401, 403, and 500, or an AppSec response-body io error SHALL `Report` failure then apply FailureAction. HTTP 401 SHALL `Report` success (the listener answered; a wrong key is a configuration error, not an outage) and still apply FailureAction. A usable verdict SHALL `Report` success. Inbound cancel MUST NOT Report. Client `Close` SHALL Close a non-nil Gate. The gate SHALL log one WARN `crowdsec appsec backoff started` (with `retryIn`) on the first skipped request after a trip, and one INFO `crowdsec appsec backoff ended` when a request admitted during the backoff (the probe) reports success. Skipped requests MUST NOT log one line each. A success from a request admitted before the trip MUST NOT log `backoff ended`. The wrapper that owns these two lines is `pkg/admission`, shared by the AppSec and ModSec Clients.
+### Requirement: AppSec Client holds one admission gate
+When `appsecUnhealthyBackOffPeriodSecs` is greater than 0, `appsec.Client` SHALL hold one `backendbackoff.Gate` from dest utilities and MUST NOT copy that package into this repository. Default period SHALL be 10. `0` SHALL build no gate. A negative period SHALL fail `New`. The period SHALL be the only knob: the trip rule is fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30) and the cooldown stays at the period. `Close` SHALL Close a non-nil Gate.
 
-#### Scenario: Default 30 builds a gate
+#### Scenario: Default 10 builds a gate
 - **WHEN** the operator omits `appsecUnhealthyBackOffPeriodSecs`
-- **THEN** the AppSec Client holds one Gate with base cooldown 30 seconds
+- **THEN** the AppSec Client holds one Gate with base cooldown 10 seconds
+
+#### Scenario: Zero builds no gate
+- **WHEN** `appsecUnhealthyBackOffPeriodSecs` is 0
+- **THEN** the AppSec Client holds no Gate
 
 #### Scenario: Fifth failure in a row trips the gate
 - **WHEN** the gate is on and AppSec fails 5 admitted requests in a row with `bouncerAppsecFailureAction` `ban`
 - **THEN** those 5 requests are banned
-- **AND** the sixth request does not call AppSec and continues without the failure action
-
-#### Scenario: Gate skip does not call AppSec
-- **WHEN** the AppSec Gate denies Allow
-- **AND** `bouncerAppsecFailureAction` is `ban`
-- **THEN** AppSec is not called
-- **AND** the request is not banned for that skip
+- **AND** the sixth request does not call AppSec and gets `bouncerAppsecBackOffAction`, not the failure action
 
 #### Scenario: Close closes the gate
 - **WHEN** an AppSec Client with a Gate is Closed
 - **THEN** that Gate is Closed
 
-#### Scenario: Backoff logs once per transition
-- **WHEN** the AppSec gate trips and several later requests are skipped
-- **THEN** exactly one `crowdsec appsec backoff started` line is logged
-- **AND** after a probe succeeds exactly one `crowdsec appsec backoff ended` line is logged
+### Requirement: AppSec admission comes after the body read
+`Query` SHALL read the client body first and then `Allow` before the AppSec hop, so a client body error or disconnect never holds an admitted ticket. An admission error other than inbound cancel SHALL apply FailureAction. A denied `Allow` SHALL NOT call AppSec, SHALL NOT apply `bouncerAppsecFailureAction`, and SHALL return `ErrGateSkip`. The bouncer answers it with the router's `bouncerAppsecBackOffAction` (`core_plugin_appsec_failure-action`).
+
+#### Scenario: Gate skip does not call AppSec
+- **WHEN** the AppSec Gate denies Allow
+- **AND** `bouncerAppsecFailureAction` is `ban` and `bouncerAppsecBackOffAction` is omitted
+- **THEN** AppSec is not called
+- **AND** the request is not banned for that skip
+
+#### Scenario: Client disconnect holds no ticket
+- **WHEN** the client disconnects while its readable body is buffered
+- **THEN** `Allow` is not called for that request
+
+### Requirement: AppSec gate records the listener's health
+An admitted transport failure, HTTP 500, any listener status other than 200, 401, 403, and 500, or an AppSec response-body io error SHALL `Report` failure, then apply FailureAction. HTTP 401 SHALL `Report` success (a wrong key is a configuration error, not an outage) and still apply FailureAction. A usable verdict SHALL `Report` success. An inbound cancel MUST NOT Report.
 
 #### Scenario: HTTP 401 does not spend gate budget
 - **WHEN** the AppSec listener answers HTTP 401 on every request
 - **THEN** the AppSec Gate never trips
 - **AND** every request still uses `bouncerAppsecFailureAction`
+
+#### Scenario: HTTP 500 spends gate budget
+- **WHEN** the AppSec listener answers HTTP 500 on 5 admitted requests in a row
+- **THEN** the AppSec Gate trips
 
 ### Requirement: Non-positive body limit is the default cap
 An `appsecBodyLimit` of `0` or less SHALL be treated as 10485760 bytes, the same value as the omitted default, both for the copy cap and for the AppSec reclaim identity. `Query` SHALL always cap the copied client body at that effective limit and MUST NOT copy an unbounded body. A body longer than the limit SHALL still be forwarded to origin whole, with only its first bytes inspected.
@@ -240,3 +253,11 @@ An `appsecBodyLimit` of `0` or less SHALL be treated as 10485760 bytes, the same
 #### Scenario: Zero and omitted share one Client
 - **WHEN** two Opens for the same middleware name and knobs differ only in `appsecBodyLimit` `0` versus omitted
 - **THEN** the ownership keys are equal
+
+### Requirement: AppSec backoff logs once per transition
+The AppSec gate SHALL log one WARN `crowdsec appsec backoff started` (with `retryIn`) on the first skipped request after a trip, and one INFO `crowdsec appsec backoff ended` when the probe admitted during the backoff reports success. Skipped requests MUST NOT log one line each. A success from a request admitted before the trip MUST NOT log `backoff ended`. `pkg/admission` owns both lines for the AppSec, ModSec, and LAPI Clients.
+
+#### Scenario: Backoff logs once per transition
+- **WHEN** the AppSec gate trips and several later requests are skipped
+- **THEN** exactly one `crowdsec appsec backoff started` line is logged
+- **AND** after a probe succeeds exactly one `crowdsec appsec backoff ended` line is logged

@@ -218,13 +218,13 @@ func TestServeHTTP_bypassRuleSkipsTheBodyRead(t *testing.T) {
 }
 
 // TestServeHTTP_resticShapeReachesOrigin is upstream issue #405: an empty HTTP/2 POST with no
-// Content-Length, both WAF legs, the default failure actions and ModSec's ban. Both legs inspect it and
-// origin is called; neither failure action applies.
+// Content-Length, both WAF legs, AppSec's ban (the failure action #405 hit) and ModSec's default and ban.
+// Both legs inspect it and origin is called; neither failure action applies.
 func TestServeHTTP_resticShapeReachesOrigin(t *testing.T) {
 	for _, modsecFailureAction := range []string{"", configuration.FailureActionBan} {
 		var appsecHits, modsecHits atomic.Int32
 		b, passed := testModsecBouncer(t, modsecFailureAction, nil)
-		b.appsecFailureAction = configuration.EffectiveFailureAction("")
+		b.appsecFailureAction = configuration.FailureActionBan
 		bindTestAppSec(b, countingAppsec(t, &appsecHits))
 		bindTestModSec(b, countingModsec(t, &modsecHits))
 		rw := httptest.NewRecorder()

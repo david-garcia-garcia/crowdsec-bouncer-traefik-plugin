@@ -96,6 +96,8 @@ http:
           modsecEnabled: "true"
           modsecHttpTimeoutSeconds: "2"
           modsecUrl: http://127.0.0.1:9
+          # A permanently down sidecar: keep the gate off so every request shows the failure action.
+          modsecUnhealthyBackOffPeriodSecs: "0"
           reclaimGraceSeconds: "2"
     bouncer-modsec-fail-ban:
       plugin:
@@ -113,6 +115,8 @@ http:
           modsecEnabled: "true"
           modsecHttpTimeoutSeconds: "2"
           modsecUrl: http://127.0.0.1:9
+          # A permanently down sidecar: keep the gate off so every request shows the failure action.
+          modsecUnhealthyBackOffPeriodSecs: "0"
           reclaimGraceSeconds: "2"
     bouncer-modsec-fail-captcha:
       plugin:
@@ -140,6 +144,8 @@ http:
           modsecEnabled: "true"
           modsecHttpTimeoutSeconds: "2"
           modsecUrl: http://127.0.0.1:9
+          # A permanently down sidecar: keep the gate off so every request shows the failure action.
+          modsecUnhealthyBackOffPeriodSecs: "0"
           reclaimGraceSeconds: "2"
     bouncer-modsec-skip:
       plugin:

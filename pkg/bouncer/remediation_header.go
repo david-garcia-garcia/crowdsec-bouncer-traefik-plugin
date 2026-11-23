@@ -17,16 +17,19 @@ const (
 	headerReasonLAPI                 = "lapi"
 	headerReasonRules                = "rules"
 	headerReasonLAPIFailure          = "lapi-failure"
+	headerReasonLAPIBackoff          = "lapi-backoff"
 	headerReasonStreamUnhealthy      = "stream-unhealthy"
 	headerReasonCacheFail            = "cache-fail"
 	headerReasonAppsec               = "appsec"
 	headerReasonAppsecChallengeEmpty = "appsec-challenge-empty"
 	headerReasonAppsecActionEmpty    = "appsec-action-empty"
 	headerReasonAppsecFailure        = "appsec-failure"
+	headerReasonAppsecBackoff        = "appsec-backoff"
 	headerReasonRateLimit            = "ratelimit"
 	headerReasonRateLimitFailure     = "ratelimit-failure"
 	headerReasonModsec               = "modsec"
 	headerReasonModsecFailure        = "modsec-failure"
+	headerReasonModsecBackoff        = "modsec-backoff"
 	headerReasonCaptchaDowngrade     = "captcha-downgrade"
 	headerReasonChallenge            = "challenge"
 	headerReasonClientDisconnected   = "client-disconnected"
@@ -87,6 +90,8 @@ func encodeHeaderOrigin(origin string) string {
 
 // headerReasonFromOrigin maps a metrics origin to a closed header reason.
 // Plugin origins stay a reason token. Every other origin is lapi (third field is that origin).
+// A *-backoff reason is never derived here: a backoff answer shares its leg's failure origin, and
+// the leg that answered the gate skip passes that reason to the writer.
 func headerReasonFromOrigin(origin string) string {
 	if strings.HasPrefix(origin, lapi.OriginPluginRulesPrefix) {
 		return headerReasonRules

@@ -112,8 +112,8 @@ The plugin reports what it did back to CrowdSec through LAPI's usage-metrics end
 
 - Requests processed, split by IPv4 and IPv6.
 - Requests dropped, split by remediation (ban or captcha) and by **decision origin**: your own CrowdSec detections, manual `cscli` decisions, the community blocklist (CAPI), and each subscribed blocklist on its own.
-- Requests blocked by a WAF: origin `appsec` for AppSec, `modsec` for the ModSecurity sidecar, and `plugin:appsec_failure` / `plugin:modsec_failure` when a failure action banned or challenged.
-- Requests the plugin dropped on its own, under `plugin:` origins: `plugin:rules:<name>` for a `bouncerActionRules` rule, `plugin:ratelimit:<bucket>` for a rate-limit bucket that answered (a ban, or the captcha page of a `captcha` bucket), `plugin:ratelimit` for the captcha page the rate limit served to a captcha form it checked, and `plugin:ratelimit_failure` (like `plugin:lapi_failure` and `plugin:appsec_failure`) for a failure action.
+- Requests blocked by a WAF: origin `appsec` for AppSec, `modsec` for the ModSecurity sidecar, and `plugin:appsec_failure` / `plugin:modsec_failure` when a failure or backoff action banned or challenged.
+- Requests the plugin dropped on its own, under `plugin:` origins: `plugin:rules:<name>` for a `bouncerActionRules` rule, `plugin:ratelimit:<bucket>` for a rate-limit bucket that answered (a ban, or the captcha page of a `captcha` bucket), `plugin:ratelimit` for the captcha page the rate limit served to a captcha form it checked, and `plugin:ratelimit_failure` (like `plugin:lapi_failure` and `plugin:appsec_failure`) for a failure action. A LAPI, AppSec, or ModSec backoff action counts under that leg's failure origin.
 - Estimated bytes dropped, split by the same decision origins. The estimate is the size of each blocked request (its URL, headers, and declared body length); the plugin does not read the body to measure it.
 - The number of active decisions held in memory.
 

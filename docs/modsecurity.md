@@ -25,7 +25,7 @@ The sidecar only inspects. After the CRS request phases (headers and body), Apac
 | --- | --- | --- |
 | 2xx | Continues to your application. | none |
 | 3xx or 4xx | Blocks. The visitor gets the sidecar's response: its status, its page, and its headers except hop-by-hop ones and `Server`. Redirects are not followed. | `ban:modsec` |
-| 5xx, timeout, or unreachable | No verdict: applies `bouncerModsecFailureAction` (see [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff)). | `ban:modsec-failure`, `captcha:modsec-failure`, or none |
+| 5xx, timeout, or unreachable | No verdict: applies `bouncerModsecFailureAction`, or `bouncerModsecBackOffAction` while the backoff gate skips the sidecar (see [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff)). | `ban:modsec-failure`, `captcha:modsec-failure`, `ban:modsec-backoff`, `captcha:modsec-backoff`, or none |
 | Not called: body over `modsecBodyLimit` | HTTP 413. | none |
 | Not called: a body without `Content-Length` that does not arrive within `modsecBodyReadTimeoutSeconds` | HTTP 400, whatever `bouncerModsecFailureAction` says. | `error:body-read-timeout` |
 
@@ -144,6 +144,7 @@ http:
         bouncer:
           bouncerEnabled: true
           bouncerModsecFailureAction: ban
+          bouncerModsecBackOffAction: ban
           bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
           lapiInstanceName: shared
           appsecInstanceName: shared
@@ -205,4 +206,4 @@ Parse these logs. Two uses:
 
 ## When the sidecar is down
 
-A 5xx, a timeout, or an unreachable sidecar is a failure, not a block: the router applies `bouncerModsecFailureAction` (default `passthrough`), and the backoff gate (`modsecUnhealthyBackOffPeriodSecs`, off by default) can stop calling a sidecar that keeps failing. See [When a WAF is down: failure action and backoff](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff) and the [ModSecurity settings](configuration.md#modsecurity).
+A 5xx, a timeout, or an unreachable sidecar is a failure, not a block: the router applies `bouncerModsecFailureAction` (default `passthrough`). After 5 failures in a row, the backoff gate (`modsecUnhealthyBackOffPeriodSecs`, 10 seconds by default, `0` to turn it off) stops calling the sidecar for the cooldown, and the router applies `bouncerModsecBackOffAction` (default `passthrough`). See [When a WAF is down: failure action and backoff](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff) and the [ModSecurity settings](configuration.md#modsecurity).

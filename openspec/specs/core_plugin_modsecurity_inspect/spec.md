@@ -96,19 +96,6 @@ Per-router `bouncerModsecFailureAction` SHALL be `passthrough` (default, call `n
 - **THEN** the response is HTTP 400 with `error:body-read-timeout`
 - **AND** `next` is not called
 
-### Requirement: Gate skip continues without the sidecar and without the failure action
-When the Client holds a Gate, `Inspect` SHALL `Admit` after the body is read and checked against the limit, and before the sidecar hop. A denied admission SHALL return `ErrGateSkip`: it SHALL NOT Report, SHALL NOT call the sidecar, and the bouncer SHALL continue to `next` without the failure action, as for AppSec. Failures before the trip SHALL still apply the failure action. A usable inspect (2xx or copied 3xx/4xx) SHALL Report success. Transport error or sidecar 5xx SHALL Report failure.
-
-#### Scenario: After the trip the request continues
-- **WHEN** `bouncerModsecFailureAction` is `ban` and the sidecar fails 5 times in a row
-- **THEN** those 5 requests answer `ban:modsec-failure`
-- **AND** the next request does not call the sidecar and reaches `next` with no remediation header
-
-#### Scenario: Body limit still applies after the trip
-- **WHEN** the Gate is skipping
-- **AND** a POST body exceeds `modsecBodyLimit`
-- **THEN** the response is HTTP 413
-
 ### Requirement: Action-rule skip skips inspect
 When a matching action rule skipped ModSec, ServeHTTP SHALL NOT buffer the body for ModSec, SHALL NOT consult the Gate, and SHALL NOT call the sidecar.
 
@@ -141,3 +128,34 @@ When a matching action rule skipped ModSec, ServeHTTP SHALL NOT buffer the body 
 - **WHEN** an HTTP/2 POST without Content-Length sends 2 bytes and then nothing
 - **THEN** `Inspect` returns `wafhop.ErrBodyReadTimeout` after `modsecBodyReadTimeoutSeconds`
 - **AND** the sidecar is not called
+
+### Requirement: Gate skip answers with the ModSec backoff action
+When the Client holds a Gate, `Inspect` SHALL `Admit` after the body is read and checked against the limit, and before the sidecar hop. A denied admission SHALL return `ErrGateSkip` without a Report and without a sidecar call. The body is read before admission whether or not the Gate is backing off, so a body read error or `wafhop.ErrBodyReadTimeout` is returned as such, never as `ErrGateSkip`. A usable inspect (2xx or copied 3xx/4xx) SHALL Report success; a transport error or sidecar 5xx SHALL Report failure.
+
+#### Scenario: After the trip the default skip continues
+- **WHEN** `bouncerModsecFailureAction` is `ban` and the sidecar fails 5 times in a row
+- **AND** `bouncerModsecBackOffAction` is omitted
+- **THEN** those 5 requests answer `ban:modsec-failure`
+- **AND** the next request does not call the sidecar and reaches `next` with no remediation header
+
+#### Scenario: Body limit still applies after the trip
+- **WHEN** the Gate is skipping
+- **AND** a POST body exceeds `modsecBodyLimit`
+- **THEN** the response is HTTP 413
+
+### Requirement: ModSec gate skip uses bouncerModsecBackOffAction
+On `ErrGateSkip` the router SHALL apply its own `bouncerModsecBackOffAction` and MUST NOT apply `bouncerModsecFailureAction`. `passthrough` (default; empty means `passthrough`) SHALL call `next`. `ban` SHALL write the ban template with RemediationReason `MODSEC` and header `ban:modsec-backoff`. `captcha` SHALL serve this router's captcha gate with `captcha:modsec-backoff`. Both SHALL count under origin `plugin:modsec_failure`.
+
+#### Scenario: Backoff action ban
+- **WHEN** the ModSec Gate denies admission and `bouncerModsecBackOffAction` is `ban`
+- **THEN** the response is the ban template with reason `MODSEC` and `ban:modsec-backoff`
+- **AND** the sidecar is not called
+- **AND** `next` is not called
+
+#### Scenario: Backoff action captcha
+- **WHEN** the ModSec Gate denies admission, `bouncerModsecBackOffAction` is `captcha`, and the router has a usable captcha client
+- **THEN** the router's captcha page is served with `captcha:modsec-backoff`
+
+#### Scenario: Failure action does not decide a skip
+- **WHEN** the ModSec Gate denies admission, `bouncerModsecFailureAction` is `ban`, and `bouncerModsecBackOffAction` is `passthrough`
+- **THEN** the request reaches `next` with no remediation header

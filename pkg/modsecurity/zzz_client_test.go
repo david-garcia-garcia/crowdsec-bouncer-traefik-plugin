@@ -100,15 +100,34 @@ func TestOpen_sameKnobsWake(t *testing.T) {
 	t.Fatal("same name and knobs must Wake the same Client before grace ends")
 }
 
-func TestNew_omittedBackoffHasNoGate(t *testing.T) {
+// TestNew_omittedBackoffBuildsTenSecondGate pins the packaged ModSec cooldown: an omitted
+// modsecUnhealthyBackOffPeriodSecs builds a 10 s gate.
+func TestNew_omittedBackoffBuildsTenSecondGate(t *testing.T) {
 	cfg := testModsecConfig("http://127.0.0.1:1")
+	if cfg.ModsecUnhealthyBackOffPeriodSecs != 10 {
+		t.Fatalf("omitted modsecUnhealthyBackOffPeriodSecs=%d want 10", cfg.ModsecUnhealthyBackOffPeriodSecs)
+	}
+	client, err := New(cfg, slog.Default(), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	if client.GateForTest() == nil {
+		t.Fatal("omitted backoff must build a gate")
+	}
+}
+
+// TestNew_zeroBackoffHasNoGate keeps 0 as the switch that turns the ModSec gate off.
+func TestNew_zeroBackoffHasNoGate(t *testing.T) {
+	cfg := testModsecConfig("http://127.0.0.1:1")
+	cfg.ModsecUnhealthyBackOffPeriodSecs = 0
 	client, err := New(cfg, slog.Default(), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
 	if client.GateForTest() != nil {
-		t.Fatal("omitted backoff must not build a gate")
+		t.Fatal("modsecUnhealthyBackOffPeriodSecs 0 must not build a gate")
 	}
 }
 
