@@ -17,7 +17,7 @@ Not yet.
 In progress. 0 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 4907b2bb
+Reviewed head: 12c9e0d6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -32,14 +32,22 @@ Owner decision: Required. See Explore Decisions.
 | Check | Result | Evidence |
 | --- | --- | --- |
 | Branch | 2026-11-23-waf-unknown-length-body pushed | `git` |
-| OpenSpec | none | `openspec/` |
+| OpenSpec | waf-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237 | pr-host |
 | CI | not seen | caller omitted CI snapshot |
 | Local tests | none | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
-None.
+Worktree:
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_wafhop_shared-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+
 
 ## Deviations from the ask
 - taken: a total read deadline on bodies of unknown length, implemented once in `pkg/wafhop` for both legs, that blocks independently of the failure action (decisions 1 and 2); no criterion names a signature change. → `appsec.Client.Query(req, pol, dl)` gains a third parameter and `modsecurity.Client.Inspect(req, dl)` replaces its `failureAction` parameter (used only by the removed drop branch). `dl` is a narrow `wafhop.ReadDeadliner` the bouncer builds from `rw` with `http.NewResponseController`. Call sites migrated here: `Query` 1 production + 69 test, `Inspect` 1 production + 5 test (explore.md, Call sites). — `pkg/bouncer (sole owner of rw); pkg/wafhop/body.go (ReadBody, owner of the read and the deadline)` — the response writer is the only handle that sets a read deadline on HTTP/1.1 (`Body.Close` cannot cut it, #204 measurement); the bouncer owns it and the shared read owns the cut. Rank `bounded incidental` (explore.md, open question on how the control reaches `pkg/wafhop`).. Requester: not asked.
@@ -68,9 +76,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | none | Same list as ## Specs |
+| Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 4907b2bb70871c4d20365906141b8bd574ed95dc | Card must match the branch you measured |
+| Reviewed head | 12c9e0d6389f6cef681f73584dab86d0a3d07183 | Card must match the branch you measured |
 
 ### Stored data model
 None.
