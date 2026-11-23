@@ -241,3 +241,52 @@ func waitAtLeast(counter *int64, want int64) {
 }
 `, yaegitest.ModulePath+"/pkg/lapi")
 }
+
+// Test_pollLoop_failedWorkRetriesThenSucceedsAtInterval fails if a failed work call waits the full
+// interval instead of the retry, or if a successful one does not go back to the interval.
+func Test_pollLoop_failedWorkRetriesThenSucceedsAtInterval(t *testing.T) {
+	var runs int64
+	poll := startPollLoop("test", 0, time.Hour, time.Millisecond, discardLoggerForTest(), func() bool {
+		return atomic.AddInt64(&runs, 1) >= 3
+	})
+	t.Cleanup(poll.stop)
+	// Two failures each re-arm at the 1 ms retry; the third run succeeds.
+	waitPollRuns(t, &runs, 3)
+	time.Sleep(50 * time.Millisecond)
+	if got := atomic.LoadInt64(&runs); got != 3 {
+		t.Fatalf("poll ran %d times, want 3: a success must wait the 1 h interval", got)
+	}
+}
+
+// Test_startRetryPollTimer_firstPollRunsNow fails if the stream timer waits one interval before
+// its first poll: with a 7200 s alone interval, a failed first poll would then be 2 hours late.
+func Test_startRetryPollTimer_firstPollRunsNow(t *testing.T) {
+	var runs int64
+	poll := startRetryPollTimer("test", 3600, discardLoggerForTest(), func() bool {
+		atomic.AddInt64(&runs, 1)
+		return true
+	})
+	t.Cleanup(poll.stop)
+	waitPollRuns(t, &runs, 1)
+	if poll.interval != time.Hour || poll.retry != failedPollRetry {
+		t.Fatalf("interval=%s retry=%s, want 1h and %s", poll.interval, poll.retry, failedPollRetry)
+	}
+}
+
+// Test_failedPollDelay fails if a failed poll waits longer than failedPollRetry, or longer than
+// one interval when the interval is shorter.
+func Test_failedPollDelay(t *testing.T) {
+	cases := []struct {
+		interval time.Duration
+		want     time.Duration
+	}{
+		{interval: 7200 * time.Second, want: 60 * time.Second},
+		{interval: 60 * time.Second, want: 60 * time.Second},
+		{interval: 10 * time.Second, want: 10 * time.Second},
+	}
+	for _, delayCase := range cases {
+		if got := failedPollDelay(delayCase.interval); got != delayCase.want {
+			t.Fatalf("failedPollDelay(%s)=%s, want %s", delayCase.interval, got, delayCase.want)
+		}
+	}
+}

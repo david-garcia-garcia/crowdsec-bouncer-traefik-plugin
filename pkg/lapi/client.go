@@ -170,9 +170,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 	client.metricsReporter = newMetricsReporter(client, time.Now())
 	client.transport.Store(next)
 
-	if err := client.startStream(config, log); err != nil {
-		return nil, err
-	}
+	client.startStream(config, log)
 
 	if config.LapiMetricsUpdateIntervalSeconds > 0 {
 		client.metricsReporter.lastMetricsPush = time.Now()
@@ -246,9 +244,8 @@ func (c *Client) Wake() {
 	c.sleeping = false
 	resumeStream := c.crowdsecMode == configuration.StreamMode || c.crowdsecMode == configuration.AloneMode
 	if resumeStream && c.streamTimer == nil {
-		c.streamTimer = startPollTimer("stream", c.updateInterval, c.log, func() {
-			c.handleStreamTicker()
-		})
+		// The timer's first poll runs now.
+		c.streamTimer = startRetryPollTimer("stream", c.updateInterval, c.log, c.handleStreamTicker)
 	}
 	if c.metricsInterval > 0 && c.metricsTimer == nil {
 		c.metricsTimer = startPollTimer("metrics", c.metricsInterval, c.log, func() {
@@ -257,9 +254,6 @@ func (c *Client) Wake() {
 	}
 	c.mu.Unlock()
 	c.log.Debug(MsgConnectionWaking, "incarnation", c.incarnation, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "waking")
-	if resumeStream {
-		go c.handleStreamTicker()
-	}
 }
 
 // Mode is the fetch strategy this Client was opened with.

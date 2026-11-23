@@ -23,7 +23,7 @@ With the default settings:
 | ------------ | --------------------- | ---------- | -------------- |
 | LAPI, `stream` mode | Decisions already downloaded keep applying. Other clients pass until a refresh fails, then get the failure action. | [`bouncerLapiFailureAction`](configuration.md#bouncerlapifailureaction), [`lapiUpdateMaxFailure`](configuration.md#lapiupdatemaxfailure) | Ban clients without a known decision, from the first failed refresh. |
 | LAPI, `live` / `none` mode | Each lookup LAPI does not answer gets the failure action. In `live`, answers already cached keep applying until they expire. | `bouncerLapiFailureAction` | Ban. |
-| CAPI, `alone` mode | At startup: the middleware does not load. Later: as `stream`, and the next try is 2 hours later. | `bouncerLapiFailureAction`, `lapiUpdateMaxFailure` | Ban clients without a known decision. |
+| CAPI, `alone` mode | As `stream`, also at startup. A failed refresh is retried after 60 seconds instead of 2 hours. | `bouncerLapiFailureAction`, `lapiUpdateMaxFailure` | Ban clients without a known decision. |
 | Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. | [`bouncerRedisUnreachableBlock`](configuration.md#bouncerredisunreachableblock) | Ban (`ban:cache-fail`). |
 | AppSec | The failure action; after repeated failures, AppSec is skipped for a cooldown. | [`bouncerAppsecFailureAction`](configuration.md#bouncerappsecfailureaction), [`appsecUnhealthyBackOffPeriodSecs`](configuration.md#appsecunhealthybackoffperiodsecs) | Ban the first failures, then let requests through without AppSec for 30 seconds at a time. |
 | ModSecurity sidecar | The failure action. | [`bouncerModsecFailureAction`](configuration.md#bouncermodsecfailureaction), [`modsecUnhealthyBackOffPeriodSecs`](configuration.md#modsecunhealthybackoffperiodsecs) | Let the request through without CRS. |
@@ -58,7 +58,7 @@ How LAPI's outage reaches a request depends on [`lapiMode`](concepts.md#lapi-mod
 
 **`stream`.** Requests never call LAPI; they are checked against the decisions in memory.
 
-- The plugin refreshes the decisions every [`lapiUpdateIntervalSeconds`](configuration.md#lapiupdateintervalseconds) (default 60), counted from the end of the previous refresh.
+- The plugin refreshes the decisions every [`lapiUpdateIntervalSeconds`](configuration.md#lapiupdateintervalseconds) (default 60), counted from the end of the previous refresh. After a failed refresh, the next one is 60 seconds later, or one interval if that is shorter.
 - A failed refresh changes nothing in memory. Decisions already downloaded keep applying until each one expires.
 - After `lapiUpdateMaxFailure` + 1 failed refreshes in a row (the first one, with the default `0`), the stream is **unhealthy**: a client with no known decision gets `bouncerLapiFailureAction`, with the verdict header `stream-unhealthy` (`ban:stream-unhealthy`, `captcha:stream-unhealthy`). `-1` never marks the stream unhealthy, so unknown clients keep passing.
 - The first refresh that succeeds marks the stream healthy again and downloads the full decision list.
@@ -74,8 +74,9 @@ How LAPI's outage reaches a request depends on [`lapiMode`](concepts.md#lapi-mod
 
 **`alone`.** The decisions come from CAPI, without a local CrowdSec.
 
-- The plugin logs in to CAPI when the middleware loads. If CAPI cannot be reached then, the middleware fails to load (ERROR `startStream:getToken`), and Traefik does not run it.
-- After that, CAPI outages behave as in `stream`. The refresh interval is fixed at 2 hours in this mode, so after a failed refresh the next try is 2 hours later.
+- The plugin logs in to CAPI when the middleware loads. If CAPI cannot be reached then, it logs ERROR `startStream:getToken` and the middleware still loads. Each refresh logs in first while it has no token.
+- CAPI outages, at startup or later, behave as in `stream`: from the first failed refresh (with the default `lapiUpdateMaxFailure`), clients without a known decision get `bouncerLapiFailureAction` (`stream-unhealthy`).
+- The refresh interval is fixed at 2 hours in this mode. After a failed refresh the next try is 60 seconds later, and the first refresh that succeeds goes back to 2 hours.
 
 ## The LAPI Redis cache
 
