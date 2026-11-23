@@ -7,7 +7,7 @@ The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`)
 _Avoid_: AppSec client, `modSecurityUrl`, the failure action as ownership, `atomic.Pointer[T]`, `X-Crowdsec-Appsec-*`
 
 **Admission gate**:
-The `pkg/admission` wrapper around the utilities `backendbackoff.Gate`, on a WAF Client when that Client's unhealthy-backoff period is greater than zero. One Gate per Client. The trip rule is fixed (`admission.TripFailures` 5, `admission.FailureRatio` 0.30) and the cooldown is the period, with no growth. This plugin must not copy the utilities package. Jitter and TTL stay unset (partial Config disables jitter).
+The `pkg/admission` wrapper around the utilities `backendbackoff.Gate`, on a WAF Client or a `live` / `none` LAPI Client when that Client's unhealthy-backoff period is greater than zero. One Gate per Client. The trip rule is fixed (`admission.TripFailures` 5, `admission.FailureRatio` 0.30) and the cooldown is the period, with no growth. This plugin must not copy the utilities package. Jitter and TTL stay unset (partial Config disables jitter).
 _Avoid_: failure action, copying Gate into this repository, a ratio, threshold, or max-period knob
 
 ## Overview

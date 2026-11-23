@@ -12,11 +12,11 @@ _Avoid_: a private `isBodyUnreadable` in a leg package
 
 ## Overview
 
-`pkg/wafhop` is the one place for the request-side business the WAF legs share. Settings stay per leg: AppSec passes `appsecBodyLimit` with `TruncateAtLimit`, ModSec passes `modsecBodyLimit` with `RejectOverLimit`, and each leg applies its own failure action (`bouncerAppsecFailureAction`, `bouncerModsecFailureAction`). Spec: `core_plugin_wafhop_shared-request`.
+`pkg/wafhop` is the one place for the request-side business the WAF legs share. Settings stay per leg: AppSec passes `appsecBodyLimit` with `TruncateAtLimit`, ModSec passes `modsecBodyLimit` with `RejectOverLimit`, and each leg applies its own failure action (`bouncerAppsecFailureAction`, `bouncerModsecFailureAction`) and, on a gate skip, its own backoff action (`bouncerAppsecBackOffAction`, `bouncerModsecBackOffAction`). Spec: `core_plugin_wafhop_shared-request`.
 
 ## How to use
 
-- Check `wafhop.HasBody` and `wafhop.IsBodyUnreadable` before reading. On an unreadable body with `wafhop.IsMethodWithBody`, apply the leg's own failure action unless it is `passthrough`; otherwise inspect headers only. Both legs follow this one rule.
+- Check `wafhop.HasBody` and `wafhop.IsBodyUnreadable` before reading. On an unreadable body with `wafhop.IsMethodWithBody`, apply the leg's own failure action unless it is `passthrough`; otherwise inspect headers only. While that leg's gate backs off (`BackingOff()`), the non-`passthrough` case is a gate skip instead (`ErrGateSkip`, answered with the backoff action) and takes no ticket. Both legs follow this one rule.
 - Buffer with `wafhop.ReadBody(req, limit, mode)`. It restores `req.Body` for `next`. Do not wrap `req.Body` yourself, and do not add a buffer pool: a whole body buffered by AppSec is reused by ModSec with no second copy.
 - Return `wafhop.ErrClientDisconnected` / `wafhop.ErrClientBodyRead` unwritten to the bouncer. `handleClientDisconnectedServeHTTP` and `handleClientBodyReadServeHTTP` (`pkg/bouncer/bouncer_serve_waf.go`) answer them for every leg. `wafhop.ErrBodyTooLarge` (`modsecurity.ErrBodyTooLarge`) also comes back unwritten; `serveModSec` answers 413.
 - Around the WAF call, classify a cancel with `wafhop.IsInboundCanceled`, not `IsClientGone`: the WAF client's `Client.Timeout` is `context.DeadlineExceeded` and is a WAF failure.

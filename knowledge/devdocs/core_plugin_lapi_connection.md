@@ -20,6 +20,9 @@ _Avoid_: `atomic.Pointer[T]`, a write-once Client `httpClient` field, CrowdsecCo
 - After `LiveLookup`, the client-address cache key holds the `?ip=` result only. Header remediations stay on `HeaderScopeKey` via `cacheLiveScope`. Do not write the merged PreferRemediation verdict onto the IP key.
 - Read a `LiveLookup` result by the remediation kind, never by the error alone: an active remediation plus a non-nil error is a decision to remediate; a non-active remediation plus `lapi.ErrGateSkip` is a gate skip, and the caller applies `bouncerLapiBackOffAction`; a non-active remediation plus any other error is a LAPI failure, and the caller applies `BouncerLapiFailureAction`. Every query the lookup makes reports that way — the client-address query and each mapped header scope.
 - In `live` and `none`, the Client holds the live admission gate (`pkg/admission`, leg `lapi`, `lapiUnhealthyBackOffPeriodSecs`, nil when `0` or in `stream` / `alone`). `queryLiveDecisions` admits each GET with `context.Background()`, sends nothing on a denial (`ErrGateSkip`), and `Record`s `liveQueryHealthy(err)` before parsing. `Close` closes the gate. Every router on the Client shares it; the backoff action stays on `Bouncer`.
+- Classify a live GET for the gate with `liveQueryHealthy`. Failure (spends budget): transport error, missing transport, body read error, 429, any 5xx. Success: a 2xx (a body that then fails to parse included) and any other 4xx (401 / 403 are configuration errors; the failure action still applies). An admission error (closed gate) is a failure for that request (failure action, no HTTP), not a skip.
+- Only cache misses reach the gate: a live cache hit never calls `Admit`. A skip writes nothing to the cache, and a skipped header scope does not WARN per request.
+- The gate logs WARN `crowdsec lapi backoff started` (`lapi.MsgBackoffStarted`) once per trip and INFO `crowdsec lapi backoff ended` (`lapi.MsgBackoffEnded`) when a probe succeeds.
 - One exchange over the stored transport is `core_plugin_lapi_query-round-trip.md` (drain, `401` replay, message shape). Do not restate those rules here.
 - Do not put a startup flag on the Client. A missing subscribed client uses that leg's failure action (`core_plugin_middleware.md`).
 - Publish stream startup, healthy, and update-failure as `int64` fields with `atomic.LoadInt64` / `StoreInt64`. `StreamHealthy` loads. Do not use `atomic.Bool` or `atomic.Int64`. Intra-instance poll overlap is `core_plugin_lapi_stream-single-flight.md`.
@@ -37,6 +40,7 @@ value, err := client.LiveLookup(remoteIP, scopes, defaultDecisionSeconds)
 - `pkg/lapi/client_http.go`
 - `pkg/lapi/client.go`
 - `pkg/lapi/client_live.go`
+- `pkg/lapi/client_decisions.go` (`queryLiveDecisions`, `liveQueryHealthy`)
 - `pkg/lapi/session.go`
 
 ## Gotchas
