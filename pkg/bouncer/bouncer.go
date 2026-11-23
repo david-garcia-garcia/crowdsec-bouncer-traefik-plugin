@@ -97,7 +97,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		appsecLeg:                legBinding{leg: "appsec", instanceName: config.AppsecInstanceName, subscribed: subscriptions.AppSec},
 		captchaLeg:               legBinding{leg: "captcha", instanceName: config.CaptchaInstanceName, subscribed: subscriptions.Captcha},
 		modsecLeg:                legBinding{leg: "modsec", instanceName: config.ModsecInstanceName, subscribed: subscriptions.ModSec},
-		rateLimitLeg:             legBinding{leg: "ratelimit", instanceName: config.RateLimitInstanceName, subscribed: subscriptions.RateLimit},
+		rateLimitLeg:             legBinding{leg: legRateLimit, instanceName: config.RateLimitInstanceName, subscribed: subscriptions.RateLimit},
 		appsecFailureAction:      configuration.EffectiveFailureAction(config.BouncerAppsecFailureAction),
 		actionRules:              actionRules,
 		banTemplate:              banTemplate,
@@ -120,9 +120,11 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		traceCustomHeader:        config.BouncerTraceHeadersCustomName,
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
-	// A router rebuilt without the rate limit drops the owner-unavailable WARN its name still has pending.
-	if !subscriptions.RateLimit {
-		pendingRateLimitOwnerWarnings.forget(name)
+	// A router rebuilt without a leg drops the connection-unavailable WARN its name still has pending on it.
+	for _, binding := range routeHandler.legBindings() {
+		if !binding.subscribed {
+			pendingConnectionWarnings.forget(name, binding.leg)
+		}
 	}
 	// JSON slog prints a nil []string as null; empty lists stay lists.
 	forwardedHeadersTrustedIPs := config.BouncerForwardedHeadersTrustedIPs

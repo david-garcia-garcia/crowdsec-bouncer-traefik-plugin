@@ -12,36 +12,25 @@ func (b *Bouncer) loadedRateLimit() *ratelimit.Client {
 	return client
 }
 
+// legRateLimit is the leg of the rate-limit binding, whose owner lines predate the shared connection lines.
+const legRateLimit = "ratelimit"
+
 const (
 	// msgRateLimitOwnerUnavailable is the WARN line when this route's rate-limit owner stops being published:
-	// every request now passes uncharged.
+	// every request now passes uncharged. connectionWarnings logs it in place of msgConnectionUnavailable.
 	msgRateLimitOwnerUnavailable = "crowdsec bouncer rate limit owner unavailable"
 	// msgRateLimitOwnerAvailable is the INFO line when a rate-limit client binds while this router name has a
-	// msgRateLimitOwnerUnavailable pending (rateLimitOwnerWarnings).
+	// msgRateLimitOwnerUnavailable pending (connectionWarnings).
 	msgRateLimitOwnerAvailable = "crowdsec bouncer rate limit owner available"
 )
 
 // ReceiveRateLimit stores the published rate-limit client and traces the pointer change.
 // published is a reclaim.Published. The same pointer is a no-op.
 // A move to no client logs WARN once per outage of this router name, and the next bind of a router with that
-// name, this Bouncer or one a reload rebuilt, logs INFO (bindRateLimitClient, warnRateLimitOwnerUnavailable).
+// name, this Bouncer or one a reload rebuilt, logs INFO (traceBinding, connectionWarnings); a bind then runs
+// the captcha check of logRateLimitCaptchaUnsubscribed.
 func (b *Bouncer) ReceiveRateLimit(published any) {
-	b.receiveBinding(&b.rateLimitLeg, published, func() string { return b.loadedRateLimit().Incarnation() }, b.bindRateLimitClient, b.warnRateLimitOwnerUnavailable)
-}
-
-// bindRateLimitClient is the bind hook of a newly bound rate-limit client: INFO when it answers an
-// owner-unavailable WARN still pending for this router name, then the captcha check of
-// logRateLimitCaptchaUnsubscribed. It runs under bindingMu.
-func (b *Bouncer) bindRateLimitClient() {
-	pendingRateLimitOwnerWarnings.answerAvailable(b.log, b.name, b.rateLimitLeg.instanceName, b.loadedRateLimit().Incarnation())
-	b.logRateLimitCaptchaUnsubscribed()
-}
-
-// warnRateLimitOwnerUnavailable is the unbind hook of the rate-limit binding: WARN on a move to no published
-// owner, since this route then charges nothing, unless this router name already has that WARN pending. It runs
-// under bindingMu, never per request.
-func (b *Bouncer) warnRateLimitOwnerUnavailable() {
-	pendingRateLimitOwnerWarnings.warnUnavailable(b.log, b.name, b.rateLimitLeg.instanceName)
+	b.receiveBinding(&b.rateLimitLeg, published, func() string { return b.loadedRateLimit().Incarnation() }, b.logRateLimitCaptchaUnsubscribed)
 }
 
 // logRateLimitCaptchaUnsubscribed logs ERROR once per bind when the bound rate-limit client's policy can

@@ -46,7 +46,7 @@ The per-router bouncer SHALL hold five optional bound clients as `atomic.Value` 
 - **AND** concurrent ServeHTTP Unbox of that field does not panic from a torn `any`
 
 ### Requirement: A missing subscribed client uses that leg's failure action
-A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. A missing subscribed rate-limit client SHALL charge no bucket and the request SHALL continue to the AppSec step; the router has no rate-limit failure action of its own, because the policy is the owner's, and it logs the loss once (`core_plugin_ratelimit_client` "A subscriber logs the loss and return of its rate-limit owner"). `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
+A missing subscribed LAPI client SHALL use this router's LAPI failure action. A missing subscribed AppSec client SHALL use this router's AppSec failure action when the request reaches AppSec. A missing subscribed captcha client SHALL ban a captcha verdict. A missing subscribed ModSec client SHALL use this router's `bouncerModsecFailureAction` when the request reaches ModSec. A missing subscribed rate-limit client SHALL charge no bucket and the request SHALL continue to the AppSec step; the router has no rate-limit failure action of its own, because the policy is the owner's, and it logs the loss once (`core_plugin_ratelimit_client` "A subscriber logs the loss and return of its rate-limit owner"). The other legs log the loss once too ("A subscriber logs the loss and return of a connection"). `New` MUST NOT wait for a client to be published. A leg the bouncer did not subscribe to is not part of that check.
 
 #### Scenario: AppSec-only subscriber ignores a missing LAPI client
 - **WHEN** the bouncer subscribes only to AppSec and LAPI is not subscribed
@@ -76,6 +76,29 @@ A missing subscribed LAPI client SHALL use this router's LAPI failure action. A 
 - **THEN** the request continues to the AppSec step without a remediation header
 - **AND** no rate-limit drop is counted
 - **AND** no WARN is logged for the request itself
+
+### Requirement: A subscriber logs the loss and return of a connection
+A router that subscribes to a LAPI, AppSec, ModSec, or captcha instance SHALL log WARN `crowdsec bouncer connection unavailable` (`traefikName`, `leg`, `instanceName`) once each time that leg moves to no published client, including a router built before its owner or naming an instance no loaded middleware shares, whether or not `Watch` delivers that first empty value (`New` traces a subscribed leg `Watch` delivered nothing to as unbound). It SHALL log INFO `crowdsec bouncer connection available` (`traefikName`, `leg`, `instanceName`, the bound client's `incarnation`) once, on the first bind of that leg after that WARN. Neither line SHALL be logged per request, on a repeated delivery of the same state, or when one client replaces another. The WARN SHALL be pending per Traefik middleware name and leg, not per `Bouncer`: a router of that name rebuilt while the leg is still missing SHALL NOT log a second WARN for the same instance name, the first bind of any router of that name and leg SHALL log the INFO, and a router of that name rebuilt without the leg SHALL drop the pending WARN without a line. The rate-limit leg SHALL keep its own lines (`core_plugin_ratelimit_client`) and SHALL NOT log these. What a request gets is unchanged ("A missing subscribed client uses that leg's failure action").
+
+#### Scenario: A misspelled LAPI instance name warns once
+- **WHEN** router `app-a` subscribes to LAPI instance `shared` and no loaded middleware publishes `shared`
+- **THEN** WARN `crowdsec bouncer connection unavailable` with `traefikName` `app-a`, `leg` `lapi`, and `instanceName` `shared` is logged once, when `New` returns
+- **AND** the same holds compiled into Traefik, whose `Watch` delivers nothing for that name, and under Traefik's interpreter, whose `Watch` delivers the typed nil: one WARN, never two
+- **AND** every request gets the LAPI failure action without another WARN
+
+#### Scenario: The connection returns
+- **WHEN** that router later binds a published LAPI client
+- **THEN** INFO `crowdsec bouncer connection available` with the client's `incarnation` is logged once
+- **AND** binding the same client again or a replacing client logs neither line
+
+#### Scenario: A rebuild during the outage does not warn again
+- **WHEN** a Traefik reload builds a new `app-a` while `shared` is still unpublished
+- **THEN** no second WARN is logged for `app-a` / `lapi` / `shared`
+- **AND** the first bind of any `app-a` instance logs the INFO once
+
+#### Scenario: Legs are pending separately
+- **WHEN** `app-a` misses both its LAPI and its ModSec instance and only LAPI is published again
+- **THEN** one WARN is logged per leg and one INFO for `lapi` only
 
 ### Requirement: Bouncer does not own the stream ticker
 The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, action rules, LAPI failure action, Redis fail-closed, and live-cache TTL) and MUST NOT start a process-wide stream ticker. Stream polling remains on the LAPI Client opened by an owner middleware.

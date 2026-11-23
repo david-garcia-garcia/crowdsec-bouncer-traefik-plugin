@@ -12,7 +12,7 @@ import (
 // TestYaegi_LegBindingReceiveAndLoad runs the leg bindings under Yaegi v0.16.1, the way Traefik
 // loads them: New with Subscriptions, then each Receive<Leg> with an empty, a published, the same,
 // a replaced, and an empty value. The program checks the bound / unbound trace sequence of every
-// leg, the LAPI client the route loads after each step, and the rate-limit owner WARN / INFO counts.
+// leg, the LAPI client the route loads after each step, and the connection / rate-limit owner WARN / INFO counts.
 func TestYaegi_LegBindingReceiveAndLoad(t *testing.T) {
 	dir := t.TempDir()
 	templatePath := filepath.Join(dir, "captcha.html")
@@ -203,6 +203,7 @@ func main() {
 	}
 	var traced []string
 	ownerWarnings, ownerRecoveries := 0, 0
+	connectionWarnings, connectionRecoveries := map[string]int{}, map[string]int{}
 	for _, line := range strings.Split(strings.TrimSpace(string(content)), "\n") {
 		entry := map[string]interface{}{}
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
@@ -214,6 +215,12 @@ func main() {
 		}
 		if msg == "crowdsec bouncer rate limit owner available" && fmt.Sprint(entry["level"]) == "INFO" {
 			ownerRecoveries++
+		}
+		if msg == "crowdsec bouncer connection unavailable" && fmt.Sprint(entry["level"]) == "WARN" {
+			connectionWarnings[fmt.Sprint(entry["leg"])]++
+		}
+		if msg == "crowdsec bouncer connection available" && fmt.Sprint(entry["level"]) == "INFO" {
+			connectionRecoveries[fmt.Sprint(entry["leg"])]++
 		}
 		if msg != "crowdsec bouncer bound" && msg != "crowdsec bouncer unbound" {
 			continue
@@ -242,6 +249,15 @@ func main() {
 	// INFO on the bind that ends the first warning; publishing the same Client and a replace log neither.
 	if ownerWarnings != 2 || ownerRecoveries != 1 {
 		exitWithFailure(fmt.Sprintf("rate limit owner lines: %%d WARN %%d INFO, want 2 and 1", ownerWarnings, ownerRecoveries))
+	}
+	// The other legs log the shared connection lines on the same transitions, one pair per leg.
+	for _, leg := range []string{"lapi", "appsec", "captcha", "modsec"} {
+		if connectionWarnings[leg] != 2 || connectionRecoveries[leg] != 1 {
+			exitWithFailure(fmt.Sprintf("%%s connection lines: %%d WARN %%d INFO, want 2 and 1", leg, connectionWarnings[leg], connectionRecoveries[leg]))
+		}
+	}
+	if connectionWarnings["ratelimit"] != 0 || connectionRecoveries["ratelimit"] != 0 {
+		exitWithFailure("ratelimit must keep its owner lines, not the connection lines")
 	}
 }
 `
