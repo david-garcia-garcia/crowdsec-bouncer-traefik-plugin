@@ -133,7 +133,7 @@ sequenceDiagram
 
 ## alone
 
-Like stream, but the list comes from the CrowdSec Central API (CAPI), about every two hours. No local CrowdSec.
+Like stream, but the list comes from the CrowdSec Central API (CAPI), about every two hours. No local CrowdSec. A failed refresh, including a failed CAPI login at startup, is retried after 60 seconds; see [Failure modes](failure-modes.md#lapi).
 
 > Cache synchronization every 2 hours to the Crowdsec Central API
 

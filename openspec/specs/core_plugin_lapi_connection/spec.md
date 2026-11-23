@@ -88,6 +88,15 @@ After the CAPI `watchers/login` exchange returns HTTP 2xx, `getToken` SHALL stor
 - **WHEN** CAPI login answers HTTP 2xx with a non-empty `token` and a JSON `code` that is not 200
 - **THEN** `getToken` stores that token on the stored transport
 
+### Requirement: A failed CAPI login at startup does not fail New
+In `alone` mode, `startStream` SHALL log a failed CAPI login at ERROR `startStream:getToken` and SHALL still start the stream poll timer; `New` MUST NOT return that error. While the stored transport has no CAPI token, each stream poll SHALL log in before its stream GET and SHALL count a failed login as a failed poll, so `lapiUpdateMaxFailure` and `bouncerLapiFailureAction` apply as for any failed poll. A token that later expires SHALL keep being renewed by the `401` replay (`core_plugin_lapi_query-round-trip`).
+
+#### Scenario: CAPI down at startup, then back
+- **WHEN** `New` runs in `alone` mode while the CAPI login fails
+- **THEN** `New` returns a Client and no error
+- **AND** the first poll sends no stream GET and marks the stream unhealthy (default `lapiUpdateMaxFailure`)
+- **AND** once the CAPI login succeeds, a later poll stores the token, GETs the stream, and marks the stream healthy
+
 ### Requirement: LAPI transport Timeout is the effective LAPI seconds
 LAPI HTTP construct SHALL set `http.Client.Timeout` and the stored timeout seconds from `config.LapiHTTPTimeoutSeconds`. It MUST NOT read a shared or inherited timeout. Inside `pkg/lapi` the stored field SHALL be `HTTPTimeoutSeconds` (prefix dropped). `AdoptTransport` MAY last-write TLS or other replaceable transport fields on the same Client when the ownership key is unchanged. A later `New` that changes `LapiHTTPTimeoutSeconds` SHALL Open a new Client because that knob is on the LAPI ownership key (`core_plugin_lapi_reclaim-key`). Implementations MUST NOT call `EffectiveHTTPTimeoutSeconds`.
 

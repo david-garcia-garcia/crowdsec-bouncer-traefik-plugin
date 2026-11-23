@@ -21,33 +21,31 @@ type Stream struct {
 	New     []Decision `json:"new"`
 }
 
-// startStream starts the stream ticker and initial poll for stream and alone modes.
-func (c *Client) startStream(config *configuration.Config, log *slog.Logger) error {
+// startStream starts the stream poll timer, whose first poll runs now, for stream and alone modes.
+// A failed CAPI login in alone mode is logged and does not fail New: the polls log in again,
+// and until one succeeds the stream-health rules and bouncerLapiFailureAction apply.
+func (c *Client) startStream(config *configuration.Config, log *slog.Logger) {
 	if config.LapiMode != configuration.StreamMode && config.LapiMode != configuration.AloneMode {
-		return nil
+		return
 	}
 	if config.LapiMode == configuration.AloneMode {
 		if err := c.getToken(); err != nil {
 			c.log.Error("startStream:getToken", "error", err)
-			return err
 		}
 	}
 	if c.decisionStore != nil {
 		c.decisionStore.HydrateRange()
 	}
-	go c.handleStreamTicker()
-	c.streamTimer = startPollTimer("stream", config.LapiUpdateIntervalSeconds, log, func() {
-		c.handleStreamTicker()
-	})
-	return nil
+	c.streamTimer = startRetryPollTimer("stream", config.LapiUpdateIntervalSeconds, log, c.handleStreamTicker)
 }
 
 // handleStreamTicker runs one stream poll unless the store already owns a poll.
 // Skip is session-scoped on DecisionStore (cursor+applied cache), not this Client.
-func (c *Client) handleStreamTicker() {
+// It reports whether the poll succeeded; a skipped poll did not, so the timer retries sooner.
+func (c *Client) handleStreamTicker() bool {
 	if c.decisionStore == nil || !c.decisionStore.TryBeginStreamPoll() {
 		c.log.Warn("handleStreamTicker:skip", "reason", "inFlight")
-		return
+		return false
 	}
 	defer c.decisionStore.EndStreamPoll()
 
@@ -73,13 +71,14 @@ func (c *Client) handleStreamTicker() {
 			c.log.Error("handleStreamTicker:error", "updateFailure", updateFailure, "error", err)
 		}
 		atomic.AddInt64(&c.updateFailure, 1)
-	} else {
-		if atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 {
-			c.log.Info(MsgStreamHealthy, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "healthy")
-		}
-		atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 1)
-		atomic.StoreInt64(&c.updateFailure, 0)
+		return false
 	}
+	if atomic.LoadInt64(&c.isCrowdsecStreamHealthy) == 0 {
+		c.log.Info(MsgStreamHealthy, "mode", c.crowdsecMode, "host", c.crowdsecHost, "reason", "healthy")
+	}
+	atomic.StoreInt64(&c.isCrowdsecStreamHealthy, 1)
+	atomic.StoreInt64(&c.updateFailure, 0)
+	return true
 }
 
 // handleStreamCache GETs stream, applies the payload, and logs the finish line at DEBUG.
@@ -102,6 +101,21 @@ func (c *Client) handleStreamCache() error {
 	return nil
 }
 
+// ensureCapiToken logs in to CAPI when alone mode has no token yet, because the login at
+// startup failed. A token that later expires is renewed by sendQuery on its 401.
+func (c *Client) ensureCapiToken() error {
+	if c.crowdsecMode != configuration.AloneMode {
+		return nil
+	}
+	if current := c.currentTransport(); current == nil || current.key != "" {
+		return nil
+	}
+	if err := c.getToken(); err != nil {
+		return fmt.Errorf("handleStreamCache:getToken %w", err)
+	}
+	return nil
+}
+
 // fetchAndApplyStreamDecisions GETs the CrowdSec stream delta and writes it into the DecisionStore.
 // Deleted is applied before New so a same-window replacement for the same IP or CIDR stays active.
 // newCount and deletedCount are decisions written into the store, not raw payload length.
@@ -111,6 +125,9 @@ func (c *Client) fetchAndApplyStreamDecisions() (int, int, error) {
 		Host:     c.crowdsecHost,
 		Path:     c.crowdsecPath + c.crowdsecStreamRoute,
 		RawQuery: c.streamQuery(),
+	}
+	if err := c.ensureCapiToken(); err != nil {
+		return 0, 0, err
 	}
 	atomic.AddInt64(&c.streamFetches, 1)
 	body, err := c.crowdsecQuery(streamRouteURL.String(), nil)

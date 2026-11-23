@@ -483,7 +483,7 @@ Timeout in seconds when contacting LAPI. Must be at least `1`.
 
 `int64` · default `60`
 
-Seconds between decision refreshes in `stream`. Fixed to `7200` in `alone`.
+Seconds between decision refreshes in `stream`. Fixed to `7200` in `alone`. After a failed refresh, the next one is 60 seconds later, or one interval if that is shorter.
 
 #### `lapiUpdateMaxFailure`
 

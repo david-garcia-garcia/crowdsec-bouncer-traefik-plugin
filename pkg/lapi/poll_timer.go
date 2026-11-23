@@ -7,7 +7,8 @@ import (
 )
 
 // pollTimer runs one Client loop (the stream poll or the usage-metrics push): it calls work,
-// waits one interval after work returns, and repeats until stop.
+// waits one interval after work returns, and repeats until stop. The stream poll reports
+// whether it succeeded; after a failure the wait is the shorter failedPollRetry.
 //
 // Why it exists: Traefik runs this plugin under yaegi v0.16.1, which builds one case list per
 // select statement and shares it across every goroutine that runs that statement. Each LAPI
@@ -30,12 +31,20 @@ import (
 // A plain `for { time.Sleep(interval); if stopped { return }; work() }` loop would also avoid
 // select, but its goroutine would outlive stop by up to one interval, still holding the Client.
 type pollTimer struct {
-	mu      sync.Mutex
-	timer   *time.Timer
-	stopped bool
-	name    string
-	log     *slog.Logger
+	mu       sync.Mutex
+	timer    *time.Timer
+	stopped  bool
+	name     string
+	log      *slog.Logger
+	interval time.Duration // wait after a work call that succeeded
+	retry    time.Duration // wait after a work call that failed
 }
+
+// failedPollRetry caps the wait after a poll that did not succeed. The next try is this long
+// after the failed one returns, or one interval if that is shorter, so a 7200 s alone-mode
+// interval does not leave the stream unhealthy for 2 hours after CAPI is back. A 60 s stream
+// interval is unchanged.
+const failedPollRetry = 60 * time.Second
 
 // startPollTimer runs work every intervalSeconds, measured from the end of the previous work.
 func startPollTimer(name string, intervalSeconds int64, log *slog.Logger, work func()) *pollTimer {
@@ -44,27 +53,55 @@ func startPollTimer(name string, intervalSeconds int64, log *slog.Logger, work f
 
 // startPollTimerEvery is startPollTimer with a Duration, so tests can use sub-second intervals.
 func startPollTimerEvery(name string, interval time.Duration, log *slog.Logger, work func()) *pollTimer {
-	poll := &pollTimer{name: name, log: log}
+	return startPollLoop(name, interval, interval, interval, log, func() bool {
+		work()
+		return true
+	})
+}
+
+// startRetryPollTimer runs work now, then every intervalSeconds after a run that reports success,
+// and failedPollRetry (or one interval if shorter) after a run that reports failure.
+func startRetryPollTimer(name string, intervalSeconds int64, log *slog.Logger, work func() bool) *pollTimer {
+	interval := time.Duration(intervalSeconds) * time.Second
+	return startPollLoop(name, 0, interval, failedPollDelay(interval), log, work)
+}
+
+// failedPollDelay is the wait after a failed poll: failedPollRetry, or interval if shorter.
+func failedPollDelay(interval time.Duration) time.Duration {
+	if interval < failedPollRetry {
+		return interval
+	}
+	return failedPollRetry
+}
+
+// startPollLoop runs work first after first, then re-arms interval after a successful work and
+// retry after a failed one.
+func startPollLoop(name string, first, interval, retry time.Duration, log *slog.Logger, work func() bool) *pollTimer {
+	poll := &pollTimer{name: name, log: log, interval: interval, retry: retry}
 	log.Debug("ticker:started", "name", name, "interval", int64(interval/time.Second))
 	// Hold mu so a first fire cannot read timer before it is assigned.
 	poll.mu.Lock()
 	defer poll.mu.Unlock()
-	poll.timer = time.AfterFunc(interval, func() {
-		poll.fire(interval, work)
+	poll.timer = time.AfterFunc(first, func() {
+		poll.fire(work)
 	})
 	return poll
 }
 
-// fire runs work on the timer goroutine, then re-arms one interval later unless stopped.
-func (p *pollTimer) fire(interval time.Duration, work func()) {
+// fire runs work on the timer goroutine, then re-arms one interval later, or one retry later
+// when work failed, unless stopped.
+func (p *pollTimer) fire(work func() bool) {
 	if p.isStopped() {
 		return
 	}
-	work()
+	next := p.interval
+	if !work() {
+		next = p.retry
+	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if !p.stopped {
-		p.timer.Reset(interval)
+		p.timer.Reset(next)
 	}
 }
 
