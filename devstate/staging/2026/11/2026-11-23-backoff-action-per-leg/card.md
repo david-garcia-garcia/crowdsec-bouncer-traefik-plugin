@@ -28,7 +28,7 @@ Real e2e adds a `lapi-flaky` nginx proxy in front of LAPI and a `live` route tha
 In progress. 1 items remain.
 
 Priority: P2 — real operator and end-user pain during a LAPI or WAF outage (stalled requests, no per-router choice while a gate backs off), limited to outage windows and with failure actions as a partial workaround
-Reviewed head: c18fa9f4
+Reviewed head: b3cedb20
 Owner decision: None.
 
 ## Review scores
@@ -99,7 +99,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 1 added / 10 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c18fa9f467a4ee53b5ecd40c7a82528f08725617 | Card must match the branch you measured |
+| Reviewed head | b3cedb20696ad6414298d89321372ebd894a73c5 | Card must match the branch you measured |
 
 ### Stored data model
 None.
