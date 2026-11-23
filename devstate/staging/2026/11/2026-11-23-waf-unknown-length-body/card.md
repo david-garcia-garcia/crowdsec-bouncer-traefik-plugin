@@ -59,7 +59,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P1 — production is unsafe today: with ModSec's default failure action, any HTTP/2 or HTTP/3 client can skip body inspection by leaving out `Content-Length`.
-Reviewed head: c5f508cb
+Reviewed head: f108d4c6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -129,7 +129,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | c5f508cb8f3fd3b9cfd608cb675188bf7f9c359d | Card must match the branch you measured |
+| Reviewed head | f108d4c67c06177c80c805a5e1177dd66d115692 | Card must match the branch you measured |
 
 ### Stored data model
 None.
