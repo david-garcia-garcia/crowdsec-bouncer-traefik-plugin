@@ -14,17 +14,17 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+Ready for review. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 12c9e0d6
+Reviewed head: eee4fd0d
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45254425324 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -34,8 +34,8 @@ Owner decision: Required. See Explore Decisions.
 | Branch | 2026-11-23-waf-unknown-length-body pushed | `git` |
 | OpenSpec | waf-inspect-unknown-length-body | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
-| Local tests | none | handoff.yaml localTests |
+| CI | build 45254425324 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45254425324 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45254425324 |
+| Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
 ## Specs
@@ -54,10 +54,11 @@ Worktree:
 
 
 ## Follow-up issues
-None.
+- [ ] [AppSec call is not canceled when the client leaves](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/knowledge/debt/2026-11-23-appsec-call-ignores-inbound-cancel.md) — the AppSec listener request does not carry the inbound context, so a client that leaves keeps the call open until `appsecHttpTimeoutSeconds` (pre-existing; found by the 180 s `Test_appsecQuery_hopCancelDoesNotTripGate`).
+
 
 ## How this fits together
-Ticket 2026-11-23-waf-unknown-length-body on branch 2026-11-23-waf-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237; CI not seen.
+Ticket 2026-11-23-waf-unknown-length-body on branch 2026-11-23-waf-unknown-length-body targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/237; CI build 45254425324 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45254425324.
 
 ## Explore Decisions
 | Question | Rank | Decision | By |
@@ -78,7 +79,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 12c9e0d6389f6cef681f73584dab86d0a3d07183 | Card must match the branch you measured |
+| Reviewed head | eee4fd0db93102bbc29decd6aa8b0ba47d01de7f | Card must match the branch you measured |
 
 ### Stored data model
 None.
