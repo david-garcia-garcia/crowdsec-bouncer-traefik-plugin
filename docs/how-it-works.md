@@ -52,7 +52,7 @@ On a router, a leg runs only when the router names it:
 | ------------- | ------------------------ |
 | No instance name for the leg, and the middleware does not connect it | The leg does not run on this router. |
 | A name some loaded middleware shares | The leg runs with that connection. |
-| A name no loaded middleware shares (a typo, an owner not loaded yet, an owner removed) | The leg runs without a connection: LAPI, AppSec and ModSec apply their failure action, the captcha becomes a ban, the rate limit lets the request through. See [The connection is not there](failure-modes.md#the-connection-is-not-there). |
+| A name no loaded middleware shares (a typo, an owner not loaded yet, an owner removed) | The leg runs without a connection: LAPI, AppSec and ModSec apply their failure action, the captcha becomes a ban, the rate limit lets the request through. The router logs WARN `crowdsec bouncer connection unavailable` (`crowdsec bouncer rate limit owner unavailable` for the rate limit) once, with `leg` and `instanceName`. See [The connection is not there](failure-modes.md#the-connection-is-not-there). |
 
 The full set of topologies (one middleware, shared connections, several CrowdSec engines, AppSec only) is in [Middleware architecture](middleware-architecture.md).
 

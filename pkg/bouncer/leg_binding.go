@@ -20,21 +20,22 @@ type legBinding struct {
 
 // receiveBinding stores published (a reclaim.Published) as binding's new Box when this route
 // subscribes to the leg, then traces the bind or unbind it caused.
-// loadIncarnation reads the stored Client back; onBind (nil skips) runs before a bound trace, and
-// onUnbind (nil skips) after the trace of a move to no Client. Both run under bindingMu.
-func (b *Bouncer) receiveBinding(binding *legBinding, published any, loadIncarnation func() string, onBind, onUnbind func()) {
+// loadIncarnation reads the stored Client back; onBind (nil skips) runs before a bound trace, under bindingMu.
+func (b *Bouncer) receiveBinding(binding *legBinding, published any, loadIncarnation func() string, onBind func()) {
 	if !binding.subscribed {
 		return
 	}
 	notice, _ := published.(reclaim.Published)
 	b.storeBinding(&binding.bound, notice.Value)
-	b.traceBinding(binding, loadIncarnation(), onBind, onUnbind)
+	b.traceBinding(binding, loadIncarnation(), onBind)
 }
 
 // traceBinding traces the move from the last traced Client to the one whose incarnation is
 // currentIncarnation (empty for nil). The same incarnation is a no-op. Replacing A by B traces unbound A,
-// then bound B. onUnbind runs once per move to no Client: after a bound Client, or on a first empty delivery.
-func (b *Bouncer) traceBinding(binding *legBinding, currentIncarnation string, onBind, onUnbind func()) {
+// then bound B. Each move to no Client (after a bound Client, or on a first empty delivery) logs the
+// connection-unavailable WARN unless this router name and leg already have it pending, and a bind logs the
+// INFO that answers a pending one (connectionWarnings), before onBind. Never per request.
+func (b *Bouncer) traceBinding(binding *legBinding, currentIncarnation string, onBind func()) {
 	b.bindingMu.Lock()
 	defer b.bindingMu.Unlock()
 	if binding.traceSeen && currentIncarnation == binding.tracedIncarnation {
@@ -54,13 +55,12 @@ func (b *Bouncer) traceBinding(binding *legBinding, currentIncarnation string, o
 		if previousIncarnation == "" {
 			b.traceBouncerBinding(false, binding.leg, binding.instanceName, "")
 		}
-		if onUnbind != nil {
-			onUnbind()
-		}
+		pendingConnectionWarnings.warnUnavailable(b.log, b.name, binding.leg, binding.instanceName)
 		return
 	}
 
 	// Bind the new Client.
+	pendingConnectionWarnings.answerAvailable(b.log, b.name, binding.leg, binding.instanceName, currentIncarnation)
 	if onBind != nil {
 		onBind()
 	}

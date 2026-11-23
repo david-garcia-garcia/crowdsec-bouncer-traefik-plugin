@@ -184,15 +184,17 @@ A router that names an instance no loaded middleware shares runs that leg withou
 
 | Leg | What the request gets | Verdict header | Log |
 | --- | --------------------- | -------------- | --- |
-| LAPI | `bouncerLapiFailureAction` (default ban) | `lapi-failure` | None per request |
-| AppSec | `bouncerAppsecFailureAction` (default ban) | `appsec-failure` | None per request |
-| ModSec | `bouncerModsecFailureAction` (default pass) | `modsec-failure` | None per request |
-| Captcha | Any captcha this router should serve becomes a ban | `ban:captcha-downgrade` | None per request |
+| LAPI | `bouncerLapiFailureAction` (default ban) | `lapi-failure` | WARN `crowdsec bouncer connection unavailable` once, INFO `crowdsec bouncer connection available` when it is back |
+| AppSec | `bouncerAppsecFailureAction` (default ban) | `appsec-failure` | WARN `crowdsec bouncer connection unavailable` once, INFO `crowdsec bouncer connection available` when it is back |
+| ModSec | `bouncerModsecFailureAction` (default pass) | `modsec-failure` | WARN `crowdsec bouncer connection unavailable` once, INFO `crowdsec bouncer connection available` when it is back |
+| Captcha | Any captcha this router should serve becomes a ban | `ban:captcha-downgrade` | WARN `crowdsec bouncer connection unavailable` once, INFO `crowdsec bouncer connection available` when it is back |
 | Rate limit | Passes: nothing is counted, no failure action | None | WARN `crowdsec bouncer rate limit owner unavailable` once, INFO `crowdsec bouncer rate limit owner available` when it is back |
 
 The rate limit differs because its failure action is part of the policy, and without the middleware that holds the policy there is none to apply.
 
-A misspelled `lapiInstanceName` or `appsecInstanceName` bans every request of that router with the default failure actions, and only the verdict header says why. When you add a router, set `bouncerRemediationHeadersCustomName` and check its first responses. [Middleware architecture](middleware-architecture.md) shows how to keep the window after startup short.
+The connection lines carry `traefikName` (the router's middleware), `leg` (`lapi`, `appsec`, `modsec` or `captcha`) and `instanceName` (the name it looks for); the INFO line also carries the `incarnation` it bound. They are logged when the connection goes missing, never per request. Traefik rebuilds routers on every reload; the WARN belongs to the middleware name and leg, not to one build, so a rebuild while the connection is still missing does not repeat it, and the INFO comes from whichever build of that name gets the connection back first. A router that Traefik builds before the middleware that connects (at startup, or on a reload that builds it first) logs both lines at once.
+
+A misspelled `lapiInstanceName` or `appsecInstanceName` bans every request of that router with the default failure actions. The WARN `crowdsec bouncer connection unavailable` with that `instanceName` is logged when the router is built, and no INFO follows it. When you add a router, look for that line, or set `bouncerRemediationHeadersCustomName` and check its first responses. [Middleware architecture](middleware-architecture.md) shows how to keep the window after startup short.
 
 ## How you notice an outage
 
@@ -209,4 +211,4 @@ A misspelled `lapiInstanceName` or `appsecInstanceName` bans every request of th
 - The verdict header is only sent when [`bouncerRemediationHeadersCustomName`](configuration.md#bouncerremediationheaderscustomname) is set, and only when the failure action is `ban` or `captcha`. A `passthrough`, and a request the backoff gate let through, carry no header. See [See the verdict in access logs](how-to/verdict-in-access-logs.md).
 - Metrics are reported to CrowdSec only by a router that has a LAPI connection, and only for a ban or a captcha. See [LAPI metrics reporting](concepts.md#lapi-metrics-reporting).
 - The ban template gets `{{ .RemediationReason }}`: `TECHNICAL_ISSUE` for an unhealthy stream or a Redis cache failure, `LAPI`, `APPSEC`, `MODSEC` or `RATE_LIMIT` for the failure action of that leg. See [Put a request id on the ban page](how-to/request-id-on-ban-page.md).
-- Alert on the WARN backoff lines and on the `stream became unhealthy` line. For the rate limit and LAPI in `live` or `none`, alert on the metric or on the verdict header in your access logs.
+- Alert on the WARN backoff lines, on the `stream became unhealthy` line, and on a WARN `crowdsec bouncer connection unavailable` that no INFO `crowdsec bouncer connection available` follows within a few seconds (see [The connection is not there](#the-connection-is-not-there)). For the rate limit and LAPI in `live` or `none`, alert on the metric or on the verdict header in your access logs.

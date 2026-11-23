@@ -508,8 +508,8 @@ func TestRateLimit_ownerUnavailableLogsOnTransitions(t *testing.T) {
 // WARN / INFO counts after each step.
 func checkRateLimitOwnerTransitions(t *testing.T, emptyFirst bool) {
 	t.Helper()
-	ResetRateLimitOwnerWarningsForTest()
-	t.Cleanup(ResetRateLimitOwnerWarningsForTest)
+	ResetConnectionWarningsForTest()
+	t.Cleanup(ResetConnectionWarningsForTest)
 	cfg := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, func(cfg *configuration.Config) {
 		cfg.RateLimitEnabled = false
 		cfg.RateLimitInstanceName = "shared"
@@ -602,8 +602,8 @@ func newTestRateLimitSubscriber(t *testing.T, traefikName, instanceName string, 
 // name, not per Bouncer: a Traefik reload rebuilds a subscriber as a new Bouncer, and the new one neither repeats
 // the WARN its previous instance logged nor misses the INFO that answers it.
 func TestRateLimit_ownerWarningOutlivesTheRebuiltSubscriber(t *testing.T) {
-	ResetRateLimitOwnerWarningsForTest()
-	t.Cleanup(ResetRateLimitOwnerWarningsForTest)
+	ResetConnectionWarningsForTest()
+	t.Cleanup(ResetConnectionWarningsForTest)
 	log, sink := newTestLogSink(slog.LevelDebug)
 	owner := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
 	counter := &testRateLimitCounter{counts: map[string]int64{}}
@@ -640,8 +640,8 @@ func TestRateLimit_ownerWarningOutlivesTheRebuiltSubscriber(t *testing.T) {
 // WARN lines, a router rebuilt on another instance name warns for that instance and answers the router's WARN
 // when it binds, and a router rebuilt without the rate limit drops its pending WARN without a line.
 func TestRateLimit_ownerWarningIsPendingPerRouterName(t *testing.T) {
-	ResetRateLimitOwnerWarningsForTest()
-	t.Cleanup(ResetRateLimitOwnerWarningsForTest)
+	ResetConnectionWarningsForTest()
+	t.Cleanup(ResetConnectionWarningsForTest)
 	log, sink := newTestLogSink(slog.LevelDebug)
 	owner := newTestRateLimitConfig([]ratelimit.BucketRule{perIPTestBucket("per-ip", 1)}, nil)
 	counter := &testRateLimitCounter{counts: map[string]int64{}}

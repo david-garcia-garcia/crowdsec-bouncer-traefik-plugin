@@ -15,5 +15,5 @@ func (b *Bouncer) loadedModSec() *modsecurity.Client {
 // ReceiveModSec stores the published ModSec client and traces the pointer change.
 // published is a reclaim.Published. The same pointer is a no-op.
 func (b *Bouncer) ReceiveModSec(published any) {
-	b.receiveBinding(&b.modsecLeg, published, func() string { return b.loadedModSec().Incarnation() }, nil, nil)
+	b.receiveBinding(&b.modsecLeg, published, func() string { return b.loadedModSec().Incarnation() }, nil)
 }

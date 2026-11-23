@@ -368,8 +368,8 @@ func countRateLimitOwnerLines(t *testing.T, logFilePath, msg, level string) int 
 // Go (Watch skips it); either way the first bind logs one INFO per WARN before it. The WARN is pending per
 // router name: a reload that rebuilds app-a while the owner is gone adds no WARN, and one INFO answers it.
 func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
-	bouncer.ResetRateLimitOwnerWarningsForTest()
-	t.Cleanup(bouncer.ResetRateLimitOwnerWarningsForTest)
+	bouncer.ResetConnectionWarningsForTest()
+	t.Cleanup(bouncer.ResetConnectionWarningsForTest)
 	logFilePath := newTestLogFile(t)
 	const warnMsg = "crowdsec bouncer rate limit owner unavailable"
 	const infoMsg = "crowdsec bouncer rate limit owner available"
