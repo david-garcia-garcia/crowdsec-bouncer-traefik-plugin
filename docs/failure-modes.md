@@ -201,8 +201,8 @@ A misspelled `lapiInstanceName` or `appsecInstanceName` bans every request of th
 | LAPI (`stream`, `alone`) | WARN `handleStreamTicker` per failed refresh; INFO `crowdsec stream became unhealthy` and ERROR `handleStreamTicker:error` once; INFO `crowdsec stream became healthy` on recovery | `stream-unhealthy` | `plugin:tech_streamfail` |
 | LAPI (`live`, `none`) | None (DEBUG `serveLAPI:LiveLookup`) | `lapi-failure` | `plugin:lapi_failure` |
 | LAPI Redis cache | ERROR `serveLAPI:Get` per request | `cache-fail` | `plugin:tech_cachefail` |
-| AppSec | ERROR `appsecQuery:unreachable` per unreachable call; INFO `appsecQuery:failure` at most every 5 seconds for a 500; WARN `crowdsec appsec backoff started` and INFO `crowdsec appsec backoff ended` per trip | `appsec-failure` | `plugin:appsec_failure` |
-| ModSec | ERROR `crowdsec modsec sidecar unavailable`, debounced; WARN `crowdsec modsec backoff started` and INFO `crowdsec modsec backoff ended` per trip | `modsec-failure` | `plugin:modsec_failure` |
+| AppSec | ERROR `appsecQuery:unreachable` per unreachable call, with the transport error in `error`; INFO `appsecQuery:failure` at most every 5 seconds for a 500 (`statusCode`), and per response-body read error (`error`); WARN `crowdsec appsec backoff started` and INFO `crowdsec appsec backoff ended` per trip | `appsec-failure` | `plugin:appsec_failure` |
+| ModSec | ERROR `crowdsec modsec sidecar unavailable`, debounced, with `reason` plus the transport error in `error` or the `statusCode`; WARN `crowdsec modsec backoff started` and INFO `crowdsec modsec backoff ended` per trip | `modsec-failure` | `plugin:modsec_failure` |
 | Rate-limit Redis | None (DEBUG `serveRateLimit`) | `ratelimit-failure` | `plugin:ratelimit_failure` |
 | Captcha provider | INFO `captcha:ServeHTTP:validate` per failed submit | None | None |
 

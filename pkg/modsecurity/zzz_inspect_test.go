@@ -142,6 +142,31 @@ func TestInspect_sidecarTransportErrorIsUnavailable(t *testing.T) {
 	mustFail(t, client, getRequest("http://example.com/"), configuration.FailureActionPassthrough, ErrUnavailable)
 }
 
+// The unreachable ERROR carries the transport cause, but not the visitor's path or query.
+func TestInspect_unreachableLogsCauseWithoutVisitorURL(t *testing.T) {
+	logger.ResetDebounceForTest()
+	var logs bytes.Buffer
+	client, err := New(testModsecConfig("http://127.0.0.1:1"), slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelInfo})), "test", "n", "k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer client.Close()
+	mustFail(t, client, getRequest("http://example.com/visitor-path?token=visitor-secret"), configuration.FailureActionPassthrough, ErrUnavailable)
+	if !strings.Contains(logs.String(), MsgUnavailable) || !strings.Contains(logs.String(), `error="dial tcp 127.0.0.1:1`) {
+		t.Fatalf("unreachable ERROR missing the dial error\n%s", logs.String())
+	}
+	if strings.Contains(logs.String(), "visitor-path") || strings.Contains(logs.String(), "visitor-secret") {
+		t.Fatalf("unreachable ERROR leaked the visitor URL\n%s", logs.String())
+	}
+}
+
+func TestTransportCause_keepsAnErrorWithoutURL(t *testing.T) {
+	plain := errors.New("plain")
+	if got := transportCause(plain); !errors.Is(got, plain) {
+		t.Fatalf("transportCause(plain)=%v", got)
+	}
+}
+
 // An inbound cancel during the sidecar call is the shared client-disconnected outcome.
 func TestInspect_inboundCancelIsClientDisconnected(t *testing.T) {
 	started := make(chan struct{})
