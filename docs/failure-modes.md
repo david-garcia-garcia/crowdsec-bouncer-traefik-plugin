@@ -40,6 +40,8 @@ With the default settings:
 | ModSec gate is on, 10 seconds | Off | `modsecUnhealthyBackOffPeriodSecs: 0` on the middleware that connects to the sidecar |
 | LAPI in `live` / `none` has a gate, 10 seconds | No gate | `lapiUnhealthyBackOffPeriodSecs: 0` on the middleware that connects to LAPI |
 
+The new gates also change what a router that set its own failure action gets while a gate backs off. A router with `bouncerModsecFailureAction: ban` (or `captcha`) now lets requests through without CRS during the cooldown, because `bouncerModsecBackOffAction` defaults to `passthrough`: set `bouncerModsecBackOffAction` to the same value on that router to keep it closed. A router with `bouncerLapiFailureAction: passthrough` now bans during the cooldown, because `bouncerLapiBackOffAction` defaults to `ban`: set `bouncerLapiBackOffAction: passthrough` on that router to keep it open.
+
 ## Three rules shared by every leg
 
 **1. A failure action is set per leg, and in most legs per router.** It is one of `ban`, `passthrough`, or `captcha`:

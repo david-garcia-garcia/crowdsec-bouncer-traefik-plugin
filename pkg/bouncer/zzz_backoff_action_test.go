@@ -357,6 +357,31 @@ func TestServeHTTP_twoRoutersOnOneAppsecGate(t *testing.T) {
 	}
 }
 
+// TestServeHTTP_twoRoutersOnOneLapiGate proves the live LAPI gate is shared and the backoff action is
+// per router: the default router bans, the router that asks for passthrough lets the request through.
+func TestServeHTTP_twoRoutersOnOneLapiGate(t *testing.T) {
+	client, hits := trippedLiveLAPI(t)
+	before := atomic.LoadInt64(hits)
+	strict, strictPassed := newTestBackoffRouter(t, testBackoffRouterConfig(), Subscriptions{LAPI: true}, logger.New("ERROR", ""))
+	bindLiveTestLAPI(strict, client)
+	lenientCfg := testBackoffRouterConfig()
+	lenientCfg.BouncerLapiBackOffAction = configuration.FailureActionPassthrough
+	lenient, lenientPassed := newTestBackoffRouter(t, lenientCfg, Subscriptions{LAPI: true}, logger.New("ERROR", ""))
+	bindLiveTestLAPI(lenient, client)
+
+	rw := serveBackoffRequest(strict, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
+	if *strictPassed || rw.Code != http.StatusForbidden || rw.Header().Get("X-Remediation") != "ban:lapi-backoff" {
+		t.Fatalf("default router passed=%v status=%d header=%q want 403 ban:lapi-backoff", *strictPassed, rw.Code, rw.Header().Get("X-Remediation"))
+	}
+	rw = serveBackoffRequest(lenient, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
+	if !*lenientPassed || rw.Header().Get("X-Remediation") != "" {
+		t.Fatalf("passthrough router passed=%v header=%q want the backend", *lenientPassed, rw.Header().Get("X-Remediation"))
+	}
+	if atomic.LoadInt64(hits) != before {
+		t.Fatal("neither router may call LAPI while the shared gate backs off")
+	}
+}
+
 // unreadableBodyRequest is a POST whose body streams without a length.
 func unreadableBodyRequest() *http.Request {
 	req := httptest.NewRequest(http.MethodPost, "http://example.com/", io.NopCloser(strings.NewReader("payload")))

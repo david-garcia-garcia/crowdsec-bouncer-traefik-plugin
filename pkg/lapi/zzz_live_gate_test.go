@@ -132,6 +132,27 @@ func TestNew_liveGatePerMode(t *testing.T) {
 	}
 }
 
+// TestHandleStreamCache_failingPollsNeverGate proves stream polling against a 503 LAPI never meets a
+// gate: every poll past the trip budget still reaches LAPI and fails as itself, not as a skip.
+func TestHandleStreamCache_failingPollsNeverGate(t *testing.T) {
+	mock := newTestGateLAPI(t)
+	client := newTestGatedClient(t, mock, configuration.StreamMode, 10, logger.New("ERROR", ""))
+	mock.setStatus(http.StatusServiceUnavailable)
+	polls := 4 * admission.TripFailures
+	before := mock.hitCount() // New may already have polled once at startup
+	for i := range polls {
+		if err := client.handleStreamCache(); err == nil || errors.Is(err, ErrGateSkip) {
+			t.Fatalf("poll %d: err=%v, want a real failure", i, err)
+		}
+	}
+	if got := mock.hitCount() - before; got < int64(polls) {
+		t.Fatalf("hits=%d want every stream poll to reach LAPI (%d)", got, polls)
+	}
+	if client.GateForTest() != nil {
+		t.Fatal("stream must not build a gate")
+	}
+}
+
 // TestLiveLookup_gateTripsAndSkips proves 5 failing live GETs trip the gate and the next lookup
 // sends nothing, returns ErrGateSkip with a non-active kind, and caches nothing.
 func TestLiveLookup_gateTripsAndSkips(t *testing.T) {
@@ -174,6 +195,19 @@ func TestLiveLookup_statusClassification(t *testing.T) {
 			t.Fatalf("err=%v want ErrGateSkip after 5 x 429", err)
 		}
 	})
+	t.Run("refused connection trips", func(t *testing.T) {
+		mock := newTestGateLAPI(t)
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		mock.server.Close()
+		for i := range admission.TripFailures {
+			if _, _, err := client.LiveLookup("192.0.2.1", nil, 60); err == nil || errors.Is(err, ErrGateSkip) {
+				t.Fatalf("lookup %d: err=%v, want a transport failure that is not a skip", i, err)
+			}
+		}
+		if _, _, err := client.LiveLookup("192.0.2.1", nil, 60); !errors.Is(err, ErrGateSkip) {
+			t.Fatalf("err=%v want ErrGateSkip after 5 refused connections", err)
+		}
+	})
 	t.Run("401 never trips", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
 		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
@@ -206,7 +240,8 @@ func TestLiveLookup_skippedScopeAfterAnsweredIP(t *testing.T) {
 	scopes := map[string]string{"username": "alice"}
 	t.Run("clean IP and skipped scope is a skip and caches nothing", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
-		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		log, sink := newTestLogSink(slog.LevelWarn)
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, log)
 		mock.onIP.Store(func() { tripTestGateDirectly(client) })
 		kind, _, err := client.LiveLookup("192.0.2.1", scopes, 60)
 		if !errors.Is(err, ErrGateSkip) || decisionscope.IsActiveRemediation(kind) {
@@ -217,6 +252,9 @@ func TestLiveLookup_skippedScopeAfterAnsweredIP(t *testing.T) {
 		}
 		if cached, _, _, _ := client.LookupRemediation("192.0.2.1", net.ParseIP("192.0.2.1"), nil); cached != "" {
 			t.Fatalf("a skipped scope must block the clean IP memo, cached %q", cached)
+		}
+		if logged := sink.String(); strings.Contains(logged, "handleNoStreamCache:scopeQuery") {
+			t.Fatalf("a skipped scope must not log a scope WARN:\n%s", logged)
 		}
 	})
 	t.Run("IP ban outranks a skipped scope", func(t *testing.T) {
