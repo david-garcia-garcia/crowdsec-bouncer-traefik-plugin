@@ -25,17 +25,17 @@ Real e2e adds a `lapi-flaky` nginx proxy in front of LAPI and a `live` route tha
 **End users.** During an AppSec outage, visitors on routers that set no AppSec action are let through instead of banned. During a LAPI `live` / `none` outage, once the gate trips, visitors get the ban page at once instead of after the LAPI timeout.
 
 ## Merge readiness
-In progress. 1 items remain.
+Ready for review. 1 items remain.
 
 Priority: P2 — real operator and end-user pain during a LAPI or WAF outage (stalled requests, no per-router choice while a gate backs off), limited to outage windows and with failure actions as a partial workaround
-Reviewed head: 87eebcf2
+Reviewed head: 7ac830d4
 Owner decision: None.
 
 ## Review scores
 | Measure | Result | What it means |
 | --- | --- | --- |
-| Overall readiness | 1/6 | Not ready |
-| CI proof | 1/6 | not seen |
+| Overall readiness | 6/6 | Ready |
+| CI proof | 6/6 | succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45262345831 |
 | Local tests proof | N/A | remote PR — CI proof covers this |
 | Review resolution | 6/6 | no open PR comments |
 
@@ -45,7 +45,7 @@ Owner decision: None.
 | Branch | 2026-11-23-backoff-action-per-leg pushed | `git` |
 | OpenSpec | add-backoff-action-and-lapi-live-gate | `openspec/` |
 | Pull request | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236 | pr-host |
-| CI | not seen | caller omitted CI snapshot |
+| CI | build 45262345831 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45262345831 | https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45262345831 |
 | Local tests | passed | handoff.yaml localTests |
 | PR comments | no comments | devstate/comments.md |
 
@@ -86,7 +86,7 @@ Completed:
 
 
 ## How this fits together
-Ticket 2026-11-23-backoff-action-per-leg on branch 2026-11-23-backoff-action-per-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236; CI not seen.
+Ticket 2026-11-23-backoff-action-per-leg on branch 2026-11-23-backoff-action-per-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236; CI build 45262345831 succeeded https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/actions/runs/45262345831.
 
 ## Explore Decisions
 None.
@@ -112,7 +112,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | 2 added / 20 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 87eebcf2e426532d23efc766c81622d4d02dd0a2 | Card must match the branch you measured |
+| Reviewed head | 7ac830d475be1d8bf409afac1f79860cb2f19c86 | Card must match the branch you measured |
 
 ### Stored data model
 None.
