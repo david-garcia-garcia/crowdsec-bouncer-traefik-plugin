@@ -34,3 +34,8 @@ description: How Traefik's entrypoint XForwarded sanitizes X-Forwarded-Proto bef
 priority: normal
 local: ext_traefik_entrypoints_request-path/
 description: How the Traefik entry point normalizes, sanitizes, and filters the request path before a plugin middleware and the backend see it.
+
+## Plugin request body read deadline
+priority: normal
+local: ext_traefik_plugins_body-read-deadline/
+description: Whether a plugin's ResponseController read deadline reaches the client connection through Traefik's writer chain per protocol, and the read deadlines Traefik sets itself.
