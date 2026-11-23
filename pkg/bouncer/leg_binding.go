@@ -38,6 +38,30 @@ func (b *Bouncer) receiveBinding(binding *legBinding, published any, loadIncarna
 func (b *Bouncer) traceBinding(binding *legBinding, currentIncarnation string, onBind func()) {
 	b.bindingMu.Lock()
 	defer b.bindingMu.Unlock()
+	b.traceBindingLocked(binding, currentIncarnation, onBind)
+}
+
+// legBindings is every leg binding of this route, in a fixed order.
+func (b *Bouncer) legBindings() []*legBinding {
+	return []*legBinding{&b.lapiLeg, &b.appsecLeg, &b.captchaLeg, &b.modsecLeg, &b.rateLimitLeg}
+}
+
+// TraceUndeliveredBindings traces, as a delivery of no Client would, every subscribed leg Watch has delivered
+// nothing to yet. Call it once, after the route's Watch calls. Compiled Go's Watch skips the first typed nil, so
+// a name no middleware publishes (a typo, an owner not loaded yet) would otherwise log no connection-unavailable
+// WARN; under Yaegi that delivery already happened and this is a no-op, so the WARN is never logged twice.
+func (b *Bouncer) TraceUndeliveredBindings() {
+	b.bindingMu.Lock()
+	defer b.bindingMu.Unlock()
+	for _, binding := range b.legBindings() {
+		if binding.subscribed && !binding.traceSeen {
+			b.traceBindingLocked(binding, "", nil)
+		}
+	}
+}
+
+// traceBindingLocked is traceBinding with bindingMu held.
+func (b *Bouncer) traceBindingLocked(binding *legBinding, currentIncarnation string, onBind func()) {
 	if binding.traceSeen && currentIncarnation == binding.tracedIncarnation {
 		return
 	}

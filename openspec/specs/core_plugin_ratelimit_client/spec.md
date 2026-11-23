@@ -169,10 +169,9 @@ A rate-limit subscriber SHALL log WARN `crowdsec bouncer rate limit owner unavai
 - **AND** publishing the same client again or replacing it by a new one logs neither line
 
 #### Scenario: Subscriber that starts before its owner
-- **WHEN** under Traefik's interpreter a subscriber of `shared` starts before any owner publishes `shared`
-- **THEN** it logs WARN `crowdsec bouncer rate limit owner unavailable` once
+- **WHEN** a subscriber of `shared` starts before any owner publishes `shared`, under Traefik's interpreter or compiled into Traefik
+- **THEN** it logs WARN `crowdsec bouncer rate limit owner unavailable` once, never twice
 - **AND** when the owner publishes, it logs INFO `crowdsec bouncer rate limit owner available` once
-- **AND** compiled Go, which does not deliver that first empty value, logs neither line
 
 ### Requirement: The owner-unavailable WARN is pending per middleware name across reloads
 The owner-unavailable WARN SHALL stay pending per Traefik middleware name for the process lifetime, not per router instance. While it is pending, no instance of that name SHALL log a second WARN for the same rate-limit instance name, and the first bind of any instance of that name SHALL log the INFO that answers it. A rebuild on another instance name or without the rate limit follows the scenarios below.

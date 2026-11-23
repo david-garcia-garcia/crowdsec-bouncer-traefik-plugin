@@ -121,7 +121,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		originBasedDecisionRemap: copyOriginBasedDecisionRemap(config.BouncerOriginBasedDecisionRemap),
 	}
 	// A router rebuilt without a leg drops the connection-unavailable WARN its name still has pending on it.
-	for _, binding := range []*legBinding{&routeHandler.lapiLeg, &routeHandler.appsecLeg, &routeHandler.captchaLeg, &routeHandler.modsecLeg, &routeHandler.rateLimitLeg} {
+	for _, binding := range routeHandler.legBindings() {
 		if !binding.subscribed {
 			pendingConnectionWarnings.forget(name, binding.leg)
 		}

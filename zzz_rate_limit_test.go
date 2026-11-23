@@ -364,8 +364,8 @@ func countRateLimitOwnerLines(t *testing.T, logFilePath, msg, level string) int 
 // TestNew_RateLimitOwnerUnavailableWarnsOnTransitions proves, through New and the real Watch, that a
 // subscriber logs WARN "crowdsec bouncer rate limit owner unavailable" once when its owner is dropped and
 // INFO "crowdsec bouncer rate limit owner available" once when it returns, never per request. A subscriber
-// that starts before its owner warns once under Yaegi (Watch delivers the typed nil) and not in compiled
-// Go (Watch skips it); either way the first bind logs one INFO per WARN before it. The WARN is pending per
+// that starts before its owner warns once in both runtimes: Yaegi's Watch delivers the typed nil, and in compiled
+// Go, whose Watch skips it, New traces the undelivered leg (TraceUndeliveredBindings). The first bind answers it. The WARN is pending per
 // router name: a reload that rebuilds app-a while the owner is gone adds no WARN, and one INFO answers it.
 func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	bouncer.ResetConnectionWarningsForTest()
@@ -383,13 +383,12 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	warnedBeforeOwner := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN")
-	if warnedBeforeOwner > 1 {
-		t.Fatalf("subscribe before publish logged %d WARN lines, want at most one", warnedBeforeOwner)
+	const warnedBeforeOwner = 1
+	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner {
+		t.Fatalf("subscribe before publish logged %d WARN lines, want %d", got, warnedBeforeOwner)
 	}
-	t.Logf("subscribe before publish: %d WARN (1 under Yaegi, 0 in compiled Go)", warnedBeforeOwner)
 
-	// The owner publishes: one INFO per WARN before it.
+	// The owner publishes: one INFO answers the WARN.
 	if _, err := New(context.Background(), testNextOK(), cfgRateLimitOwnerOnly("shared", 3, http.StatusTooManyRequests), "rl-owner"); err != nil {
 		t.Fatal(err)
 	}
@@ -411,8 +410,8 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 		t.Fatalf("owner dropped: WARN lines=%d want %d", got, warnedBeforeOwner+1)
 	}
 
-	// A reload rebuilds app-a while the owner is gone: under Yaegi its first delivery is the typed nil, which
-	// is the same outage, so no second WARN.
+	// A reload rebuilds app-a while the owner is gone: its first delivery (or undelivered trace) is no client,
+	// which is the same outage, so no second WARN.
 	if _, err := New(context.Background(), testNextOK(), subscriberConfig, "app-a"); err != nil {
 		t.Fatal(err)
 	}

@@ -267,6 +267,8 @@ func New(ctx context.Context, next http.Handler, rawConfig *configuration.Config
 			reclaim.Watch(ctx, instanceAlias(leg.group, leg.instanceName(&config)), leg.empty, leg.receive(route))
 		}
 	}
+	// A leg Watch delivered nothing to has no connection: log it as Yaegi's typed-nil delivery would.
+	route.TraceUndeliveredBindings()
 	return route, nil
 }
 
