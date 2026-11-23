@@ -214,6 +214,90 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	}
 }
 
+// startSilentRedis accepts connections and reads them without ever answering, so every
+// command runs into the decision cache's 1 s CommandTimeout (redis:timeout).
+func startSilentRedis(t *testing.T) string {
+	t.Helper()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go func(conn net.Conn) {
+				defer func() { _ = conn.Close() }()
+				buf := make([]byte, 4096)
+				for {
+					if _, readErr := conn.Read(buf); readErr != nil {
+						return
+					}
+				}
+			}(conn)
+		}
+	}()
+	return listener.Addr().String()
+}
+
+// TestServeHTTP_RedisTimeoutFailureAction is a Redis that does not answer in time: it is an outage like
+// an unreachable one, so bouncerRedisUnreachableBlock decides between passing the LAPI leg and cache-fail.
+func TestServeHTTP_RedisTimeoutFailureAction(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	redisAddr := startSilentRedis(t)
+	var hits int64
+	srv := liveLAPI(t, map[string]bool{"203.0.113.42": true, "203.0.113.43": true}, &hits)
+	t.Cleanup(func() { srv.Close() })
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	passCfg := cfgLiveAt(parsed.Host)
+	passCfg.LogLevel = "ERROR"
+	passCfg.LapiRedisEnabled = true
+	passCfg.LapiRedisHost = redisAddr
+	passCfg.BouncerRedisUnreachableBlock = false
+	passHandler, err := New(context.Background(), testNextOK(), passCfg, "redis-timeout-pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := atomic.LoadInt64(&hits)
+	passRW := httptest.NewRecorder()
+	passHandler.ServeHTTP(passRW, reqForIP("203.0.113.42"))
+	if passRW.Code != http.StatusOK {
+		t.Fatalf("redis timeout passthrough status = %d", passRW.Code)
+	}
+	if atomic.LoadInt64(&hits) != before {
+		t.Fatal("redis timeout must not fall through to LiveLookup")
+	}
+
+	blockCfg := cfgLiveAt(parsed.Host)
+	blockCfg.LogLevel = "ERROR"
+	blockCfg.LapiKey = "redis-timeout-block-key"
+	blockCfg.LapiRedisEnabled = true
+	blockCfg.LapiRedisHost = redisAddr
+	blockCfg.BouncerRedisUnreachableBlock = true
+	blockCfg.BouncerRemediationHeadersCustomName = "X-Remediation"
+	blockHandler, err := New(context.Background(), testNextOK(), blockCfg, "redis-timeout-block")
+	if err != nil {
+		t.Fatal(err)
+	}
+	blockRW := httptest.NewRecorder()
+	blockHandler.ServeHTTP(blockRW, reqForIP("203.0.113.43"))
+	if blockRW.Code != http.StatusForbidden {
+		t.Fatalf("redis timeout block status = %d", blockRW.Code)
+	}
+	if got := blockRW.Header().Get("X-Remediation"); got != "ban:cache-fail" {
+		t.Fatalf("remediation %q want ban:cache-fail", got)
+	}
+}
+
 // waitStreamUnhealthy waits until the constructor's stream poll has failed and flipped healthy off.
 func waitStreamUnhealthy(t *testing.T, handler http.Handler) {
 	t.Helper()

@@ -24,7 +24,7 @@ With the default settings:
 | LAPI, `stream` mode | Decisions already downloaded keep applying. Other clients pass until a refresh fails, then get the failure action. | [`bouncerLapiFailureAction`](configuration.md#bouncerlapifailureaction), [`lapiUpdateMaxFailure`](configuration.md#lapiupdatemaxfailure) | Ban clients without a known decision, from the first failed refresh. |
 | LAPI, `live` / `none` mode | Each lookup LAPI does not answer gets the failure action. In `live`, answers already cached keep applying until they expire. | `bouncerLapiFailureAction` | Ban. |
 | CAPI, `alone` mode | At startup: the middleware does not load. Later: as `stream`, and the next try is 2 hours later. | `bouncerLapiFailureAction`, `lapiUpdateMaxFailure` | Ban clients without a known decision. |
-| Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. | [`bouncerRedisUnreachableBlock`](configuration.md#bouncerredisunreachableblock) | Ban (`ban:cache-fail`). |
+| Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. A Redis that answers in more than about 1 second counts as down. | [`bouncerRedisUnreachableBlock`](configuration.md#bouncerredisunreachableblock) | Ban (`ban:cache-fail`). |
 | AppSec | The failure action; after repeated failures, AppSec is skipped for a cooldown. | [`bouncerAppsecFailureAction`](configuration.md#bouncerappsecfailureaction), [`appsecUnhealthyBackOffPeriodSecs`](configuration.md#appsecunhealthybackoffperiodsecs) | Ban the first failures, then let requests through without AppSec for 30 seconds at a time. |
 | ModSecurity sidecar | The failure action. | [`bouncerModsecFailureAction`](configuration.md#bouncermodsecfailureaction), [`modsecUnhealthyBackOffPeriodSecs`](configuration.md#modsecunhealthybackoffperiodsecs) | Let the request through without CRS. |
 | Redis of the rate limit | With the default sliding window, each Traefik replica keeps counting on its own. | [`rateLimitFailureAction`](configuration.md#ratelimitfailureaction), [`rateLimitSyncRate`](configuration.md#ratelimitsyncrate), [`rateLimitAlgorithm`](configuration.md#ratelimitalgorithm) | Limit per replica instead of across replicas. |
@@ -83,8 +83,8 @@ With [`lapiRedisEnabled`](configuration.md#lapiredisenabled), LAPI decisions are
 
 | Redis | What the request gets |
 | ----- | --------------------- |
-| Cannot be reached (connection refused, no connection available) | With `bouncerRedisUnreachableBlock: true` (default): a ban, verdict header `ban:cache-fail`, reason `TECHNICAL_ISSUE`. With `false`: the LAPI check is skipped and the request goes on to the next checks. Bans stored in Redis do not apply. |
-| Answers too slowly (more than about 1 second) | A ban (`ban:cache-fail`), whatever `bouncerRedisUnreachableBlock` says. |
+| Cannot be reached (connection refused, no connection available), or answers too slowly (more than about 1 second) | With `bouncerRedisUnreachableBlock: true` (default): a ban, verdict header `ban:cache-fail`, reason `TECHNICAL_ISSUE`. With `false`: the LAPI check is skipped and the request goes on to the next checks. Bans stored in Redis do not apply. |
+| Answers with an error (TLS rejected, wrong or missing password) | A ban (`ban:cache-fail`), whatever `bouncerRedisUnreachableBlock` says. This is a configuration error to fix. |
 
 - `bouncerLapiFailureAction` does not apply to a Redis outage.
 - Reads go to [`lapiRedisReadHosts`](configuration.md#lapiredisreadhosts) in turn, and do not fall back to the primary.

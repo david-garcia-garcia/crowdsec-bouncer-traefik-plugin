@@ -419,7 +419,7 @@ Turn bans or captchas from specific origins into a captcha or a pass on this rou
 
 `bool` · default `true`
 
-When the LAPI Redis cache cannot be reached, ban (`true`) or skip the LAPI check (`false`). A Redis that answers too slowly bans either way. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
+When the LAPI Redis cache cannot be reached, ban (`true`) or skip the LAPI check (`false`). A Redis that answers too slowly (more than about 1 second) counts as unreachable. A Redis that answers with an error (TLS rejected, wrong or missing password) bans either way. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
 
 #### `bouncerRemediationHeadersCustomName`
 

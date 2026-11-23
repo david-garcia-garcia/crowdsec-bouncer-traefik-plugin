@@ -34,7 +34,7 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 		kind, origin, originID, lookupErr := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 		if lookupErr != nil {
 			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
-				b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "redisUnreachable", true)
+				b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "redisUnreachable", true, "error", lookupErr)
 				return false
 			}
 			b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "error", lookupErr)
