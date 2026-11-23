@@ -14,10 +14,10 @@ Not yet.
 **End users.** None.
 
 ## Merge readiness
-In progress. 0 items remain.
+In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: be83792e
+Reviewed head: edc013ac
 Owner decision: None.
 
 ## Review scores
@@ -42,10 +42,12 @@ Owner decision: None.
 None.
 
 ## Deviations from the ask
-None.
+- taken: add `lapiUnhealthyBackOffPeriodSecs` to the LAPI session identity (`pkg/lapi/session.go`), like AppSec does in `pkg/appsec/session.go`. → add it to the LAPI `ownership` payload (`OwnershipKey`), only in `live` / `none`; `streamSession` / `SessionHex` stay unchanged. — `pkg/lapi/identity.go` — AppSec's identity is its Client Open key; the LAPI equivalent is `ownership`, which reclaims the `lapi.Client` that holds the gate. `SessionHex` keys the DecisionStore, so a cooldown change there would drop the cache and the stream cursor.. Requester: not asked.
+
 
 ## Follow-up issues
-None.
+- [ ] [WAF failure-action captcha downgrade shows reason `LAPI`](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-backoff-action-per-leg/knowledge/debt/2026-11-23-waf-failure-captcha-downgrade-reason.md) — an AppSec or ModSec failure-action captcha that downgrades to a ban shows ban-template reason `LAPI`, because `handleRemediationServeHTTP` hard-codes `ReasonLAPI`.
+
 
 ## How this fits together
 Ticket 2026-11-23-backoff-action-per-leg on branch 2026-11-23-backoff-action-per-leg targeting master; PR https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pull/236; CI not seen.
@@ -66,7 +68,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | be83792e77f6557e30c36c49c464e1b47ea693ec | Card must match the branch you measured |
+| Reviewed head | edc013ac92b6b12d8bd261be6274a6f50b55f1ab | Card must match the branch you measured |
 
 ### Stored data model
 None.
