@@ -17,7 +17,7 @@ Not yet.
 In progress. 1 items remain.
 
 Priority: unknown — motivation not written
-Reviewed head: 0071cc74
+Reviewed head: f6b9e4a6
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -55,7 +55,7 @@ Ticket 2026-11-23-backoff-action-per-leg on branch 2026-11-23-backoff-action-per
 ## Explore Decisions
 | Question | Rank | Decision | By |
 | --- | --- | --- | --- |
-| Can the real e2e stack stop LAPI for a live-backoff test without breaking other suites? | additive asked — new compose service, new route, new cases; existing suites keep their routes; requirement section 7 asks for the LAPI live backoff case when the stack allows it | assumed — yes, without stopping `crowdsec`. Add compose service `lapi-flaky` (`nginx:alpine`, container `lapi-flaky-test`, `config/lapi-flaky.conf` with `resolver 127.0.0.11` and a `set $lapi http://crowdsec:8080` `proxy_pass`, the `appsec-flaky.conf` shape). Add one `live` middleware/router `/lapi-cycle` in a file-provider YAML with `lapiHost: lapi-flaky:80`, its own key `BOUNCER_KEY_LAPI_BACKOFF` (next free `c51a1c70…1c`, registered in the crowdsec env list), `lapiUnhealthyBackOffPeriodSecs: 10`, `lapiHttpTimeoutSeconds: 2`, `lapiMetricsUpdateIntervalSeconds: 0`, `reclaimGraceSeconds: 2`, JSON log, verdict header. Cycle: one fresh `X-Forwarded-For` per request (live caches a clean answer for `lapiDefaultDecisionSeconds`); stop `lapi-flaky-test`, 5 × `ban:lapi-failure`, then fast `ban:lapi-backoff` (assert elapsed well under the 2 s timeout), exactly one `crowdsec lapi backoff started`; start it, wait for 200, exactly one `crowdsec lapi backoff ended`; `AfterAll` starts the container. Place it in `waf_backoff.Tests.ps1` (domain `modsec`, which already owns stop/start cycles) or a new `lapi_backoff.Tests.ps1` registered in `PesterDomains.ps1` `lapi`; propose picks. Non-default WAF BackOffAction: a second router subscribing to the `/appsec-cycle` AppSec instance by name with `bouncerAppsecBackOffAction: ban`, proving the shared gate and the per-router action in the same outage. | explore |
+| Can the real e2e stack stop LAPI for a live-backoff test without breaking other suites? | additive asked — new compose service, new route, new cases; existing suites keep their routes; requirement section 7 asks for the LAPI live backoff case when the stack allows it | assumed — yes, without stopping `crowdsec`. Add compose service `lapi-flaky` (`nginx:alpine`, container `lapi-flaky-test`, `config/lapi-flaky.conf` with `resolver 127.0.0.11` and a `set $lapi http://crowdsec:8080` `proxy_pass`, the `appsec-flaky.conf` shape). Add one `live` middleware/router `/lapi-cycle` in a file-provider YAML with `lapiHost: lapi-flaky:80`, its own key `BOUNCER_KEY_LAPI_BACKOFF` (next free `c51a1c7000000000000000000000001f`; `…1a`–`…1e` are taken in `tests/e2e`; registered in the crowdsec env list), `lapiUnhealthyBackOffPeriodSecs: 10`, `lapiHttpTimeoutSeconds: 2`, `lapiMetricsUpdateIntervalSeconds: 0`, `reclaimGraceSeconds: 2`, JSON log, verdict header. Cycle: one fresh `X-Forwarded-For` per request (live caches a clean answer for `lapiDefaultDecisionSeconds`); stop `lapi-flaky-test`, 5 × `ban:lapi-failure`, then fast `ban:lapi-backoff` (assert elapsed well under the 2 s timeout), exactly one `crowdsec lapi backoff started`; start it, wait for 200, exactly one `crowdsec lapi backoff ended`; `AfterAll` starts the container. Place it in `waf_backoff.Tests.ps1` (domain `modsec`, which already owns stop/start cycles) or a new `lapi_backoff.Tests.ps1` registered in `PesterDomains.ps1` `lapi`; propose picks. Non-default WAF BackOffAction: a second router subscribing to the `/appsec-cycle` AppSec instance by name with `bouncerAppsecBackOffAction: ban`, proving the shared gate and the per-router action in the same outage. | explore |
 
 
 ## Findings
@@ -71,7 +71,7 @@ None.
 | --- | --- | --- |
 | Specs in this PR | none | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | 0071cc74c7a47832942b718ae63db2f6e1f5b190 | Card must match the branch you measured |
+| Reviewed head | f6b9e4a6625fc764860a9c3968007d0115963743 | Card must match the branch you measured |
 
 ### Stored data model
 None.
