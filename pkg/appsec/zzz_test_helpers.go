@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
@@ -18,14 +19,15 @@ import (
 
 func testAppsecConfig(host string) *configuration.Config {
 	return &configuration.Config{
-		AppsecBodyLimit:          10485760,
-		AppsecEnabled:            true,
-		AppsecHost:               host,
-		AppsecHTTPTimeoutSeconds: 1,
-		AppsecKey:                "test-key",
-		AppsecPath:               "/",
-		AppsecScheme:             "http",
-		AppsecTLSInsecureVerify:  true,
+		AppsecBodyLimit:              10485760,
+		AppsecBodyReadTimeoutSeconds: configuration.DefaultBodyReadTimeoutSeconds,
+		AppsecEnabled:                true,
+		AppsecHost:                   host,
+		AppsecHTTPTimeoutSeconds:     1,
+		AppsecKey:                    "test-key",
+		AppsecPath:                   "/",
+		AppsecScheme:                 "http",
+		AppsecTLSInsecureVerify:      true,
 	}
 }
 
@@ -72,24 +74,50 @@ func newReadablePostWithFailingBody(readErr error) *http.Request {
 	return req
 }
 
-func newStreamingRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodPost, "http://localhost/signalexchange.SignalExchange/ConnectStream", blockingBody{done: done})
+// stallingTestBody blocks every Read until Close, the way an HTTP/2 stream that never ends blocks
+// until its handler closes the body.
+type stallingTestBody struct {
+	once sync.Once
+	cut  chan struct{}
+}
+
+// newStallingTestBody returns a body that stalls until it is closed.
+func newStallingTestBody() *stallingTestBody {
+	return &stallingTestBody{cut: make(chan struct{})}
+}
+
+// Read blocks until Close, then fails like a closed HTTP/2 request body.
+func (b *stallingTestBody) Read(_ []byte) (int, error) {
+	<-b.cut
+	return 0, errors.New("http2: request body closed due to handler exiting")
+}
+
+// Close unblocks Read.
+func (b *stallingTestBody) Close() error {
+	b.once.Do(func() { close(b.cut) })
+	return nil
+}
+
+// newStreamingTestRequest is a gRPC client stream over HTTP/2 whose body never ends until it is closed.
+func newStreamingTestRequest(method string) *http.Request {
+	req, _ := http.NewRequest(method, "http://localhost/signalexchange.SignalExchange/ConnectStream", newStallingTestBody())
 	req.Header.Set("Content-Type", "application/grpc")
 	req.ProtoMajor = 2
 	req.ContentLength = -1
 	return req
 }
 
-func newUnreadableGetRequest(done <-chan struct{}) *http.Request {
+// newUnknownLengthGetRequest is an HTTP/3 GET whose body never ends: AppSec must not read it.
+func newUnknownLengthGetRequest(done <-chan struct{}) *http.Request {
 	req, _ := http.NewRequest(http.MethodGet, "http://localhost/", blockingBody{done: done})
 	req.ProtoMajor = 3
 	req.ContentLength = -1
 	return req
 }
 
-// newUnreadableDeleteRequest is an HTTP/2 DELETE whose body cannot be buffered.
-func newUnreadableDeleteRequest(done <-chan struct{}) *http.Request {
-	req, _ := http.NewRequest(http.MethodDelete, "http://localhost/", blockingBody{done: done})
+// newUnknownLengthTestRequest is an HTTP/2 request with body and no Content-Length.
+func newUnknownLengthTestRequest(method, body string) *http.Request {
+	req, _ := http.NewRequest(method, "http://localhost/", io.NopCloser(strings.NewReader(body)))
 	req.ProtoMajor = 2
 	req.ContentLength = -1
 	return req
@@ -106,7 +134,7 @@ func assertClientDisconnectedQuery(t *testing.T, readErr error, failureAction st
 	defer appsecServer.Close()
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
-	decision, err := client.Query(withTestAddress(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction})
+	decision, err := client.Query(withTestAddress(newReadablePostWithFailingBody(readErr)), Policy{FailureAction: failureAction}, nil)
 	if !errors.Is(err, ErrClientDisconnected) {
 		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}
@@ -131,7 +159,7 @@ func assertUnclassifiedBodyReadIsClientBodyRead(t *testing.T) {
 	appsecURL, _ := url.Parse(appsecServer.URL)
 	client := newQueryClient(appsecURL, appsecServer.Client())
 	for _, failureAction := range []string{configuration.FailureActionBan, configuration.FailureActionPassthrough} {
-		_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("disk read fault"))), Policy{FailureAction: failureAction})
+		_, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("disk read fault"))), Policy{FailureAction: failureAction}, nil)
 		if !errors.Is(err, ErrClientBodyRead) {
 			t.Fatalf("failureAction=%s: Query() error %v want ErrClientBodyRead", failureAction, err)
 		}
@@ -162,7 +190,7 @@ func assertCanceledContextReadErrIsDisconnect(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	req := newReadablePostWithFailingBody(errors.New("stream error: stream ID 1; CANCEL")).WithContext(ctx)
-	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan}, nil)
 	if !errors.Is(err, ErrClientDisconnected) {
 		t.Fatalf("Query() error %v want ErrClientDisconnected", err)
 	}

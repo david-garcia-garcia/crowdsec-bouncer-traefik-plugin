@@ -139,9 +139,10 @@ func TestOpen_connectionKnobsSplitClient(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, change := range map[string]func(*configuration.Config){
-		"url":       func(c *configuration.Config) { c.ModsecURL = "http://127.0.0.1:2" },
-		"timeout":   func(c *configuration.Config) { c.ModsecHTTPTimeoutSeconds = 30 },
-		"bodyLimit": func(c *configuration.Config) { c.ModsecBodyLimit = 1024 },
+		"url":             func(c *configuration.Config) { c.ModsecURL = "http://127.0.0.1:2" },
+		"timeout":         func(c *configuration.Config) { c.ModsecHTTPTimeoutSeconds = 30 },
+		"bodyLimit":       func(c *configuration.Config) { c.ModsecBodyLimit = 1024 },
+		"bodyReadTimeout": func(c *configuration.Config) { c.ModsecBodyReadTimeoutSeconds = 5 },
 	} {
 		cfg := testModsecConfig("http://127.0.0.1:1")
 		change(cfg)
@@ -149,8 +150,11 @@ func TestOpen_connectionKnobsSplitClient(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if other == base {
+		if other == base || other.Incarnation() == base.Incarnation() {
 			t.Fatalf("%s change must open a new Client", name)
+		}
+		if OwnershipKey(cfg, "same") == OwnershipKey(testModsecConfig("http://127.0.0.1:1"), "same") {
+			t.Fatalf("%s change must change the ownership key", name)
 		}
 	}
 }

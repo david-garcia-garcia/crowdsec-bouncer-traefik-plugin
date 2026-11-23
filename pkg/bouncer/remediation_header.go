@@ -31,6 +31,7 @@ const (
 	headerReasonChallenge            = "challenge"
 	headerReasonClientDisconnected   = "client-disconnected"
 	headerReasonClientBodyRead       = "client-body-read"
+	headerReasonBodyReadTimeout      = "body-read-timeout"
 
 	listsHeaderPrefix = "lists_"
 )

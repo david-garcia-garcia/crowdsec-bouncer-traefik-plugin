@@ -47,6 +47,7 @@ func TestOpen_P2KnobChangeSplitsClient(t *testing.T) {
 		{name: "path", mut: func(c *configuration.Config) { c.AppsecPath = "/waf" }},
 		{name: "key", mut: func(c *configuration.Config) { c.AppsecKey = "other" }},
 		{name: "bodyLimit", mut: func(c *configuration.Config) { c.AppsecBodyLimit = 200 }},
+		{name: "bodyReadTimeout", mut: func(c *configuration.Config) { c.AppsecBodyReadTimeoutSeconds = 5 }},
 		{name: "tls", mut: func(c *configuration.Config) { c.AppsecTLSInsecureVerify = false }},
 		{name: "timeout", mut: func(c *configuration.Config) { c.AppsecHTTPTimeoutSeconds = 30 }},
 		{name: "backoff", mut: func(c *configuration.Config) { c.AppsecUnhealthyBackOffPeriodSecs = 30 }},
@@ -63,6 +64,29 @@ func TestOpen_P2KnobChangeSplitsClient(t *testing.T) {
 				t.Fatalf("P2: %s change must open a new Client", tc.name)
 			}
 		})
+	}
+}
+
+// TestKey_nonPositiveBodyLimitIsTheDefaultIdentity proves appsecBodyLimit 0, -1, and omitted share one
+// Client after Prepare: all three mean the 10 MiB cap.
+func TestKey_nonPositiveBodyLimitIsTheDefaultIdentity(t *testing.T) {
+	keyFor := func(limit *int64) string {
+		cfg := configuration.New()
+		cfg.AppsecEnabled = true
+		cfg.AppsecKey = "k"
+		cfg.AppsecScheme = "http"
+		if limit != nil {
+			cfg.AppsecBodyLimit = *limit
+		}
+		if err := Prepare(cfg, slog.Default(), "router"); err != nil {
+			t.Fatal(err)
+		}
+		return Key(cfg, "router")
+	}
+	zero, negative := int64(0), int64(-1)
+	omitted := keyFor(nil)
+	if keyFor(&zero) != omitted || keyFor(&negative) != omitted {
+		t.Fatal("appsecBodyLimit 0 and -1 must hash like the omitted default")
 	}
 }
 

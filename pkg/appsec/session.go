@@ -22,6 +22,7 @@ type identity struct {
 	Path                       string `json:"path"`
 	Key                        string `json:"key"`
 	BodyLimit                  int64  `json:"bodyLimit"`
+	BodyReadTimeoutSeconds     int64  `json:"bodyReadTimeoutSeconds"`
 	TLSInsecureVerify          bool   `json:"tlsInsecureVerify"`
 	TLSCertificateAuthority    string `json:"tlsCertificateAuthority"`
 	TLSClientCertificate       string `json:"tlsClientCertificate"`
@@ -41,6 +42,7 @@ func identityFrom(cfg *configuration.Config, middlewareName string) identity {
 		Path:                       cfg.AppsecPath,
 		Key:                        cfg.AppsecKey,
 		BodyLimit:                  cfg.AppsecBodyLimit,
+		BodyReadTimeoutSeconds:     cfg.AppsecBodyReadTimeoutSeconds,
 		TLSInsecureVerify:          cfg.AppsecTLSInsecureVerify,
 		TLSCertificateAuthority:    ca,
 		TLSClientCertificate:       cert,

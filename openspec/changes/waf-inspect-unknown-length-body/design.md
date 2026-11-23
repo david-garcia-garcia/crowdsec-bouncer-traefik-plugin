@@ -40,6 +40,8 @@ Rejected: keep `IsBodyUnreadable` and make its branch "read with a deadline". It
 
 The signature becomes `ReadBody(httpReq, limit, mode, dl ReadDeadliner, timeout time.Duration)`, where `type ReadDeadliner interface{ SetReadDeadline(time.Time) error }` (`*http.ResponseController` satisfies it). In `bufferBody`, after the reuse check (a complete, untouched `bufferedBody` returns at once and starts nothing), and only when `httpReq.ContentLength < 0`:
 
+Implemented with the concrete `ctrl *http.ResponseController` instead of the `ReadDeadliner` interface (deviation row by implement). Measured under Yaegi v0.16.1: comparing an interpreted interface that holds the native `*http.ResponseController` with `nil` panics (`isNotNil` / `isNilChild`, nil pointer dereference) when it runs in the `time.AfterFunc` goroutine, and capturing it in the callback closure panics with `reflect.Value.Set using unaddressable value`. A nil check on the concrete pointer runs (`pkg/wafhop/zzz_yaegi_body_read_deadline_test.go`). Tests use `nil` (the `Close` fallback), a controller built on an `httptest.ResponseRecorder` (whose `SetReadDeadline` fails, so the fallback runs), or a real `httptest` server.
+
 ```go
 body := httpReq.Body // the body this call reads; captured for the fallback
 timer := time.AfterFunc(timeout, func() {
@@ -70,8 +72,8 @@ Rejected:
 
 ### D4. The legs receive the per-request control (deviation, by explore)
 
-- `appsec.Client.Query(req clientrequest.Request, pol Policy, dl wafhop.ReadDeadliner)`.
-- `modsecurity.Client.Inspect(req *http.Request, dl wafhop.ReadDeadliner)` replaces `failureAction string`, whose only use was the removed drop branch.
+- `appsec.Client.Query(req clientrequest.Request, pol Policy, ctrl *http.ResponseController)` (designed as `dl wafhop.ReadDeadliner`; see D2).
+- `modsecurity.Client.Inspect(req *http.Request, ctrl *http.ResponseController)` replaces `failureAction string`, whose only use was the removed drop branch.
 - `serveAppSec` and `serveModSec` each pass `http.NewResponseController(rw)`: the bouncer is the only owner of `rw`, and building the controller costs nothing, so both sides stay symmetric. Tests pass `nil` (falls back to `Body.Close`) or a stub.
 - Migration: `Query` has 1 production and 69 test calls, `Inspect` 1 production and 5 test calls (explore.md, Call sites). The change is mechanical.
 

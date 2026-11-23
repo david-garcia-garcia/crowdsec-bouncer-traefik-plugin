@@ -29,7 +29,7 @@ func (b *Bouncer) serveModSec(rw http.ResponseWriter, req clientrequest.Request,
 	if client == nil {
 		return b.applyModsecFailureAction(rw, req, match)
 	}
-	blocked, err := client.Inspect(req.Request, b.modsecFailureAction)
+	blocked, err := client.Inspect(req.Request, http.NewResponseController(rw))
 	switch {
 	case err == nil && blocked == nil:
 		return false
@@ -41,6 +41,9 @@ func (b *Bouncer) serveModSec(rw http.ResponseWriter, req clientrequest.Request,
 	case errors.Is(err, modsecurity.ErrGateSkip):
 		// The admission gate is backing off: the sidecar was not called and the failure action does not apply.
 		return false
+	case errors.Is(err, wafhop.ErrBodyReadTimeout):
+		b.handleBodyReadTimeoutServeHTTP(rw, req, legModsec, msgModsecBodyReadTimeout, client.BodyReadTimeoutSeconds())
+		return true
 	case errors.Is(err, modsecurity.ErrBodyTooLarge):
 		b.log.Debug("serveModSec: request body over modsecBodyLimit", "ip", req.IPAddrString())
 		http.Error(rw, "Request body too large", http.StatusRequestEntityTooLarge)

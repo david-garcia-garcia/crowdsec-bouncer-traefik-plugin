@@ -229,7 +229,7 @@ func TestServeHTTP_appsecGateSkipStillRunsModsec(t *testing.T) {
 	defer appsecClient.Close()
 	for range admission.TripFailures {
 		req := testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "203.0.113.40")
-		_, _ = appsecClient.Query(req, appsec.Policy{FailureAction: configuration.FailureActionBan})
+		_, _ = appsecClient.Query(req, appsec.Policy{FailureAction: configuration.FailureActionBan}, nil)
 	}
 
 	b, passed := testModsecBouncer(t, configuration.FailureActionPassthrough, nil)

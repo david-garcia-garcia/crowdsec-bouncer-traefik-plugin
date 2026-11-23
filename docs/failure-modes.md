@@ -138,8 +138,9 @@ The real-stack tests (`tests/e2e/real/waf_backoff.Tests.ps1`) stop a WAF contain
 | Failure (the failure action, and one failure for the backoff gate) | 500 and any status other than 200, 401 and 403; a timeout; a refused connection, a DNS or TLS error; a response that cannot be read | 5xx; a timeout; a refused connection, a DNS or TLS error |
 | Failure that does not count for the gate | HTTP 401 (a wrong `appsecKey`): the failure action applies on every request, and the gate stays closed, because the listener answered | — |
 | Not called | Body over `appsecBodyLimit`: only the first bytes are sent, not a failure | Body over [`modsecBodyLimit`](configuration.md#modsecbodylimit): HTTP 413 to the client, without the failure action, also while the gate skips the sidecar |
+| Not called, HTTP 400 | A body without `Content-Length` that does not arrive within [`appsecBodyReadTimeoutSeconds`](configuration.md#appsecbodyreadtimeoutseconds) (`error:body-read-timeout`) | A body without `Content-Length` that does not arrive within [`modsecBodyReadTimeoutSeconds`](configuration.md#modsecbodyreadtimeoutseconds) (`error:body-read-timeout`) |
 
-A POST, PUT or PATCH body streamed over HTTP/2 or HTTP/3 without a length (gRPC, for example) is never buffered, for either WAF. With `passthrough`, the WAF is called with the request headers only. With `ban` or `captcha`, the WAF is not called and the failure action applies, except while the gate skips that WAF.
+The failure action covers only a WAF that gave no verdict. The client's own body never triggers it. A body without `Content-Length` (HTTP/1.1 chunked, or HTTP/2 and HTTP/3 without the header) is read and inspected like any other, so removing `Content-Length` no longer skips inspection on either WAF. If it does not arrive within that WAF's read timeout, the request is blocked with HTTP 400, whatever the failure action says, and also while the gate skips that WAF. A body that never ends (gRPC client streaming, for example) is always blocked: see [Run streaming request bodies through the WAF legs](how-to/streaming-request-bodies.md).
 
 **The gate in detail.**
 

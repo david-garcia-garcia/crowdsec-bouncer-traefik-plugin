@@ -10,7 +10,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/wafhop"
 )
@@ -22,8 +21,8 @@ const sidecarBodyDrainLimit = 256 << 10
 const MsgUnavailable = "crowdsec modsec sidecar unavailable"
 
 var (
-	// ErrUnavailable means the sidecar gave no verdict: unreachable, timeout, HTTP 5xx, a request that
-	// could not be built, or a streamed body it cannot see. The bouncer applies bouncerModsecFailureAction.
+	// ErrUnavailable means the sidecar gave no verdict: unreachable, timeout, HTTP 5xx, or a request that
+	// could not be built. The bouncer applies bouncerModsecFailureAction.
 	ErrUnavailable = errors.New("modsecInspect:unavailable")
 	// ErrGateSkip means the admission gate is backing off and the sidecar was not called.
 	// As for AppSec, the bouncer continues without ModSec and without the failure action.
@@ -36,25 +35,16 @@ var (
 //
 //   - nil, nil: allow (sidecar 2xx). The caller continues to next.
 //   - resp, nil: block (sidecar 3xx or 4xx). The caller sends it with WriteBlock, which closes it.
-//   - nil, err: ErrUnavailable, ErrGateSkip, ErrBodyTooLarge, wafhop.ErrClientDisconnected, or
-//     wafhop.ErrClientBodyRead.
+//   - nil, err: ErrUnavailable, ErrGateSkip, ErrBodyTooLarge, wafhop.ErrBodyReadTimeout,
+//     wafhop.ErrClientDisconnected, or wafhop.ErrClientBodyRead.
 //
-// failureAction is the router's bouncerModsecFailureAction. It only decides what a POST, PUT, or PATCH
-// body streamed without a length means: passthrough inspects its headers only, any other action is
-// ErrUnavailable, or ErrGateSkip while the gate is backing off. That is the AppSec rule.
-func (c *Client) Inspect(req *http.Request, failureAction string) (*http.Response, error) {
+// Any body is read before admission, with or without Content-Length. ctrl is the inbound request's
+// response controller: a body without Content-Length is read under modsecBodyReadTimeoutSeconds, and
+// ctrl cuts that read when the deadline fires (nil falls back to closing the body, which cuts HTTP/2 only).
+func (c *Client) Inspect(req *http.Request, ctrl *http.ResponseController) (*http.Response, error) {
 	var body []byte
-	switch {
-	case wafhop.IsBodyUnreadable(req):
-		if wafhop.IsMethodWithBody(req.Method) && configuration.EffectiveModsecFailureAction(failureAction) != configuration.FailureActionPassthrough {
-			// No sidecar call, so no ticket: while backing off this is a skip, not the failure action.
-			if c.gate.BackingOff() {
-				return nil, ErrGateSkip
-			}
-			return nil, fmt.Errorf("%w: streamed %s body without a length", ErrUnavailable, req.Method)
-		}
-	case wafhop.HasBody(req):
-		read, err := wafhop.ReadBody(req, c.bodyLimit, wafhop.RejectOverLimit)
+	if wafhop.HasBody(req) {
+		read, err := wafhop.ReadBody(req, c.bodyLimit, wafhop.RejectOverLimit, ctrl, c.bodyReadTimeout)
 		if err != nil {
 			return nil, err
 		}

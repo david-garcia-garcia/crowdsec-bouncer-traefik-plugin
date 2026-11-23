@@ -63,6 +63,11 @@ const (
 	FailureActionCaptcha = "captcha"
 	// DefaultModsecBodyLimit is 8 MiB when modsecBodyLimit is omitted.
 	DefaultModsecBodyLimit int64 = 8 * 1024 * 1024
+	// DefaultAppsecBodyLimit is 10 MiB when appsecBodyLimit is omitted, 0, or negative.
+	DefaultAppsecBodyLimit int64 = 10485760
+	// DefaultBodyReadTimeoutSeconds is the default of appsecBodyReadTimeoutSeconds and
+	// modsecBodyReadTimeoutSeconds: the total time a WAF leg waits for a body without Content-Length.
+	DefaultBodyReadTimeoutSeconds int64 = 30
 	// DefaultAppsecUnhealthyBackOffPeriodSecs is the AppSec gate cooldown when omitted.
 	DefaultAppsecUnhealthyBackOffPeriodSecs int64 = 30
 	// RateLimitStoreRedis is the only rate-limit store in this version.
@@ -73,6 +78,7 @@ const (
 // appsec / bouncer / captcha / lapi / log / reclaim form one visible block each.
 type Config struct {
 	AppsecBodyLimit                     int64                        `json:"appsecBodyLimit,omitempty"`
+	AppsecBodyReadTimeoutSeconds        int64                        `json:"appsecBodyReadTimeoutSeconds,omitempty"`
 	AppsecEnabled                       bool                         `json:"appsecEnabled,omitempty"`
 	AppsecHost                          string                       `json:"appsecHost,omitempty"`
 	AppsecHTTPTimeoutSeconds            int64                        `json:"appsecHttpTimeoutSeconds,omitempty"`
@@ -166,6 +172,7 @@ type Config struct {
 	LogFormat                           string                       `json:"logFormat,omitempty"`
 	LogLevel                            string                       `json:"logLevel,omitempty"`
 	ModsecBodyLimit                     int64                        `json:"modsecBodyLimit,omitempty"`
+	ModsecBodyReadTimeoutSeconds        int64                        `json:"modsecBodyReadTimeoutSeconds,omitempty"`
 	ModsecEnabled                       bool                         `json:"modsecEnabled,omitempty"`
 	ModsecHTTPTimeoutSeconds            int64                        `json:"modsecHttpTimeoutSeconds,omitempty"`
 	ModsecInstanceName                  string                       `json:"modsecInstanceName,omitempty"`
@@ -228,6 +235,15 @@ func EffectiveFailureAction(action string) string {
 	return action
 }
 
+// EffectiveAppsecBodyLimit is the AppSec body cap: appsecBodyLimit 0 or negative means the
+// default 10 MiB, so AppSec never forwards a body without a cap.
+func EffectiveAppsecBodyLimit(limit int64) int64 {
+	if limit <= 0 {
+		return DefaultAppsecBodyLimit
+	}
+	return limit
+}
+
 // EffectiveModsecFailureAction maps empty config to passthrough: unlike LAPI and AppSec,
 // a ModSec sidecar outage lets traffic through unless the operator asks otherwise.
 func EffectiveModsecFailureAction(action string) string {
@@ -249,7 +265,8 @@ func EffectiveRateLimitFailureAction(action string) string {
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
-		AppsecBodyLimit:                     10485760,
+		AppsecBodyLimit:                     DefaultAppsecBodyLimit,
+		AppsecBodyReadTimeoutSeconds:        DefaultBodyReadTimeoutSeconds,
 		AppsecEnabled:                       false,
 		AppsecHost:                          "crowdsec:7422",
 		AppsecHTTPTimeoutSeconds:            10,
@@ -315,6 +332,7 @@ func New() *Config {
 		LogFormat:                           "common",
 		LogLevel:                            LogINFO,
 		ModsecBodyLimit:                     DefaultModsecBodyLimit,
+		ModsecBodyReadTimeoutSeconds:        DefaultBodyReadTimeoutSeconds,
 		ModsecEnabled:                       false,
 		ModsecHTTPTimeoutSeconds:            10,
 		ModsecUnhealthyBackOffPeriodSecs:    0,
@@ -915,7 +933,6 @@ func validateParamsRequired(config *Config) error {
 		}
 	}
 	requiredInt0 := map[string]int64{
-		"AppsecBodyLimit":                  config.AppsecBodyLimit,
 		"AppsecUnhealthyBackOffPeriodSecs": config.AppsecUnhealthyBackOffPeriodSecs,
 		"LapiMetricsUpdateIntervalSeconds": config.LapiMetricsUpdateIntervalSeconds,
 		"ModsecUnhealthyBackOffPeriodSecs": config.ModsecUnhealthyBackOffPeriodSecs,
@@ -931,9 +948,11 @@ func validateParamsRequired(config *Config) error {
 		"LapiDefaultDecisionSeconds":          config.LapiDefaultDecisionSeconds,
 		"LapiHTTPTimeoutSeconds":              config.LapiHTTPTimeoutSeconds,
 		"AppsecHTTPTimeoutSeconds":            config.AppsecHTTPTimeoutSeconds,
+		"AppsecBodyReadTimeoutSeconds":        config.AppsecBodyReadTimeoutSeconds,
 		"CaptchaSiteverifyHTTPTimeoutSeconds": config.CaptchaSiteverifyHTTPTimeoutSeconds,
 		"CaptchaGracePeriodSeconds":           config.CaptchaGracePeriodSeconds,
 		"ModsecHTTPTimeoutSeconds":            config.ModsecHTTPTimeoutSeconds,
+		"ModsecBodyReadTimeoutSeconds":        config.ModsecBodyReadTimeoutSeconds,
 	}
 	for key, val := range requiredInt1 {
 		if val < 1 {
@@ -955,9 +974,6 @@ func validateParamsRequired(config *Config) error {
 	}
 	if _, err := httprule.NewActionSet(config.BouncerActionRules); err != nil {
 		return fmt.Errorf("BouncerActionRules: %w", err)
-	}
-	if config.AppsecBodyLimit < 0 {
-		return errors.New("AppsecBodyLimit: cannot be less than 0")
 	}
 	if config.BouncerRemediationStatusCode < 100 || config.BouncerRemediationStatusCode >= 600 {
 		return errors.New("BouncerRemediationStatusCode: cannot be less than 100 and more than 600")

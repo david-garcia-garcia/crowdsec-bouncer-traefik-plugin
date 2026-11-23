@@ -1,5 +1,6 @@
 # ModSec leg alone: inspect-only Apache CRS sidecar (waf), one failing address for each
-# bouncerModsecFailureAction, WebSocket, and bypassModsec. Distinct PathPrefix values.
+# bouncerModsecFailureAction, WebSocket, bypassModsec, and a 2 s body read deadline. Distinct
+# PathPrefix values.
 http:
   routers:
     modsec-allow:
@@ -41,6 +42,11 @@ http:
       rule: PathPrefix(`/modsec-skip`)
       entryPoints: [web]
       middlewares: [bouncer-modsec-skip]
+      service: whoami@docker
+    modsec-stall:
+      rule: PathPrefix(`/modsec-stall`)
+      entryPoints: [web]
+      middlewares: [bouncer-modsec-stall]
       service: whoami@docker
   middlewares:
     bouncer-modsec:
@@ -151,6 +157,24 @@ http:
           lapiEnabled: "false"
           logFormat: json
           logLevel: DEBUG
+          modsecEnabled: "true"
+          modsecHttpTimeoutSeconds: "10"
+          modsecUrl: http://waf:8080
+          reclaimGraceSeconds: "2"
+    # modsecBodyReadTimeoutSeconds 2 with the default failure action (passthrough): a body without
+    # Content-Length that stalls is still blocked.
+    bouncer-modsec-stall:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "false"
+          logFormat: json
+          logLevel: DEBUG
+          modsecBodyReadTimeoutSeconds: "2"
           modsecEnabled: "true"
           modsecHttpTimeoutSeconds: "10"
           modsecUrl: http://waf:8080

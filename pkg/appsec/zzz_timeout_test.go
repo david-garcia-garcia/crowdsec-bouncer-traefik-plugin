@@ -56,7 +56,7 @@ func TestQuery_HangHonorsAppsecOverride(t *testing.T) {
 	started := time.Now()
 	decision, queryErr := client.Query(buildTestRequest(), Policy{
 		FailureAction: configuration.FailureActionPassthrough,
-	})
+	}, nil)
 	elapsed := time.Since(started)
 	if queryErr != nil {
 		t.Fatalf("passthrough Query err = %v", queryErr)

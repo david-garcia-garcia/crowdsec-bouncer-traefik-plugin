@@ -40,6 +40,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `captcha:solved` | The visitor just solved the captcha and is being redirected back. |
 | `error:client-disconnected` | The client disconnected while AppSec or ModSec was reading the request body. Not a ban. |
 | `error:client-body-read` | The request body could not be read whole for AppSec or ModSec while the client was still connected (for example an upload slower than the entry point read timeout). Answered HTTP 400 `Bad Request`. Not a ban. |
+| `error:body-read-timeout` | A request body without `Content-Length` did not arrive within `appsecBodyReadTimeoutSeconds` or `modsecBodyReadTimeoutSeconds`. Answered HTTP 400 `Bad Request` whatever the failure action. Not a ban. A gRPC stream or another body that never ends gets this: see [Run streaming request bodies through the WAF legs](streaming-request-bodies.md). |
 | `<action>:appsec` | Any other action returned by AppSec. |
 
 Requests that are let through get no header. A client address that cannot be read (`RemoteAddr` is not `host:port`, or the chosen text is not an IP) is HTTP 502 `Bad Gateway`, also with no header.
