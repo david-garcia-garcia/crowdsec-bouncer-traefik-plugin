@@ -59,7 +59,7 @@ Proof:
 In progress. 1 items remain.
 
 Priority: P1 — production is unsafe today: with ModSec's default failure action, any HTTP/2 or HTTP/3 client can skip body inspection by leaving out `Content-Length`.
-Reviewed head: f108d4c6
+Reviewed head: 4916b386
 Owner decision: Required. See Explore Decisions.
 
 ## Review scores
@@ -82,13 +82,22 @@ Owner decision: Required. See Explore Decisions.
 
 ## Specs
 Worktree:
-- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
-- [core_plugin_wafhop_shared-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+- [core_plugin_wafhop_shared-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/changes/archive/2026-11-23-waf-inspect-unknown-length-body/proposal.md) — modified
+
+Completed:
+- [core_plugin_appsec_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_appsec_client/spec.md) — modified
+- [core_plugin_appsec_failure-action](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_appsec_failure-action/spec.md) — modified
+- [core_plugin_middleware_bouncer](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_middleware_bouncer/spec.md) — modified
+- [core_plugin_middleware_config-validation](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_middleware_config-validation/spec.md) — modified
+- [core_plugin_modsecurity_client](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_modsecurity_client/spec.md) — modified
+- [core_plugin_modsecurity_inspect](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_modsecurity_inspect/spec.md) — modified
+- [core_plugin_wafhop_shared-request](https://github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/blob/2026-11-23-waf-unknown-length-body/openspec/specs/core_plugin_wafhop_shared-request/spec.md) — modified
 
 
 ## Deviations from the ask
@@ -127,9 +136,9 @@ None.
 ### Review metrics
 | Metric | Value | Why it matters |
 | --- | --- | --- |
-| Specs in this PR | 0 added / 7 modified | Same list as ## Specs |
+| Specs in this PR | 0 added / 14 modified | Same list as ## Specs |
 | Open reviewer comments walked | 0 FIX / 0 ANSWER / 0 open | Unanswered review is merge risk |
-| Reviewed head | f108d4c67c06177c80c805a5e1177dd66d115692 | Card must match the branch you measured |
+| Reviewed head | 4916b38676eacf611791323c3c765feba774d5ea | Card must match the branch you measured |
 
 ### Stored data model
 None.
