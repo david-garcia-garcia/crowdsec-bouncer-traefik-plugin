@@ -62,7 +62,7 @@ Settings of a connection live on the middleware that connects. Settings that dec
 
 | Leg | On the middleware that connects | On each router that uses it |
 | --- | ------------------------------- | --------------------------- |
-| LAPI | `lapiHost`, `lapiKey`, `lapiMode`, intervals, TLS, `lapiStreamScopes`, the CAPI credentials of `alone`, the [Redis cache](configuration.md#redis-cache) | `bouncerLapiFailureAction`, `bouncerRedisUnreachableBlock`, `bouncerDecisionScopeHeaders`, `bouncerOriginBasedDecisionRemap`, and `lapiDefaultDecisionSeconds` for the answers this router caches in `live` mode |
+| LAPI | `lapiHost`, `lapiKey`, `lapiMode`, intervals, TLS, `lapiStreamScopes`, the CAPI credentials of `alone`, the [Redis cache](configuration.md#redis-cache) | `bouncerLapiFailureAction`, `bouncerLapiRedisFailureAction`, `bouncerDecisionScopeHeaders`, `bouncerOriginBasedDecisionRemap`, and `lapiDefaultDecisionSeconds` for the answers this router caches in `live` mode |
 | Rate limit | Redis, and the **whole policy**: `rateLimitBuckets`, `rateLimitAlgorithm`, `rateLimitStatusCode`, `rateLimitResponseHeaders`, `rateLimitFailureAction`, `rateLimitSyncRate` | Nothing but the name: each router counts under its own middleware name, and serves its own captcha |
 | AppSec | `appsecHost`, `appsecKey`, timeout, `appsecBodyLimit`, TLS, `appsecUnhealthyBackOffPeriodSecs` (and the backoff state) | `bouncerAppsecFailureAction` |
 | ModSec | `modsecUrl`, timeout, `modsecBodyLimit`, `modsecUnhealthyBackOffPeriodSecs` (and the backoff state) | `bouncerModsecFailureAction` |

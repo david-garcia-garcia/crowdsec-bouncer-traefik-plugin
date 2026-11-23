@@ -157,7 +157,7 @@ Redis PutMany and DeleteMany SHALL return no error to callers. Redis MSetEX and 
 - **AND** the write is not skipped
 
 ### Requirement: Store errors are miss and unreachable
-Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `store:miss` and `store:unreachable`. Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis engines SHALL return the same sentinels. Redis SHALL treat utilities miss as `store:miss` and unreachable as `store:unreachable`. Redis SHALL treat a utilities timeout (`redis:timeout`, a GET or MGET not answered within the 1s command timeout) as unreachable: the error SHALL satisfy `errors.Is(err, ErrUnreachable)` and SHALL also wrap `redis:timeout`, so its `Error()` is `store:unreachable: redis:timeout`. Other utilities errors (TLS, NOAUTH, protocol) MUST NOT map to `ErrUnreachable`.
+Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Their `Error()` text SHALL remain `store:miss` and `store:unreachable`. Callers that distinguish miss from unreachable SHALL use `errors.Is`. A clean miss MUST NOT allocate a new error value. Memory and Redis engines SHALL return the same sentinels. Redis SHALL treat utilities miss as `store:miss` and unreachable as `store:unreachable`.
 
 #### Scenario: In-memory miss is the miss sentinel
 - **WHEN** a memory Store Lookup of an absent key returns an error
@@ -168,16 +168,6 @@ Store errors SHALL be the package sentinels `ErrMiss` and `ErrUnreachable`. Thei
 - **WHEN** a Redis Store Lookup fails because the store is unreachable
 - **THEN** `errors.Is(err, ErrUnreachable)` is true
 - **AND** `err.Error()` is `store:unreachable`
-
-#### Scenario: Redis timeout is the unreachable sentinel
-- **WHEN** a Redis Store Lookup or RangeIndex read gets no answer within the command timeout
-- **THEN** `errors.Is(err, ErrUnreachable)` is true
-- **AND** `errors.Is(err, simpleredis.ErrTimeout)` is true
-
-#### Scenario: Redis error reply is not unreachable
-- **WHEN** a Redis Store Lookup gets an error reply such as NOAUTH
-- **THEN** the error is not nil
-- **AND** `errors.Is(err, ErrUnreachable)` is false
 
 ### Requirement: DecisionStore owns the origin intern table
 The memory engine SHALL own two `pkg/intern.Table` values (each `names []string` index-is-id, `byName` string→`uint16`; empty name is id 0; lock-free `Name` for a known id): one for folded usage-metrics origins (`MetricsOrigin`, including `lists:<name>`), and one for the raw LAPI scenario. `intern.Table.ID` SHALL stay overflow at `uint16` max 65535. CrowdSec `packWord`/`unpackWord`/`KindOriginString` SHALL live in `pkg/decisionstore`. The memory pack word SHALL be a `uint32` laid out as 2-bit kind, 12-bit origin id, 2-bit family, 16-bit scenario id (`kind` 0=empty / 1=`t` / 2=`c` / 3=`f`; `familyCode` 1=`ipv4`, 2=`ipv6`, 0=empty). `unpackWord` SHALL return the kind letter (`t` / `c` / `f`, or empty when kind is 0), the origin id, the family, and the scenario id. Unpack origin id MUST NOT be `uint16(word>>8)`. When the origin intern id is greater than 4095, memory pack SHALL pack origin id `0` and SHALL NOT log. Memory Put SHALL classify family with `FamilyOfHostOrCIDR` on the decision value once. The tables MUST NOT be package variables. Two DecisionStores with different reclaim keys MUST NOT share either table. Intern MUST stay off `lapi.Client` except thin forwards tests need. When origin intern would overflow `uint16`, the store SHALL store a packed word with origin id `0` on memory and SHALL NOT log, and SHALL store `KindOriginString(kind, origin)` on Redis without a leftover U+001F string. Redis slots SHALL be `KindOriginString` (kind, then newline, then origin; bare kind when origin is empty). Memory Ip and header writes SHALL Pack into the word map. Range-index blobs SHALL use `KindOriginString`, never a packed intern id in the blob. `HeaderScopeKey` and `IPCacheKey` SHALL live in `pkg/decisionstore`. `LiveSlot` SHALL remain `Word uint32` plus `ExpiresAt int32` (8 bytes). `LookupRemediation` SHALL still return kind, origin name, and origin id; it MUST NOT grow a scenario id. `ActiveCounts` SHALL still group origin id × family from the packed word (extractors SHALL follow this layout) and MUST NOT group by scenario.

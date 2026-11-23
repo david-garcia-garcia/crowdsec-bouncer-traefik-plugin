@@ -34,7 +34,7 @@ func getTestConfig() *configuration.Config {
 		BouncerForwardedHeadersCustomName:   "",
 		BouncerForwardedHeadersTrustedIPs:   []string{"127.0.0.1"},
 		BouncerLapiFailureAction:            configuration.FailureActionBan,
-		BouncerRedisUnreachableBlock:        false,
+		BouncerLapiRedisFailureAction:       configuration.FailureActionPassthrough,
 		BouncerRemediationHeadersCustomName: "",
 		BouncerRemediationStatusCode:        403,
 		LapiCapiMachineID:                   "",

@@ -208,6 +208,12 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 	cfgModsecFailureActionBan.BouncerModsecFailureAction = FailureActionBan
 	cfgModsecFailureActionCaptchaNoInstance := getMinimalConfig()
 	cfgModsecFailureActionCaptchaNoInstance.BouncerModsecFailureAction = FailureActionCaptcha
+	cfgLapiRedisFailureActionOpen := getMinimalConfig()
+	cfgLapiRedisFailureActionOpen.BouncerLapiRedisFailureAction = "open"
+	cfgLapiRedisFailureActionPassthrough := getMinimalConfig()
+	cfgLapiRedisFailureActionPassthrough.BouncerLapiRedisFailureAction = FailureActionPassthrough
+	cfgLapiRedisFailureActionCaptchaNoInstance := getMinimalConfig()
+	cfgLapiRedisFailureActionCaptchaNoInstance.BouncerLapiRedisFailureAction = FailureActionCaptcha
 	cfgModsecBackoffNegative := getMinimalConfig()
 	cfgModsecBackoffNegative.ModsecUnhealthyBackOffPeriodSecs = -1
 	cfgAppsecBackoffNegative := getMinimalConfig()
@@ -416,6 +422,9 @@ func Test_ValidateParams(t *testing.T) { //nolint:maintidx
 		{name: "Old ModSec failMode value open fails", args: args{config: cfgModsecFailureActionOpen}, wantErr: true, wantErrContains: "BouncerModsecFailureAction"},
 		{name: "ModSec failure action ban passes", args: args{config: cfgModsecFailureActionBan}, wantErr: false},
 		{name: "ModSec failure action captcha without a captcha instance fails", args: args{config: cfgModsecFailureActionCaptchaNoInstance}, wantErr: true, wantErrContains: "BouncerModsecFailureAction"},
+		{name: "LAPI Redis failure action open fails", args: args{config: cfgLapiRedisFailureActionOpen}, wantErr: true, wantErrContains: "BouncerLapiRedisFailureAction"},
+		{name: "LAPI Redis failure action passthrough passes", args: args{config: cfgLapiRedisFailureActionPassthrough}, wantErr: false},
+		{name: "LAPI Redis failure action captcha without a captcha instance fails", args: args{config: cfgLapiRedisFailureActionCaptchaNoInstance}, wantErr: true, wantErrContains: "BouncerLapiRedisFailureAction"},
 		{name: "Negative ModSec backoff fails", args: args{config: cfgModsecBackoffNegative}, wantErr: true, wantErrContains: "ModsecUnhealthyBackOffPeriodSecs"},
 		{name: "Negative AppSec backoff fails", args: args{config: cfgAppsecBackoffNegative}, wantErr: true, wantErrContains: "AppsecUnhealthyBackOffPeriodSecs"},
 		{name: "Zero AppSec backoff disables the gate", args: args{config: cfgAppsecBackoffZero}, wantErr: false},
@@ -1184,6 +1193,9 @@ func TestNew_ModsecAndAppsecBackoffDefaults(t *testing.T) {
 	}
 	if cfg.BouncerModsecFailureAction != FailureActionPassthrough {
 		t.Fatalf("BouncerModsecFailureAction=%q want %q", cfg.BouncerModsecFailureAction, FailureActionPassthrough)
+	}
+	if cfg.BouncerLapiRedisFailureAction != FailureActionBan {
+		t.Fatalf("BouncerLapiRedisFailureAction=%q want %q", cfg.BouncerLapiRedisFailureAction, FailureActionBan)
 	}
 	if cfg.AppsecUnhealthyBackOffPeriodSecs != DefaultAppsecUnhealthyBackOffPeriodSecs {
 		t.Fatalf("Appsec backoff=%d want %d", cfg.AppsecUnhealthyBackOffPeriodSecs, DefaultAppsecUnhealthyBackOffPeriodSecs)

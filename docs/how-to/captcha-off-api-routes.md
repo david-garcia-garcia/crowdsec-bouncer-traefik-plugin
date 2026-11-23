@@ -23,6 +23,7 @@ On a matching request, each of these lets the request through:
 | ---------------------------------------- | ---------------------------- |
 | A CrowdSec decision of type `captcha` matches the client (its IP, range, country, AS, or a custom scope). | `captcha:lapi`, `captcha:lapi:<origin>` |
 | LAPI is unreachable, or decisions could not be refreshed, and `bouncerLapiFailureAction` is `captcha`. | `captcha:lapi-failure`, `captcha:stream-unhealthy` |
+| The LAPI Redis cache could not be read and `bouncerLapiRedisFailureAction` is `captcha`. | `captcha:cache-fail` |
 | AppSec answered `captcha`. | `captcha:appsec` |
 | AppSec is unreachable and `bouncerAppsecFailureAction` is `captcha`. | `captcha:appsec-failure` |
 | The ModSecurity sidecar gave no verdict and `bouncerModsecFailureAction` is `captcha`. | `captcha:modsec-failure` |
@@ -35,7 +36,7 @@ These are unchanged on a matching request:
 
 | Case | What happens |
 | ---- | ------------ |
-| Any ban: a CrowdSec `ban` decision, an AppSec block, a `ban` rule, a failure action `ban`, Redis unreachable. | The request is banned. |
+| Any ban: a CrowdSec `ban` decision, an AppSec block, a `ban` rule, a failure action `ban`. | The request is banned. |
 | A ban that `bouncerOriginBasedDecisionRemap` softens to a captcha (`ban: captcha`). | It stays a ban on these requests. Otherwise a ban would end as a pass. A remap `ban: pass` still lets the request through. |
 | The AppSec bot-detection challenge (`captcha:challenge`). | It is still served. It is AppSec's own page, not this router's captcha, although its header value starts with `captcha:`. |
 | A request the rule does not match. | It gets the captcha as before. |

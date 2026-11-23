@@ -99,9 +99,9 @@ type Config struct {
 	BouncerForwardedHeadersInsecure     bool                         `json:"bouncerForwardedHeadersInsecure,omitempty"`
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
+	BouncerLapiRedisFailureAction       string                       `json:"bouncerLapiRedisFailureAction,omitempty"`
 	BouncerModsecFailureAction          string                       `json:"bouncerModsecFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
-	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
 	BouncerRemediationHeadersCustomName string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
 	BouncerRemediationStatusCode        int                          `json:"bouncerRemediationStatusCode,omitempty"`
 	BouncerTraceHeadersCustomName       string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
@@ -268,9 +268,9 @@ func New() *Config {
 		BouncerForwardedHeadersInsecure:     false,
 		BouncerForwardedHeadersTrustedIPs:   []string{},
 		BouncerLapiFailureAction:            FailureActionBan,
+		BouncerLapiRedisFailureAction:       FailureActionBan,
 		BouncerModsecFailureAction:          FailureActionPassthrough,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
-		BouncerRedisUnreachableBlock:        true,
 		BouncerRemediationHeadersCustomName: "",
 		BouncerRemediationStatusCode:        http.StatusForbidden,
 		BouncerTraceHeadersCustomName:       "",
@@ -945,6 +945,9 @@ func validateParamsRequired(config *Config) error {
 	}
 	captchaInstanceReady := captchaInstanceNameReadyAfterOwnerFill(config)
 	if err := validateFailureAction("BouncerLapiFailureAction", config.BouncerLapiFailureAction, captchaInstanceReady); err != nil {
+		return err
+	}
+	if err := validateFailureAction("BouncerLapiRedisFailureAction", config.BouncerLapiRedisFailureAction, captchaInstanceReady); err != nil {
 		return err
 	}
 	if err := validateFailureAction("BouncerAppsecFailureAction", config.BouncerAppsecFailureAction, captchaInstanceReady); err != nil {

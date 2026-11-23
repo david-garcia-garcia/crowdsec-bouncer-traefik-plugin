@@ -455,6 +455,21 @@ Public config `bouncerModsecFailureAction` SHALL be validated by the same rule a
 - **WHEN** `bouncerModsecFailureAction` is `captcha` and the router has no captcha instance name after owner-fill
 - **THEN** `ValidateParams` returns an error naming `BouncerModsecFailureAction`
 
+### Requirement: bouncerLapiRedisFailureAction is passthrough, ban, or captcha
+Public config `bouncerLapiRedisFailureAction` SHALL be validated by the same rule as `bouncerLapiFailureAction`: empty, `passthrough`, `ban`, or `captcha`; `captcha` SHALL need a captcha instance name after owner-fill. Empty or omitted SHALL be `ban` at runtime (`configuration.EffectiveFailureAction`). This key SHALL be per-router (not on LAPI Client identity). It SHALL apply to every failed LAPI Redis cache read (unreachable, timeout, NOAUTH, TLS, protocol error). `passthrough` SHALL skip the LAPI leg without falling through to LiveLookup. `bouncerRedisUnreachableBlock` SHALL NOT be a Config field.
+
+#### Scenario: Default is ban
+- **WHEN** the operator omits `bouncerLapiRedisFailureAction`
+- **THEN** a failed LAPI Redis read bans with verdict header `ban:cache-fail`
+
+#### Scenario: An error reply follows the action
+- **WHEN** `bouncerLapiRedisFailureAction` is `passthrough` and Redis answers a read with `-NOAUTH`
+- **THEN** the request skips the LAPI leg and continues
+
+#### Scenario: Captcha without a captcha instance fails
+- **WHEN** `bouncerLapiRedisFailureAction` is `captcha` and the router has no captcha instance name after owner-fill
+- **THEN** `ValidateParams` returns an error naming `BouncerLapiRedisFailureAction`
+
 ### Requirement: WAF backoff periods are the only gate knobs
 `appsecUnhealthyBackOffPeriodSecs` SHALL default to 30 and `modsecUnhealthyBackOffPeriodSecs` SHALL default to 0. `0` SHALL disable that leg's gate. Both SHALL be in the `requiredInt0` check: a negative period SHALL fail `ValidateParams` with `<Field>: cannot be less than 0`. There SHALL be no ratio, threshold, or max-period knob for either leg: the trip rule is fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30) and the cooldown does not grow.
 

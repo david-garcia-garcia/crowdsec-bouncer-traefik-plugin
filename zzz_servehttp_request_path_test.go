@@ -178,7 +178,7 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	passCfg.LogLevel = "ERROR"
 	passCfg.LapiRedisEnabled = true
 	passCfg.LapiRedisHost = redisAddr
-	passCfg.BouncerRedisUnreachableBlock = false
+	passCfg.BouncerLapiRedisFailureAction = configuration.FailureActionPassthrough
 	passHandler, err := New(context.Background(), testNextOK(), passCfg, "redis-pass")
 	if err != nil {
 		t.Fatal(err)
@@ -198,7 +198,7 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 	blockCfg.LapiKey = "redis-block-key"
 	blockCfg.LapiRedisEnabled = true
 	blockCfg.LapiRedisHost = redisAddr
-	blockCfg.BouncerRedisUnreachableBlock = true
+	blockCfg.BouncerLapiRedisFailureAction = configuration.FailureActionBan
 	blockCfg.BouncerRemediationHeadersCustomName = "X-Remediation"
 	blockHandler, err := New(context.Background(), testNextOK(), blockCfg, "redis-block")
 	if err != nil {
@@ -218,6 +218,12 @@ func TestServeHTTP_RedisUnreachableFailureAction(t *testing.T) {
 // command runs into the decision cache's 1 s CommandTimeout (redis:timeout).
 func startSilentRedis(t *testing.T) string {
 	t.Helper()
+	return startScriptedRedis(t, "")
+}
+
+// startScriptedRedis accepts connections and answers every read with reply. An empty reply never answers.
+func startScriptedRedis(t *testing.T, reply string) string {
+	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -236,6 +242,12 @@ func startSilentRedis(t *testing.T) string {
 					if _, readErr := conn.Read(buf); readErr != nil {
 						return
 					}
+					if reply == "" {
+						continue
+					}
+					if _, writeErr := conn.Write([]byte(reply)); writeErr != nil {
+						return
+					}
 				}
 			}(conn)
 		}
@@ -243,8 +255,8 @@ func startSilentRedis(t *testing.T) string {
 	return listener.Addr().String()
 }
 
-// TestServeHTTP_RedisTimeoutFailureAction is a Redis that does not answer in time: it is an outage like
-// an unreachable one, so bouncerRedisUnreachableBlock decides between passing the LAPI leg and cache-fail.
+// TestServeHTTP_RedisTimeoutFailureAction is a Redis that does not answer in time: bouncerLapiRedisFailureAction
+// decides between passing the LAPI leg and cache-fail, as for an unreachable Redis.
 func TestServeHTTP_RedisTimeoutFailureAction(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
@@ -262,7 +274,7 @@ func TestServeHTTP_RedisTimeoutFailureAction(t *testing.T) {
 	passCfg.LogLevel = "ERROR"
 	passCfg.LapiRedisEnabled = true
 	passCfg.LapiRedisHost = redisAddr
-	passCfg.BouncerRedisUnreachableBlock = false
+	passCfg.BouncerLapiRedisFailureAction = configuration.FailureActionPassthrough
 	passHandler, err := New(context.Background(), testNextOK(), passCfg, "redis-timeout-pass")
 	if err != nil {
 		t.Fatal(err)
@@ -282,7 +294,7 @@ func TestServeHTTP_RedisTimeoutFailureAction(t *testing.T) {
 	blockCfg.LapiKey = "redis-timeout-block-key"
 	blockCfg.LapiRedisEnabled = true
 	blockCfg.LapiRedisHost = redisAddr
-	blockCfg.BouncerRedisUnreachableBlock = true
+	blockCfg.BouncerLapiRedisFailureAction = configuration.FailureActionBan
 	blockCfg.BouncerRemediationHeadersCustomName = "X-Remediation"
 	blockHandler, err := New(context.Background(), testNextOK(), blockCfg, "redis-timeout-block")
 	if err != nil {
@@ -295,6 +307,77 @@ func TestServeHTTP_RedisTimeoutFailureAction(t *testing.T) {
 	}
 	if got := blockRW.Header().Get("X-Remediation"); got != "ban:cache-fail" {
 		t.Fatalf("remediation %q want ban:cache-fail", got)
+	}
+}
+
+// TestServeHTTP_RedisErrorReplyFailureAction is a Redis that answers with an error (NOAUTH): every Redis
+// failure, auth included, follows bouncerLapiRedisFailureAction.
+func TestServeHTTP_RedisErrorReplyFailureAction(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+
+	redisAddr := startScriptedRedis(t, "-NOAUTH Authentication required.\r\n")
+	var hits int64
+	srv := liveLAPI(t, map[string]bool{"203.0.113.44": true, "203.0.113.45": true}, &hits)
+	t.Cleanup(func() { srv.Close() })
+	parsed, err := url.Parse(srv.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	passCfg := cfgLiveAt(parsed.Host)
+	passCfg.LogLevel = "ERROR"
+	passCfg.LapiRedisEnabled = true
+	passCfg.LapiRedisHost = redisAddr
+	passCfg.BouncerLapiRedisFailureAction = configuration.FailureActionPassthrough
+	passHandler, err := New(context.Background(), testNextOK(), passCfg, "redis-noauth-pass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := atomic.LoadInt64(&hits)
+	passRW := httptest.NewRecorder()
+	passHandler.ServeHTTP(passRW, reqForIP("203.0.113.44"))
+	if passRW.Code != http.StatusOK {
+		t.Fatalf("redis NOAUTH passthrough status = %d", passRW.Code)
+	}
+	if atomic.LoadInt64(&hits) != before {
+		t.Fatal("redis NOAUTH must not fall through to LiveLookup")
+	}
+
+	captchaCfg := cfgLiveAt(parsed.Host)
+	captchaCfg.LogLevel = "ERROR"
+	captchaCfg.LapiKey = "redis-noauth-captcha-key"
+	captchaCfg.LapiRedisEnabled = true
+	captchaCfg.LapiRedisHost = redisAddr
+	captchaCfg.BouncerLapiRedisFailureAction = configuration.FailureActionCaptcha
+	captchaCfg.CaptchaEnabled = true
+	captchaCfg.CaptchaProvider = configuration.CustomProvider
+	captchaCfg.CaptchaCustomJsURL = "/captcha.js"
+	captchaCfg.CaptchaCustomKey = "dummy-captcha"
+	captchaCfg.CaptchaCustomResponse = "dummy-captcha-response"
+	captchaCfg.CaptchaCustomValidateURL = "http://127.0.0.1/siteverify"
+	captchaCfg.CaptchaSiteKey = "site"
+	captchaCfg.CaptchaSecretKey = "secret"
+	captchaCfg.CaptchaGateSecret = "gate-secret"
+	captchaCfg.CaptchaFilePath = writeTestFile(t, "captcha.html", "CAPTCHA_CHALLENGE_PAGE")
+	captchaCfg.BouncerRemediationHeadersCustomName = "X-Remediation"
+	called := false
+	captchaHandler, err := New(context.Background(), http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	}), captchaCfg, "redis-noauth-captcha")
+	if err != nil {
+		t.Fatal(err)
+	}
+	captchaRW := httptest.NewRecorder()
+	captchaHandler.ServeHTTP(captchaRW, reqForIP("203.0.113.45"))
+	if called {
+		t.Fatal("captcha on a Redis NOAUTH must not call next")
+	}
+	if got := captchaRW.Header().Get("X-Remediation"); got != "captcha:cache-fail" {
+		t.Fatalf("remediation %q want captcha:cache-fail, body: %s", got, captchaRW.Body.String())
+	}
+	if !strings.Contains(captchaRW.Body.String(), "CAPTCHA_CHALLENGE_PAGE") {
+		t.Fatalf("captcha challenge not served, body: %s", captchaRW.Body.String())
 	}
 }
 

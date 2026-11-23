@@ -78,7 +78,7 @@ A missing subscribed LAPI client SHALL use this router's LAPI failure action. A 
 - **AND** no WARN is logged for the request itself
 
 ### Requirement: Bouncer does not own the stream ticker
-The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, action rules, LAPI failure action, Redis fail-closed, and live-cache TTL) and MUST NOT start a process-wide stream ticker. Stream polling remains on the LAPI Client opened by an owner middleware.
+The per-router bouncer SHALL handle request policy (trusted IPs, ban/captcha pages, whether AppSec runs on pass, action rules, LAPI failure action, LAPI Redis failure action, and live-cache TTL) and MUST NOT start a process-wide stream ticker. Stream polling remains on the LAPI Client opened by an owner middleware.
 
 #### Scenario: Second subscriber does not start a second ticker
 - **WHEN** two bouncing middlewares subscribe to the same published LAPI stream client
@@ -264,7 +264,7 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `ban:lapi:<origin>` | CrowdSec decision type ban; third field is header-safe metrics origin |
 | `ban:lapi-failure` | LAPI down / unpublished, fail-closed ban |
 | `ban:stream-unhealthy` | Stream miss + unhealthy, fail-closed ban |
-| `ban:cache-fail` | Redis/cache fail-closed |
+| `ban:cache-fail` | LAPI Redis cache read failed (any error), failure action `ban` |
 | `ban:appsec` | AppSec JSON `action: ban` |
 | `ban:appsec-challenge-empty` | AppSec `action: challenge` with empty body (fail-closed to ban page) |
 | `ban:appsec-action-empty` | AppSec action other than `allow` / `ban` / `captcha` / `challenge` with empty body (fail-closed to ban page) |
@@ -278,6 +278,7 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec decision type captcha (same origin encoding) |
 | `captcha:lapi-failure` | LAPI fail-closed captcha |
 | `captcha:stream-unhealthy` | Stream fail-closed captcha |
+| `captcha:cache-fail` | LAPI Redis cache read failed (any error), failure action `captcha` |
 | `captcha:appsec-failure` | AppSec fail-closed captcha |
 | `captcha:modsec-failure` | ModSec sidecar down / unpublished, failure action `captcha` |
 | `captcha:ratelimit:<bucket>` | Router captcha page for a rate-limit bucket with `action: captcha`; third field is the bucket name |

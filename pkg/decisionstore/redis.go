@@ -3,7 +3,6 @@ package decisionstore
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net"
 	"sync/atomic"
@@ -72,23 +71,6 @@ func redisClientConfig(host, pass, database string, log *slog.Logger) simpleredi
 	}
 }
 
-// errTimeout is a read Redis did not answer within CommandTimeout. It wraps ErrUnreachable, so
-// bouncerRedisUnreachableBlock governs a slow Redis like a down one, and simpleredis.ErrTimeout,
-// so the log line still says it was a timeout.
-var errTimeout = fmt.Errorf("%w: %w", ErrUnreachable, simpleredis.ErrTimeout)
-
-// readError maps a GET or MGET failure. Unreachable and timeout are an outage (ErrUnreachable);
-// TLS, NOAUTH, and protocol errors are configuration and stay as they are.
-func readError(err error) error {
-	if simpleredis.IsUnreachable(err) {
-		return ErrUnreachable
-	}
-	if errors.Is(err, simpleredis.ErrTimeout) {
-		return errTimeout
-	}
-	return err
-}
-
 func prefixed(prefix, key string) string {
 	if prefix == "" {
 		return key
@@ -117,7 +99,10 @@ func (r *redis) get(key string) (string, error) {
 		if simpleredis.IsMiss(err) {
 			return "", ErrMiss
 		}
-		return "", readError(err)
+		if simpleredis.IsUnreachable(err) {
+			return "", ErrUnreachable
+		}
+		return "", err
 	}
 	valueString := string(value)
 	if len(valueString) > 0 {
@@ -146,7 +131,10 @@ func (r *redis) getMany(keys []string) (map[string]string, error) {
 	}
 	values, err := reader.MGet(context.Background(), prefixedNames)
 	if err != nil {
-		return nil, readError(err)
+		if simpleredis.IsUnreachable(err) {
+			return nil, ErrUnreachable
+		}
+		return nil, err
 	}
 	out := make(map[string]string)
 	for i, key := range slotKeys {

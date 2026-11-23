@@ -32,8 +32,8 @@ type Bouncer struct {
 	forwardedHeadersInsecure bool
 	lapiLeg                  legBinding // *lapi.Client
 	lapiFailureAction        string     // per-router LAPI fallback (not on Client identity)
+	lapiRedisFailureAction   string     // per-router action when the LAPI Redis cache read fails
 	modsecFailureAction      string
-	redisUnreachableBlock    bool  // per-router Redis fail-closed
 	defaultDecisionSeconds   int64 // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
 	bindingMu                sync.Mutex // serializes bind / unbind traces of every leg
@@ -109,7 +109,7 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		forwardedHeadersInsecure: config.BouncerForwardedHeadersInsecure,
 		lapiFailureAction:        configuration.EffectiveFailureAction(config.BouncerLapiFailureAction),
 		modsecFailureAction:      configuration.EffectiveModsecFailureAction(config.BouncerModsecFailureAction),
-		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
+		lapiRedisFailureAction:   configuration.EffectiveFailureAction(config.BouncerLapiRedisFailureAction),
 		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
 		name:                     name,

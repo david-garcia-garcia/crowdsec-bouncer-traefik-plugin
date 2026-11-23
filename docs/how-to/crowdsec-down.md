@@ -8,6 +8,8 @@
 - `passthrough` — let it through. If LAPI is down, AppSec still checks the request.
 - `captcha` — show a captcha. Requires a captcha on this router.
 
+With the [LAPI Redis cache](../failure-modes.md#the-lapi-redis-cache), a failed Redis read follows `bouncerLapiRedisFailureAction` instead, with the same three values (default `ban`).
+
 When the LAPI failure action applies depends on the LAPI mode:
 
 - **`stream` and `alone`.** The plugin keeps using the decisions it already has when LAPI is down. The failure action only applies to clients without a known decision, after `lapiUpdateMaxFailure` failed refreshes.

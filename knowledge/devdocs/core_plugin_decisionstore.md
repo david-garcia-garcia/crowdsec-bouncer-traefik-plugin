@@ -85,7 +85,6 @@ kind, origin, originID, err := lapiClient.LookupRemediation(remoteIP, ipAddr, sc
 - Stream store-write TTL is `int64(duration.Seconds())` with no clamp; a sub-second CrowdSec duration becomes `0`.
 - Live and none writes use `liveCacheTTL` (substitute `defaultDecisionSeconds` when duration is empty). Stream must not use `liveCacheTTL`.
 - After `Close()`, Redis Get/MGET/SET/DEL/MSetEX surface `store:unreachable` and must not open a new TCP connection.
-- A Redis GET/MGET timeout (`redis:timeout`, past the 1s command timeout) is an outage, not a configuration error: `readError` returns `store:unreachable: redis:timeout`, which matches `ErrUnreachable`, so `bouncerRedisUnreachableBlock` governs a slow Redis like a down one. TLS, NOAUTH, and protocol errors stay as they are and always ban `cache-fail`.
 - Do not copy `SimpleRedis` by value after `New`. Dial 2s and command 1s (not utilities zero-Config defaults).
 - Memory expiry is elapsed-only: wall Unix in `PublishTick` or lookup would treat every slot as expired after stream apply.
 - Yaegi-safe: do not put a map-holding type in an interface. Store `atomic.Value` holds `*RangeMembership` and `string`. Memory published snapshot is `*publishedSlots`, not the map.
