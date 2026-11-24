@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 )
 
 const siteverifyChallengeMarker = "E2E_CAPTCHA_PAGE_MARKER"
@@ -128,6 +130,131 @@ func Test_ServeHTTP_jsonDecodeErrorRendersChallenge(t *testing.T) {
 	cookie := solveRW.Result().Header.Get("Set-Cookie")
 	if strings.Contains(cookie, gateCookieName+"=") {
 		t.Fatalf("decode error must not mint gate cookie: %s", cookie)
+	}
+}
+
+// Test_ServeHTTP_unusableSiteverifyAnswerLogsWarn proves a provider error page or
+// non-JSON answer re-renders the challenge at 200 and logs WARN with status and type.
+func Test_ServeHTTP_unusableSiteverifyAnswerLogsWarn(t *testing.T) {
+	cases := []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+		wantInLog   string
+	}{
+		{"500 html", http.StatusInternalServerError, "text/html", "<html>oops</html>", `siteverify: status 500, content type \"text/html\"`},
+		{"404 plain", http.StatusNotFound, "text/plain; charset=utf-8", "404 page not found", `siteverify: status 404, content type \"text/plain; charset=utf-8\"`},
+		{"503 json success", http.StatusServiceUnavailable, "application/json", `{"success":true}`, `siteverify: status 503, content type \"application/json\"`},
+		{"200 html", http.StatusOK, "text/html", "<html>login</html>", `siteverify: status 200, content type \"text/html\"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", tc.contentType)
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(siteverify.Close)
+
+			logger.ResetDebounceForTest()
+			client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
+			log, sink := newTestLogSink(slog.LevelInfo)
+			client.log = log
+
+			outcome, err := client.Validate(testCaptchaRequest(solverPOST(), "1.2.3.4"))
+			if err == nil || outcome == Pass {
+				t.Fatalf("Validate = (%v, %v), want not-passed with an error", outcome, err)
+			}
+
+			solveRW := httptest.NewRecorder()
+			client.ServeHTTP(solveRW, testCaptchaRequest(solverPOST(), "1.2.3.4"), "", "")
+			if solveRW.Code != http.StatusOK {
+				t.Fatalf("want 200 challenge, got %d", solveRW.Code)
+			}
+			if !strings.Contains(solveRW.Body.String(), siteverifyChallengeMarker) {
+				t.Fatalf("want captcha HTML, got %q", solveRW.Body.String())
+			}
+			if cookie := solveRW.Result().Header.Get("Set-Cookie"); strings.Contains(cookie, gateCookieName+"=") {
+				t.Fatalf("must not mint gate cookie: %s", cookie)
+			}
+			logs := sink.String()
+			if !strings.Contains(logs, `"level":"WARN"`) || !strings.Contains(logs, `"msg":"captcha:ServeHTTP:validate"`) {
+				t.Fatalf("want WARN captcha:ServeHTTP:validate, got %s", logs)
+			}
+			if !strings.Contains(logs, tc.wantInLog) {
+				t.Fatalf("want %s in log, got %s", tc.wantInLog, logs)
+			}
+			for _, secret := range []string{"e2e-dummy-secret", "ok-token", tc.body} {
+				if strings.Contains(logs, secret) {
+					t.Fatalf("log leaks %q: %s", secret, logs)
+				}
+			}
+		})
+	}
+}
+
+// Test_ServeHTTP_siteverifyWarnIsDebounced proves repeated failed submits inside 5 seconds log one WARN.
+func Test_ServeHTTP_siteverifyWarnIsDebounced(t *testing.T) {
+	logger.ResetDebounceForTest()
+	siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html")
+		w.WriteHeader(http.StatusBadGateway)
+	}))
+	t.Cleanup(siteverify.Close)
+
+	client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
+	log, sink := newTestLogSink(slog.LevelInfo)
+	client.log = log
+	for range 3 {
+		client.ServeHTTP(httptest.NewRecorder(), testCaptchaRequest(solverPOST(), "1.2.3.4"), "", "")
+	}
+	if n := strings.Count(sink.String(), `"msg":"captcha:ServeHTTP:validate"`); n != 1 {
+		t.Fatalf("want 1 WARN line for 3 failed submits, got %d: %s", n, sink.String())
+	}
+}
+
+// Test_ServeHTTP_clientErrorJSONIsReject proves a 4xx JSON answer is a reject with no error and no log,
+// even when the body says success true.
+func Test_ServeHTTP_clientErrorJSONIsReject(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"400 success false", http.StatusBadRequest, `{"success":false}`},
+		{"403 success true", http.StatusForbidden, `{"success":true}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			logger.ResetDebounceForTest()
+			siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(siteverify.Close)
+
+			client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
+			log, sink := newTestLogSink(slog.LevelInfo)
+			client.log = log
+
+			outcome, err := client.Validate(testCaptchaRequest(solverPOST(), "1.2.3.4"))
+			if err != nil || outcome != Reject {
+				t.Fatalf("Validate = (%v, %v), want (Reject, nil)", outcome, err)
+			}
+			solveRW := httptest.NewRecorder()
+			client.ServeHTTP(solveRW, testCaptchaRequest(solverPOST(), "1.2.3.4"), "", "")
+			if solveRW.Code != http.StatusOK {
+				t.Fatalf("want 200 challenge, got %d", solveRW.Code)
+			}
+			if cookie := solveRW.Result().Header.Get("Set-Cookie"); strings.Contains(cookie, gateCookieName+"=") {
+				t.Fatalf("must not mint gate cookie: %s", cookie)
+			}
+			if strings.Contains(sink.String(), "captcha:ServeHTTP:validate") {
+				t.Fatalf("a wrong solve must not log the provider failure: %s", sink.String())
+			}
+		})
 	}
 }
 
