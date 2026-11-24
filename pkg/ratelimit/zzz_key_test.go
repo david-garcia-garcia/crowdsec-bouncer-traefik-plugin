@@ -7,13 +7,15 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 // testKeyOf returns the counter key the first bucket of rules gives the request, or false when a part is missing.
 func testKeyOf(t *testing.T, middlewareName string, rules []BucketRule, httpReq *http.Request, clientIP string) (string, bool) {
 	t.Helper()
 	set := mustNewTestBucketSet(t, rules)
-	return set.buckets[0].counterKey(middlewareName, &keySource{httpReq: httpReq, clientIP: net.ParseIP(clientIP)})
+	return set.buckets[0].counterKey(middlewareName, newKeySource(clientrequest.New(httpReq, clientIP, net.ParseIP(clientIP))))
 }
 
 // TestCounterKey_eachSource proves every source reads its own request value and a missing value skips.
@@ -67,6 +69,22 @@ func TestCounterKey_eachSource(t *testing.T) {
 	emptyGroupReq := httptest.NewRequest(http.MethodGet, "http://x/t//orders", nil)
 	if _, found := testKeyOf(t, "edge", []BucketRule{emptyGroup}, emptyGroupReq, "198.51.100.7"); found {
 		t.Error("an empty capture group must be a missing value")
+	}
+}
+
+// TestCounterKey_hostIgnoresCaseAndTrailingDot proves "SHOP.example." and "shop.example:8443" share the
+// counter of "shop.example", so changing the Host case does not start a fresh count.
+func TestCounterKey_hostIgnoresCaseAndTrailingDot(t *testing.T) {
+	bucket := validTestBucket("b")
+	bucket.Key = []KeyPart{{From: KeyFromHost}}
+	want := redisCounterKey("edge", "b", []string{"shop.example"})
+	for _, host := range []string{"shop.example", "SHOP.EXAMPLE", "Shop.Example:8443", "shop.example."} {
+		httpReq := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
+		httpReq.Host = host
+		key, found := testKeyOf(t, "edge", []BucketRule{bucket}, httpReq, "198.51.100.7")
+		if !found || key != want {
+			t.Errorf("host %q key=%s found=%v want %s", host, key, found, want)
+		}
 	}
 }
 

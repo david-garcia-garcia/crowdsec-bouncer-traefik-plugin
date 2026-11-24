@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -34,7 +35,7 @@ func getTestConfig() *configuration.Config {
 		BouncerForwardedHeadersCustomName:   "",
 		BouncerForwardedHeadersTrustedIPs:   []string{"127.0.0.1"},
 		BouncerLapiFailureAction:            configuration.FailureActionBan,
-		BouncerRedisUnreachableBlock:        false,
+		BouncerLapiRedisFailureAction:       configuration.FailureActionPassthrough,
 		BouncerRemediationHeadersCustomName: "",
 		BouncerRemediationStatusCode:        403,
 		LapiCapiMachineID:                   "",
@@ -57,7 +58,6 @@ func getTestConfig() *configuration.Config {
 		LapiTLSInsecureVerify:               true,
 		LapiUpdateIntervalSeconds:           60,
 		LapiUpdateMaxFailure:                0,
-		LogFilePath:                         "",
 		LogFormat:                           "common",
 		LogLevel:                            "INFO",
 		ModsecBodyLimit:                     configuration.DefaultModsecBodyLimit,
@@ -65,22 +65,23 @@ func getTestConfig() *configuration.Config {
 	}
 }
 
-// newTestLogFile creates an isolated temp log path and resets reclaim with zero grace
-// so file-logging tests do not inherit process-table grace from t.TempDir or prior cases.
+// newTestLogFile sends every logger New builds from now until the test ends to a temp file and
+// returns its path. It also resets reclaim with zero grace so the test does not inherit
+// process-table grace from prior cases.
 func newTestLogFile(t *testing.T) string {
 	t.Helper()
 	reclaim.ResetForTestWith(0)
-	// slog keeps the file open; t.TempDir cleanup fails on Windows (usetesting wants TempDir).
+	// slog keeps writing after the test body; t.TempDir cleanup fails on Windows (usetesting wants TempDir).
 	f, err := os.CreateTemp("", "bouncer-log-*.log") //nolint:usetesting
 	if err != nil {
 		t.Fatalf("CreateTemp: %v", err)
 	}
+	restore := logger.SetOutputForTest(f)
 	path := f.Name()
-	if closeErr := f.Close(); closeErr != nil {
-		t.Fatalf("close temp log: %v", closeErr)
-	}
 	t.Cleanup(func() {
+		restore()
 		reclaim.ResetForTest()
+		_ = f.Close()
 		_ = os.Remove(path)
 	})
 	return path
@@ -246,7 +247,6 @@ func TestBouncerFileLoggingLevels(t *testing.T) {
 			config := getTestConfig()
 			config.LogLevel = tt.logLevel
 			config.LogFormat = "json" // Use JSON format for easier parsing
-			config.LogFilePath = logFile
 
 			// Create and execute bouncer request
 			createAndExecuteBouncerRequest(t, config)
@@ -279,7 +279,6 @@ func TestBouncerFileLoggingCommonFormat(t *testing.T) {
 	config := getTestConfig()
 	config.LogLevel = "DEBUG"
 	config.LogFormat = "common" // Use common format
-	config.LogFilePath = logFile
 
 	// Create a mock next handler
 	nextHandler := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

@@ -36,8 +36,8 @@ func TestPrepare_AloneModeRewritesCAPIEndpoint(t *testing.T) {
 func TestNew_MissingLapiKey(t *testing.T) {
 	cfg := testStreamConfig("lapi.example:8080", 0)
 	cfg.LapiKey = ""
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
-	_, err := New(cfg, logger.New("ERROR", ""), "test", store, "router", "bind")
+	store := decisionstore.NewMemory(logger.New("ERROR"))
+	_, err := New(cfg, logger.New("ERROR"), "test", store, "router", "bind")
 	if err == nil || !strings.Contains(err.Error(), "LapiKey") {
 		t.Fatalf("New err = %v, want missing LapiKey", err)
 	}

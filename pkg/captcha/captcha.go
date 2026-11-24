@@ -4,7 +4,6 @@ package captcha
 import (
 	"html"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -19,6 +18,9 @@ import (
 
 // remediationHeaderCaptchaSolved is the Pass 302 and WriteSolvedRedirect header value. No third field.
 const remediationHeaderCaptchaSolved = "captcha:solved"
+
+// msgValidateFailed is the debounced WARN when the provider cannot decide a submitted token.
+const msgValidateFailed = "captcha:ServeHTTP:validate"
 
 // Client is one published captcha widget, verifier, template, and gate. Not a Bouncer field.
 type Client struct {
@@ -121,9 +123,10 @@ func (c *Client) HTTPClientForTest() *http.Client {
 // remediationHeader is this router's name. challengeValue is the already-formatted challenge-page header.
 func (c *Client) ServeHTTP(rw http.ResponseWriter, req clientrequest.Request, remediationHeader, challengeValue string) {
 	outcome, err := c.Validate(req)
-	// Transport and JSON decode stay classified; the solver retries the challenge.
+	// An error is the provider failing, never a wrong solve; the solver retries the challenge.
+	// WARN at most once per 5 seconds so an outage does not log every submit.
 	if err != nil {
-		c.log.Info("captcha:ServeHTTP:validate", "error", err)
+		logger.Debounced(c.log, slog.LevelWarn, 5*time.Second, msgValidateFailed, "error", err)
 	}
 	if outcome == Pass {
 		logger.Trace(c.log, "captcha:ServeHTTP captcha:valid")
@@ -150,20 +153,16 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, req clientrequest.Request, re
 		"BootScript":   bootScript,
 		"Action":       c.widget.Action,
 		"DrawCheckbox": c.widget.drawCheckbox(),
-		"Domain":       html.EscapeString(RequestDomain(req.Host)),
+		"Domain":       html.EscapeString(RequestDomain(req)),
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
 	}
 }
 
-// RequestDomain is the hostname the browser showed, without a port.
-func RequestDomain(host string) string {
-	name := host
-	if parsed, _, err := net.SplitHostPort(host); err == nil {
-		name = parsed
-	}
-	name = strings.TrimSpace(name)
+// RequestDomain is the host name shown on the captcha and ban pages: req.Hostname(), or "This site" when empty.
+func RequestDomain(req clientrequest.Request) string {
+	name := strings.TrimSpace(req.Hostname())
 	if name == "" {
 		return "This site"
 	}

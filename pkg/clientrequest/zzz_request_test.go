@@ -204,3 +204,27 @@ func (s *readSpy) Close() error { return nil }
 func optionalProto(value string) *string {
 	return &value
 }
+
+// TestNew_hostnameIsLowerCaseWithoutPortOrTrailingDot proves New reads Host once in lower case,
+// without its port and without one trailing dot, and that a later Host edit does not change it.
+func TestNew_hostnameIsLowerCaseWithoutPortOrTrailingDot(t *testing.T) {
+	for host, want := range map[string]string{
+		"example.com:443":   "example.com",
+		"[::1]:443":         "::1",
+		"example.com":       "example.com",
+		"EXAMPLE.com":       "example.com",
+		"Example.Com:8080":  "example.com",
+		"example.com.":      "example.com",
+		"EXAMPLE.COM.:443":  "example.com",
+		"[2001:DB8::1]:443": "2001:db8::1",
+		"":                  "",
+	} {
+		httpReq := httptest.NewRequest(http.MethodGet, "/", nil)
+		httpReq.Host = host
+		req := New(httpReq, "", nil)
+		httpReq.Host = "changed.example"
+		if got := req.Hostname(); got != want {
+			t.Errorf("Hostname for Host %q = %q want %q", host, got, want)
+		}
+	}
+}

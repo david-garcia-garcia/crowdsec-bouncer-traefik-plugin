@@ -34,9 +34,9 @@ type Bouncer struct {
 	lapiLeg                  legBinding // *lapi.Client
 	lapiFailureAction        string     // per-router LAPI fallback (not on Client identity)
 	lapiBackOffAction        string     // per-router answer while the shared live/none LAPI gate backs off
+	lapiRedisFailureAction   string     // per-router action when the LAPI Redis cache read fails
 	modsecFailureAction      string
 	modsecBackOffAction      string // per-router answer while the shared ModSec gate backs off
-	redisUnreachableBlock    bool   // per-router Redis fail-closed
 	defaultDecisionSeconds   int64  // per-router live-cache TTL passed into LiveLookup
 	log                      *slog.Logger
 	bindingMu                sync.Mutex // serializes bind / unbind traces of every leg
@@ -114,8 +114,8 @@ func New(next http.Handler, name string, config *configuration.Config, subscript
 		lapiFailureAction:        configuration.EffectiveLapiFailureAction(config.BouncerLapiFailureAction),
 		lapiBackOffAction:        configuration.EffectiveLapiBackOffAction(config.BouncerLapiBackOffAction),
 		modsecFailureAction:      configuration.EffectiveModsecFailureAction(config.BouncerModsecFailureAction),
+		lapiRedisFailureAction:   configuration.EffectiveLapiRedisFailureAction(config.BouncerLapiRedisFailureAction),
 		modsecBackOffAction:      configuration.EffectiveModsecBackOffAction(config.BouncerModsecBackOffAction),
-		redisUnreachableBlock:    config.BouncerRedisUnreachableBlock,
 		defaultDecisionSeconds:   config.LapiDefaultDecisionSeconds,
 		log:                      log,
 		name:                     name,
@@ -209,7 +209,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 // The challenge prefix belongs to CrowdSec, not to the site: AppSec must answer it to solve the challenge,
 // so a bypass or bypassAppsec rule that also matches it does not skip AppSec there. LAPI skips stay.
 func (b *Bouncer) foldActionRules(req clientrequest.Request) httprule.ActionMatch {
-	match := b.actionRules.Fold(req.Request)
+	match := b.actionRules.Fold(req)
 	if match.AmbiguousPathName != "" {
 		logger.Trace(b.log, "foldActionRules", "ip", req.IPAddrString(), "ambiguousPathRule", match.AmbiguousPathName)
 	}

@@ -130,7 +130,7 @@ func TestSessionKey_PolicyAndTLSDoNotChangeKey(t *testing.T) {
 	base := testStreamConfig("lapi.example:8080", 1)
 	policy := testStreamConfig("lapi.example:8080", 1)
 	policy.BouncerLapiFailureAction = configuration.FailureActionPassthrough
-	policy.BouncerRedisUnreachableBlock = true
+	policy.BouncerLapiRedisFailureAction = configuration.FailureActionCaptcha
 	policy.LapiDefaultDecisionSeconds = 5
 	tlsOnly := testStreamConfig("lapi.example:8080", 1)
 	tlsOnly.LapiHTTPTimeoutSeconds = 30

@@ -83,7 +83,7 @@ func newTestGatedClient(t *testing.T, mock *testGateLAPI, mode string, periodSec
 	cfg.LapiMode = mode
 	cfg.LapiHost = serverURL.Host
 	cfg.LapiUnhealthyBackOffPeriodSecs = periodSecs
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
+	store := decisionstore.NewMemory(logger.New("ERROR"))
 	client, err := New(cfg, log, "test", store, "router", "bind")
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func tripTestGate(t *testing.T, client *Client, mock *testGateLAPI) {
 func TestNew_liveGatePerMode(t *testing.T) {
 	mock := newTestGateLAPI(t)
 	for _, mode := range []string{configuration.LiveMode, configuration.NoneMode} {
-		client := newTestGatedClient(t, mock, mode, configuration.DefaultLapiUnhealthyBackOffPeriodSecs, logger.New("ERROR", ""))
+		client := newTestGatedClient(t, mock, mode, configuration.DefaultLapiUnhealthyBackOffPeriodSecs, logger.New("ERROR"))
 		gate := client.GateForTest()
 		if gate == nil {
 			t.Fatalf("%s with the default period must build a gate", mode)
@@ -116,18 +116,18 @@ func TestNew_liveGatePerMode(t *testing.T) {
 		if _, err := gate.Inner().Report(backendbackoff.Permit{}, true); err == nil {
 			t.Fatalf("%s: Close must close the gate", mode)
 		}
-		if zero := newTestGatedClient(t, mock, mode, 0, logger.New("ERROR", "")); zero.GateForTest() != nil {
+		if zero := newTestGatedClient(t, mock, mode, 0, logger.New("ERROR")); zero.GateForTest() != nil {
 			t.Fatalf("%s with period 0 must not build a gate", mode)
 		}
 	}
-	stream := newTestGatedClient(t, mock, configuration.StreamMode, 10, logger.New("ERROR", ""))
+	stream := newTestGatedClient(t, mock, configuration.StreamMode, 10, logger.New("ERROR"))
 	if stream.GateForTest() != nil {
 		t.Fatal("stream must not build a gate")
 	}
 	alone := testLiveConfig(60)
 	alone.LapiMode = configuration.AloneMode
 	alone.LapiUnhealthyBackOffPeriodSecs = 10
-	if gate, err := newLiveGate(alone, logger.New("ERROR", "")); err != nil || gate != nil {
+	if gate, err := newLiveGate(alone, logger.New("ERROR")); err != nil || gate != nil {
 		t.Fatalf("alone gate=%v err=%v, want none", gate, err)
 	}
 }
@@ -136,7 +136,7 @@ func TestNew_liveGatePerMode(t *testing.T) {
 // gate: every poll past the trip budget still reaches LAPI and fails as itself, not as a skip.
 func TestHandleStreamCache_failingPollsNeverGate(t *testing.T) {
 	mock := newTestGateLAPI(t)
-	client := newTestGatedClient(t, mock, configuration.StreamMode, 10, logger.New("ERROR", ""))
+	client := newTestGatedClient(t, mock, configuration.StreamMode, 10, logger.New("ERROR"))
 	mock.setStatus(http.StatusServiceUnavailable)
 	polls := 4 * admission.TripFailures
 	before := mock.hitCount() // New may already have polled once at startup
@@ -159,7 +159,7 @@ func TestLiveLookup_gateTripsAndSkips(t *testing.T) {
 	for _, mode := range []string{configuration.LiveMode, configuration.NoneMode} {
 		t.Run(mode, func(t *testing.T) {
 			mock := newTestGateLAPI(t)
-			client := newTestGatedClient(t, mock, mode, 10, logger.New("ERROR", ""))
+			client := newTestGatedClient(t, mock, mode, 10, logger.New("ERROR"))
 			tripTestGate(t, client, mock)
 			if got := mock.hitCount(); got != admission.TripFailures {
 				t.Fatalf("hits=%d want %d", got, admission.TripFailures)
@@ -186,7 +186,7 @@ func TestLiveLookup_gateTripsAndSkips(t *testing.T) {
 func TestLiveLookup_statusClassification(t *testing.T) {
 	t.Run("429 trips", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
-		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR"))
 		mock.setStatus(http.StatusTooManyRequests)
 		for range admission.TripFailures {
 			_, _, _ = client.LiveLookup("192.0.2.1", nil, 60)
@@ -197,7 +197,7 @@ func TestLiveLookup_statusClassification(t *testing.T) {
 	})
 	t.Run("refused connection trips", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
-		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR"))
 		mock.server.Close()
 		for i := range admission.TripFailures {
 			if _, _, err := client.LiveLookup("192.0.2.1", nil, 60); err == nil || errors.Is(err, ErrGateSkip) {
@@ -210,7 +210,7 @@ func TestLiveLookup_statusClassification(t *testing.T) {
 	})
 	t.Run("401 never trips", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
-		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR"))
 		mock.setStatus(http.StatusUnauthorized)
 		for i := range 4 * admission.TripFailures {
 			kind, _, err := client.LiveLookup("192.0.2.1", nil, 60)
@@ -224,7 +224,7 @@ func TestLiveLookup_statusClassification(t *testing.T) {
 	})
 	t.Run("bad JSON is a success for the gate", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
-		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR"))
 		mock.ipBody.Store("not json")
 		for i := range 4 * admission.TripFailures {
 			if _, _, err := client.LiveLookup("192.0.2.1", nil, 60); err == nil || errors.Is(err, ErrGateSkip) {
@@ -259,7 +259,7 @@ func TestLiveLookup_skippedScopeAfterAnsweredIP(t *testing.T) {
 	})
 	t.Run("IP ban outranks a skipped scope", func(t *testing.T) {
 		mock := newTestGateLAPI(t)
-		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR", ""))
+		client := newTestGatedClient(t, mock, configuration.LiveMode, 10, logger.New("ERROR"))
 		mock.ipBody.Store(testLiveBanBody("Ip", "192.0.2.1"))
 		mock.onIP.Store(func() { tripTestGateDirectly(client) })
 		kind, _, _ := client.LiveLookup("192.0.2.1", scopes, 60)
@@ -323,7 +323,7 @@ func TestLiveLookup_probeRecoversAndLogsOnce(t *testing.T) {
 // TestLiveLookup_zeroPeriodAlwaysQueries keeps 0 as the switch that turns the gate off.
 func TestLiveLookup_zeroPeriodAlwaysQueries(t *testing.T) {
 	mock := newTestGateLAPI(t)
-	client := newTestGatedClient(t, mock, configuration.LiveMode, 0, logger.New("ERROR", ""))
+	client := newTestGatedClient(t, mock, configuration.LiveMode, 0, logger.New("ERROR"))
 	mock.setStatus(http.StatusServiceUnavailable)
 	for i := range 4 * admission.TripFailures {
 		if _, _, err := client.LiveLookup("192.0.2.1", nil, 60); err == nil || errors.Is(err, ErrGateSkip) {

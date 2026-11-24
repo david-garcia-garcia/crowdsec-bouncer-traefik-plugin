@@ -9,7 +9,7 @@ import (
 )
 
 func newTestInternStore() *decisionstore.Store {
-	return decisionstore.NewMemory(logger.New("ERROR", ""))
+	return decisionstore.NewMemory(logger.New("ERROR"))
 }
 
 func TestPackUsesInternOnMemoryStore(t *testing.T) {
@@ -35,7 +35,7 @@ func TestPackSkippedOnRedisStore(t *testing.T) {
 
 func TestStoreStreamDecisionPacksMemory(t *testing.T) {
 	store := newTestInternStore()
-	client := &Client{decisionStore: store, log: logger.New("ERROR", "")}
+	client := &Client{decisionStore: store, log: logger.New("ERROR")}
 	store.BeginTick()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.10", Origin: "crowdsec", Scenario: "ssh-bf"}, 60)
 	store.PublishTick(0)
@@ -74,7 +74,7 @@ func TestActiveDecisionDeleteOmitsGauge(t *testing.T) {
 
 func TestMemoLivePutsScenario(t *testing.T) {
 	store := newTestInternStore()
-	client := &Client{decisionStore: store, log: logger.New("ERROR", "")}
+	client := &Client{decisionStore: store, log: logger.New("ERROR")}
 	client.memoLive(decisionscope.ScopeIP, "203.0.113.10", decisionscope.BannedValue, "crowdsec", "ssh-bf", 60)
 	kind, origin, _, err := store.LookupRemediation("203.0.113.10", nil, nil)
 	if err != nil || kind != decisionscope.BannedValue || origin != "crowdsec" {
@@ -89,7 +89,7 @@ func TestMemoLivePutsScenario(t *testing.T) {
 func TestStoreInternOverflowUsesGenericOrigin(t *testing.T) {
 	store := newTestInternStore()
 	store.FillUntilMaxForTest()
-	client := &Client{decisionStore: store, log: logger.New("ERROR", "")}
+	client := &Client{decisionStore: store, log: logger.New("ERROR")}
 	store.BeginTick()
 	client.storeStreamDecision(Decision{Type: "ban", Scope: "ip", Value: "203.0.113.99", Origin: "overflow-origin"}, 60)
 	store.PublishTick(0)

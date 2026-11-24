@@ -122,7 +122,7 @@ func newSharedStreamPoller(t *testing.T, store *decisionstore.Store, host string
 	t.Helper()
 	client := &Client{
 		decisionStore:       store,
-		log:                 logger.New("ERROR", ""),
+		log:                 logger.New("ERROR"),
 		crowdsecScheme:      "http",
 		crowdsecHost:        host,
 		crowdsecPath:        "/",
@@ -141,7 +141,7 @@ func TestHandleStreamCache_TwoPollersBothFetch(t *testing.T) {
 			name: "memory",
 			store: func(t *testing.T) *decisionstore.Store {
 				t.Helper()
-				return decisionstore.NewMemory(logger.New("ERROR", ""))
+				return decisionstore.NewMemory(logger.New("ERROR"))
 			},
 		},
 		{

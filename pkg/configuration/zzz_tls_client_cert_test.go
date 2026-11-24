@@ -39,7 +39,7 @@ func testClientCertPEM(t *testing.T) (certPEM, keyPEM string) {
 }
 
 func TestGetTLSConfigCrowdsec_ClientCertificate(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	certPEM, keyPEM := testClientCertPEM(t)
 	cfg := getMinimalConfig()
 	cfg.LapiScheme = HTTPS

@@ -38,13 +38,9 @@ _Avoid_: nested YAML, old-key alias, repeating the prefix inside `pkg/lapi`, `pk
 The `ValidateParams` startup gate `plugin.New` runs on the config snapshot before `lapi.Prepare`.
 _Avoid_: `GetVariable` as a feature-flag check
 
-**Writability-check handle**:
-The `*os.File` opened only to prove a non-empty `LogFilePath` is writable. Not the process-lifetime logger file.
-_Avoid_: sharedLogFiles, reclaim value, log owner
-
 ## Overview
 
-`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaEnabled` is true, including `lapiMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `AppsecEnabled` is true. ModSec URL and body limit run only when `ModsecEnabled` is true. `validateLogging` still `OpenFile`s a non-empty `LogFilePath` even when `logger.NewWithFormat` already holds that path. Close that handle after a successful open.
+`ValidateParams` is `New`'s constructor gate. When it fails, `New` returns a nil handler and that error and does not open LAPI. File-backed secrets go through `GetVariable`, which Stats and reads `<key>File` when that path is non-empty. Gate each `GetVariable` call behind the flag that uses that secret. Captcha site and secret keys are required whenever `captchaEnabled` is true, including `lapiMode: alone` and the default `ban` failure action. AppSec URL, key-file, and HTTPS CA run only when `AppsecEnabled` is true. ModSec URL and body limit run only when `ModsecEnabled` is true. `validateLogging` checks only the log level; it touches no file.
 
 ## How to use
 
@@ -71,16 +67,13 @@ _Avoid_: sharedLogFiles, reclaim value, log owner
 - The only backoff knobs are `lapiUnhealthyBackOffPeriodSecs`, `appsecUnhealthyBackOffPeriodSecs`, and `modsecUnhealthyBackOffPeriodSecs`, each default 10 (negative fails, `0` disables that leg's gate). The LAPI one is read only in `live` and `none`; `stream` with a value still passes. The trip rule is fixed in `pkg/admission`; there is no ratio, threshold, or max-period knob to validate.
 - When `RateLimitEnabled` is true, `validateRateLimit` checks in order: `rateLimitStore` is `redis` (anything else, `memory` included, fails as not supported in this version), a non-empty `rateLimitRedisHost`, `RateLimitRedisPassword` through `GetVariable`, `rateLimitAlgorithm` through `ratelimit.ValidateAlgorithm` (`slidingWindow`, `tokenBucket`, or empty = `slidingWindow`; error `RateLimitAlgorithm: must be …`), `rateLimitSyncRate` through `RateLimitSyncRateDuration` (a Go duration, 0 or more; `New` uses the same parser), `rateLimitFailureAction` through `validateFailureAction` (`captcha` passes without a captcha instance name: the subscribing router decides at request time), `rateLimitStatusCode` from 100 to 599, a non-empty `rateLimitBuckets`, then `ratelimit.NewBucketSet(buckets, rateLimitAlgorithm)` wrapped as `RateLimitBuckets: bucket %d: …` (compiled, then discarded; a row `algorithm` and a `burst` on a `slidingWindow` policy fail there, naming `rateLimitAlgorithm`). When it is false none of this runs: leftover settings and an unreadable `rateLimitRedisPasswordFile` pass, including on a subscriber.
 - `LapiEnabled` and `CaptchaEnabled` default false. Tests and compose that Open LAPI or own captcha must set the flag true. A set `captchaProvider` does not own captcha.
-- `captcha` on any of the three failure actions or the three backoff actions is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
+- `captcha` on any of the four failure actions (LAPI, LAPI Redis, AppSec, ModSec) or the three backoff actions is legal only when this router has a captcha instance name after owner-fill (`captchaEnabled` omit fills to the Traefik name). Error text names `captcha requires a captcha instance name`.
 - Call `httprule.NewActionSet` on `BouncerActionRules`. An omitted or empty list passes (that setting is off). A fully empty rule (path, host, headers, and cookies absent AND method any) fails `ValidateParams`; a method-only or host-only rule passes. Empty name, colon in name, duplicate name, empty/unknown/duplicate action, or `ban` mixed with other tokens fail. `!!` and a leading `!` with an empty pattern fail. Invalid RE2 fails. Error text names `BouncerActionRules`. `plugin.New` returns a nil handler and that error without opening LAPI. Do not ignore an invalid pattern. Do not fail because captcha is unusable. `ValidateParams` discards the compiled set; `bouncer.New` compiles again to store it.
 - Own-axis captcha keys are `captchaEnabled` and `captchaInstanceName`. Owner-read settings are `captcha*` / `Captcha*`.
 - Keep the helper's empty-key pass and explicit-`https` CA parse. Do not fail an empty AppSec key at `ValidateParams`.
 - When the knob is false, skip AppSec host, URL, key, and CA even if leftover fields are set.
 - Leave `New` as `return nil, err` on `ValidateParams` failure.
 - Trim `CaptchaCustomValidateBody`. Accept only `""`, `form`, and `json` (exact lowercase). Reject unknown tokens for any provider (`CaptchaCustomValidateBody: must be empty, form, or json`). Reject `json` when the provider is not `custom` (`CaptchaCustomValidateBody: json is only valid when CaptchaProvider is custom`). Built-in leftover `""` / `form` pass and are ignored.
-- Keep the `LogFilePath` check as its own `OpenFile` (append/create/write). Do not reuse `sharedLogFiles` and do not skip the open when the logger already opened the path.
-- After a successful open, `Close` the writability-check handle. Ignore the `Close` error; writability is already proven.
-- Still return an error when the path is not writable. The logger's stdout fallback is a different job.
 
 ## Pattern snippet
 
@@ -117,14 +110,6 @@ if siteKey == "" {
 }
 ```
 
-```go
-checkFile, err := os.OpenFile(filepath.Clean(config.LogFilePath), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
-if err != nil {
-	return fmt.Errorf("LogFilePath is not writable %w", err)
-}
-_ = checkFile.Close()
-```
-
 ## Key files
 
 - `pkg/configuration/configuration.go` (`ValidateParams`, `validateEnabledCaptchaSettings`, `validateCaptchaCredentialsAndTemplates`, `GetTemplate`, `TemplateUnavailableReason`, `GetVariable`, `validateLogging`, `validateModsecURL`, `validateFailureAction`, `validateRateLimit`, `RateLimitSyncRateDuration`)
@@ -148,5 +133,3 @@ _ = checkFile.Close()
 - CA parse still triggers on explicit `AppsecScheme == https`, not inherit-https.
 - A fully empty action rule, invalid name/action, or invalid RE2 fails `ValidateParams` with `BouncerActionRules`; do not ignore it. Empty lists pass. Leftover `bouncerAppsecBypassRules` / `bouncerLapiBypassRules` / `bouncerDecisionHeader` / `modSecurityUrl` never reach `New`.
 - Enabled ModSec with an empty or relative URL, or with `modsecBodyLimit: 0`, fails. Disabled ModSec with an empty URL or a zero limit passes. `bouncerModsecFailureAction: open` (the old FailMode value) fails; `captcha` without a captcha instance name fails.
-- `NewWithFormat` warns and uses stdout when the path is not writable. `ValidateParams` must still fail so `plugin.New` does not start.
-- Do not put the writability-check handle on `pkg/reclaim` or add `sync.Once` / a package global for this close. `sharedLogFiles` is the process-lifetime owner.

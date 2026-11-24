@@ -16,7 +16,7 @@ const (
 
 func countedMemory(t *testing.T) *Store {
 	t.Helper()
-	return NewMemory(logger.New("ERROR", ""))
+	return NewMemory(logger.New("ERROR"))
 }
 
 func originCount(store *Store, origin, family string) int64 {
@@ -61,7 +61,7 @@ func TestActiveCountsPutWithoutPublishTickIsEmpty(t *testing.T) {
 
 func TestActiveCountsRedisAlwaysEmpty(t *testing.T) {
 	server := startTestStoreRedis(t)
-	store := NewRedis(logger.New("ERROR", ""), server.addr(), nil, "", "", "sess")
+	store := NewRedis(logger.New("ERROR"), server.addr(), nil, "", "", "sess")
 	t.Cleanup(store.Close)
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: activeCountBanIP, Kind: decisionscope.BannedValue, Origin: activeCountOrigin, DurationSec: 60})

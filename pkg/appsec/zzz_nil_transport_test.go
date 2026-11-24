@@ -15,7 +15,7 @@ func TestQuery_NilTransportUsesFailureAction(t *testing.T) {
 		appsecScheme: "http",
 		appsecHost:   "appsec.example:7422",
 		appsecPath:   "/",
-		log:          logger.New("ERROR", ""),
+		log:          logger.New("ERROR"),
 	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 
@@ -38,7 +38,7 @@ func TestQuery_NilTransportUsesFailureAction(t *testing.T) {
 }
 
 func TestAdoptTransport_TimeoutChangeIsReportedOnce(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := testAppsecConfig("appsec.example:7422")
 	cfg.AppsecHTTPTimeoutSeconds = 10
 	client, err := New(cfg, log, "test", "router", "bind")

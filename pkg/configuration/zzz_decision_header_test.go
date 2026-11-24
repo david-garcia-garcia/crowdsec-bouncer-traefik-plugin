@@ -13,7 +13,7 @@ func TestBouncerActionRulesDefaultEmpty(t *testing.T) {
 	}
 	cfg = getMinimalConfig()
 	cfg.BouncerActionRules = nil
-	if err := ValidateParams(cfg, logger.New("ERROR", "")); err != nil {
+	if err := ValidateParams(cfg, logger.New("ERROR")); err != nil {
 		t.Fatalf("omitted BouncerActionRules must not fail ValidateParams: %v", err)
 	}
 }

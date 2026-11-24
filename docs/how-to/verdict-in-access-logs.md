@@ -17,7 +17,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `ban:lapi-failure` | LAPI was unreachable, and the failure action is `ban`. |
 | `ban:lapi-backoff` | LAPI kept failing, so the backoff gate did not call it (`live` and `none`), and the backoff action is `ban`. |
 | `ban:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `ban`. |
-| `ban:cache-fail` | The LAPI Redis cache could not be read (see [The LAPI Redis cache](../failure-modes.md#the-lapi-redis-cache)). |
+| `ban:cache-fail` | The LAPI Redis cache could not be read (see [The LAPI Redis cache](../failure-modes.md#the-lapi-redis-cache)), and `bouncerLapiRedisFailureAction` is `ban`. |
 | `ban:appsec` | Blocked by AppSec. |
 | `ban:appsec-challenge-empty` | AppSec asked for a bot challenge but sent no page, so a ban was served instead. |
 | `ban:appsec-action-empty` | AppSec returned an action this plugin cannot show (for example a custom `SetRemediation("tarpit")`) and sent no page, so a ban was served instead. |
@@ -34,6 +34,7 @@ The value is `what:why` or `what:why:origin`, separated by colons with no spaces
 | `captcha:lapi-failure` | LAPI was unreachable, and the failure action is `captcha`. |
 | `captcha:lapi-backoff` | The LAPI backoff gate did not call LAPI, and the backoff action is `captcha`. |
 | `captcha:stream-unhealthy` | Decisions could not be refreshed for too long, and the failure action is `captcha`. |
+| `captcha:cache-fail` | The LAPI Redis cache could not be read, and `bouncerLapiRedisFailureAction` is `captcha`. |
 | `captcha:appsec-failure` | AppSec was unreachable, and the failure action is `captcha`. |
 | `captcha:appsec-backoff` | The AppSec backoff gate did not call AppSec, and the backoff action is `captcha`. |
 | `captcha:modsec-failure` | The ModSecurity sidecar gave no verdict, and the failure action is `captcha`. |

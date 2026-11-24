@@ -31,7 +31,7 @@ func TestNextReader(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			backend := &redis{log: logger.New("INFO", "")}
+			backend := &redis{log: logger.New("INFO")}
 			backend.writer = &simpleredis.SimpleRedis{}
 			backend.readers = make([]*simpleredis.SimpleRedis, tt.readers)
 			for i := range backend.readers {
@@ -47,7 +47,7 @@ func TestNextReader(t *testing.T) {
 }
 
 func TestNewRedisKeepsReadersByPointer(t *testing.T) {
-	store := NewRedis(logger.New("INFO", ""), "127.0.0.1:1", []string{"127.0.0.1:2", "127.0.0.1:3"}, "", "", "p")
+	store := NewRedis(logger.New("INFO"), "127.0.0.1:1", []string{"127.0.0.1:2", "127.0.0.1:3"}, "", "", "p")
 	defer store.Close()
 	backend := store.red
 	if backend == nil {
@@ -89,7 +89,7 @@ func TestPrefixed(t *testing.T) {
 func TestRedisReplicaMissDoesNotReadWriter(t *testing.T) {
 	writer := startTestStoreRedis(t)
 	replica := startTestStoreRedis(t)
-	store := NewRedis(logger.New("ERROR", ""), writer.addr(), []string{replica.addr()}, "", "", "sess")
+	store := NewRedis(logger.New("ERROR"), writer.addr(), []string{replica.addr()}, "", "", "sess")
 	defer store.Close()
 	store.Put(Decision{Scope: "Ip", Value: "203.0.113.10", Kind: "t", Origin: "crowdsec", DurationSec: 60})
 	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", nil, nil)
@@ -99,7 +99,7 @@ func TestRedisReplicaMissDoesNotReadWriter(t *testing.T) {
 }
 
 func TestStoreCloseRedisTwice(_ *testing.T) {
-	store := NewRedis(logger.New("INFO", ""), "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
+	store := NewRedis(logger.New("INFO"), "127.0.0.1:1", []string{"127.0.0.1:1"}, "", "", "p")
 	store.Close()
 	store.Close()
 }

@@ -43,7 +43,7 @@ func Test_New_rateLimitDefaults(t *testing.T) {
 
 // Test_ValidateParams_rateLimit covers each top-level stem and the bucket wrapping of the config-validation delta.
 func Test_ValidateParams_rateLimit(t *testing.T) {
-	log := logger.New("INFO", "")
+	log := logger.New("INFO")
 	missingFile := filepath.Join(t.TempDir(), "missing-redis-password")
 	with := func(change func(*Config)) *Config {
 		cfg := getRateLimitTestConfig()
@@ -121,7 +121,7 @@ func Test_ValidateParams_disabledRateLimitIgnoresLeftovers(t *testing.T) {
 	cfg.RateLimitStore = "memory"
 	cfg.RateLimitFailureAction = "allow"
 	cfg.RateLimitAlgorithm = "leakyBucket"
-	if err := ValidateParams(cfg, logger.New("INFO", "")); err != nil {
+	if err := ValidateParams(cfg, logger.New("INFO")); err != nil {
 		t.Fatalf("disabled leg must ignore leftovers: %v", err)
 	}
 }
@@ -130,7 +130,7 @@ func Test_ValidateParams_disabledRateLimitIgnoresLeftovers(t *testing.T) {
 // a leftover rateLimitInstanceName with nothing enabled fails (E2), and a subscriber ignores leftover
 // owner-read rateLimit* settings.
 func Test_ValidateParams_rateLimitOpenVsSubscribe(t *testing.T) {
-	log := logger.New("INFO", "")
+	log := logger.New("INFO")
 	leftoverName := getMinimalConfig()
 	leftoverName.RateLimitInstanceName = "shared"
 	if err := ValidateParams(leftoverName, log); err == nil || !strings.Contains(err.Error(), "RateLimit") {

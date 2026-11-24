@@ -147,12 +147,12 @@ http:
             - 10.0.10.23/32
             - 10.0.20.0/24
           bouncerLapiFailureAction: ban
+          bouncerLapiRedisFailureAction: ban
           bouncerOriginBasedDecisionRemap:
             CAPI:
               ban: captcha
             lists:firehol_level1:
               ban: captcha
-          bouncerRedisUnreachableBlock: true
           bouncerRemediationHeadersCustomName: cs-remediation
           bouncerRemediationStatusCode: 403
           bouncerTraceHeadersCustomName: X-Request-ID
@@ -203,7 +203,6 @@ http:
           lapiTlsInsecureVerify: false
           lapiUpdateIntervalSeconds: 60
           lapiUpdateMaxFailure: 0
-          logFilePath: ""
           logFormat: common
           logLevel: DEBUG
           rateLimitAlgorithm: slidingWindow
@@ -257,7 +256,7 @@ This middleware connects to LAPI and shares the connection as `lapiInstanceName`
 
 #### `lapiInstanceName`
 
-`string` · default the middleware name
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md))
 
 Name under which the LAPI connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -269,7 +268,7 @@ This middleware connects to AppSec and shares the connection as `appsecInstanceN
 
 #### `appsecInstanceName`
 
-`string` · default the middleware name
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md))
 
 Name under which the AppSec connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -281,7 +280,7 @@ This middleware sets up the captcha provider and shares it as `captchaInstanceNa
 
 #### `captchaInstanceName`
 
-`string` · default the middleware name
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md))
 
 Name under which the captcha provider is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -293,7 +292,7 @@ This middleware connects to the ModSecurity CRS sidecar and shares the connectio
 
 #### `modsecInstanceName`
 
-`string` · default the middleware name when it connects
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md)) when it connects
 
 Name under which the sidecar connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -305,7 +304,7 @@ Open the rate-limit Redis connection and share it, with `rateLimitBuckets` and t
 
 #### `rateLimitInstanceName`
 
-`string` · default the middleware name when `rateLimitEnabled`
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md)) when `rateLimitEnabled`
 
 On the middleware with `rateLimitEnabled`: the name its policy is shared as. On a middleware with `bouncerEnabled`: the policy this router applies, counted under this middleware's name. A middleware with neither `bouncerEnabled` nor `rateLimitEnabled` fails at startup when it sets it. See [Limit how often a client calls a route](rate-limit.md).
 
@@ -325,7 +324,7 @@ What this router does with each request. These settings are per router, even whe
 
 Rules that, for matching requests, skip checks or force a ban or captcha. Each rule has a unique `name` (no `:`), conditions, and an `action` list.
 
-- Conditions (all optional, all must match): `method`, `path`, `host`, `headers`, `cookies`. Values are regular expressions matched anywhere in the value, so anchor them (`^/health$`). `method` accepts a leading `!` to negate (`!POST`). An empty header or cookie pattern means "is present". A rule must have at least one condition.
+- Conditions (all optional, all must match): `method`, `path`, `host`, `headers`, `cookies`. Values are regular expressions matched anywhere in the value, so anchor them (`^/health$`). Matching is case-sensitive: to ignore case, start the pattern with `(?i)` (`(?i)^/admin`, `(?i)bot`). `method` accepts a leading `!` to negate (`!POST`). `host` is matched against the host name in lower case, without the port and without a trailing dot, so `RULES.TEST.:443` reads `rules.test`; write the pattern in lower case or start it with `(?i)`. An empty header or cookie pattern means "is present". A rule must have at least one condition.
 - Actions: `bypass` (skip LAPI, AppSec, and ModSec), `bypassLapi`, `bypassAppsec`, `bypassModsec`, `bypassCaptcha`, `bypassRateLimit` (skip only the [rate limit](rate-limit.md); `bypass` does not skip it), `captcha`, `ban`. `ban` must be the only action of its rule. `captcha` and `bypassCaptcha` cannot share a rule.
 - Every matching rule applies. A `ban` applies immediately. A `captcha` is shown unless CrowdSec bans the client anyway.
 - A `bypass`, `bypassLapi`, `bypassAppsec`, `bypassModsec` or `bypassRateLimit` rule with a `path` only skips checks when the path can be read one way. If the request path has percent-encoding (`%2F`, `%20`...), `;`, `\`, `*`, or `.`, `..` or empty segments, the rule still applies its `captcha` but skips nothing. Some backends read such paths differently: Java servers read `/health/..;/admin` as `/admin`. Anchoring the pattern does not prevent this; this check does.
@@ -421,6 +420,12 @@ What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. 
 
 What to do while the ModSec backoff gate skips the sidecar (`modsecUnhealthyBackOffPeriodSecs`): `passthrough`, `ban`, or `captcha`, as for AppSec. The sidecar is not called. Per router. Verdict header `ban:modsec-backoff` or `captcha:modsec-backoff`. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
 
+#### `bouncerLapiRedisFailureAction`
+
+`string` · default `ban`
+
+What to do when the LAPI Redis cache cannot be read: `ban`, `passthrough`, or `captcha`. Every failure counts: Redis cannot be reached, answers in more than about 1 second, or answers with an error (TLS rejected, wrong or missing password). `passthrough` skips the LAPI check and the request goes on to the next checks. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
+
 #### `bouncerModsecFailureAction`
 
 `string` · default `passthrough`
@@ -432,12 +437,6 @@ What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreacha
 `map[string]map[string]string` · default `{}`
 
 Turn bans or captchas from specific origins into a captcha or a pass on this router. See [Show a community ban as a captcha](how-to/community-ban-as-captcha.md).
-
-#### `bouncerRedisUnreachableBlock`
-
-`bool` · default `true`
-
-When the LAPI Redis cache cannot be reached, ban (`true`) or skip the LAPI check (`false`). A Redis that answers too slowly bans either way. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
 
 #### `bouncerRemediationHeadersCustomName`
 
@@ -595,7 +594,7 @@ Redis primary, `host:port`.
 
 `[]string` · default `[]`
 
-Redis replicas for reads, used in turn. Defaults to `lapiRedisHost`. Reads do not fall back to the primary, so an outage of the replicas blocks requests (see `bouncerRedisUnreachableBlock`) even if the primary is up.
+Redis replicas for reads, used in turn. Defaults to `lapiRedisHost`. Reads do not fall back to the primary, so an outage of the replicas blocks requests (see [`bouncerLapiRedisFailureAction`](#bouncerlapiredisfailureaction)) even if the primary is up.
 
 #### `lapiRedisPassword`
 
@@ -914,6 +913,8 @@ captchaEnabled: true
 
 ### Logging
 
+The plugin writes its logs to stdout, next to Traefik's own. Send them to a file, rotate them, or ship them with Traefik's or the container runtime's log handling (for example the Docker logging driver or journald).
+
 #### `logLevel`
 
 `string` · default `INFO`
@@ -925,12 +926,6 @@ captchaEnabled: true
 `string` · default `common`
 
 `common` (text) or `json`.
-
-#### `logFilePath`
-
-`string` · default `""`
-
-Write logs to this file instead of stdout/stderr. Must be writable by Traefik.
 
 ## Read a value from a file
 

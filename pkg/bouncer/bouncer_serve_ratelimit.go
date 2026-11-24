@@ -61,7 +61,7 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 	// One budget for every bucket and every Redis command of this request.
 	ctx, cancel := context.WithTimeout(req.Context(), ratelimit.StepBudget)
 	defer cancel()
-	verdict := buckets.Charge(ctx, rateLimitClient, b.name, req.Request, req.IPAddr(), gateCleared)
+	verdict := buckets.Charge(ctx, rateLimitClient, b.name, req, gateCleared)
 
 	// Log buckets over their limit: the dry run exists to be read.
 	for _, exceeded := range verdict.Exceeded {

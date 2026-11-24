@@ -1,12 +1,20 @@
 package logger
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
+
+// captureOutput sends loggers built during the test to a buffer.
+func captureOutput(t *testing.T) *bytes.Buffer {
+	t.Helper()
+	var buf bytes.Buffer
+	t.Cleanup(SetOutputForTest(&buf))
+	return &buf
+}
 
 func TestNew(t *testing.T) {
 	tests := []struct {
@@ -23,7 +31,7 @@ func TestNew(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			logger := New(tt.logLevel, "")
+			logger := New(tt.logLevel)
 
 			// Verify logger is created
 			if logger == nil {
@@ -36,12 +44,39 @@ func TestNew(t *testing.T) {
 	}
 }
 
+// TestDefaultOutputIsStdout proves a logger built outside SetOutputForTest writes to stdout.
+func TestDefaultOutputIsStdout(t *testing.T) {
+	outputMu.Lock()
+	writer := output
+	outputMu.Unlock()
+	if writer != os.Stdout {
+		t.Fatalf("default output = %T, want os.Stdout", writer)
+	}
+}
+
+// TestSetOutputForTestRestores proves restore puts the previous writer back for later loggers.
+func TestSetOutputForTestRestores(t *testing.T) {
+	var first, second bytes.Buffer
+	restoreFirst := SetOutputForTest(&first)
+	restoreSecond := SetOutputForTest(&second)
+	New("INFO").Info("to second")
+	restoreSecond()
+	New("INFO").Info("to first")
+	restoreFirst()
+
+	if !strings.Contains(second.String(), "to second") || strings.Contains(second.String(), "to first") {
+		t.Fatalf("second buffer = %q", second.String())
+	}
+	if !strings.Contains(first.String(), "to first") || strings.Contains(first.String(), "to second") {
+		t.Fatalf("first buffer = %q", first.String())
+	}
+}
+
 func TestNewWithFormatJSONCaseInsensitive(t *testing.T) {
 	for _, format := range []string{"JSON", "json", "Json"} {
 		t.Run(format, func(t *testing.T) {
-			logPath := filepath.Join(t.TempDir(), "format.log")
-			t.Cleanup(ResetSharedLogFilesForTest)
-			logger := NewWithFormat("INFO", logPath, format)
+			buf := captureOutput(t)
+			logger := NewWithFormat("INFO", format)
 			if logger == nil {
 				t.Fatal("expected logger")
 			}
@@ -49,15 +84,9 @@ func TestNewWithFormatJSONCaseInsensitive(t *testing.T) {
 			testMessage := "json format case test"
 			logger.Info(testMessage)
 
-			// #nosec G304 -- logPath is a test-generated temporary file path
-			data, err := os.ReadFile(logPath)
-			if err != nil {
-				t.Fatalf("read log file: %v", err)
-			}
-
-			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+			lines := strings.Split(strings.TrimSpace(buf.String()), "\n")
 			if len(lines) != 1 {
-				t.Fatalf("expected 1 log line, got %d: %q", len(lines), string(data))
+				t.Fatalf("expected 1 log line, got %d: %q", len(lines), buf.String())
 			}
 
 			var logEntry map[string]interface{}
@@ -77,51 +106,18 @@ func TestNewWithFormatJSONCaseInsensitive(t *testing.T) {
 	}
 }
 
-func TestSharedLogFilePerPath(t *testing.T) {
-	logPath := filepath.Join(t.TempDir(), "shared.log")
-	t.Cleanup(ResetSharedLogFilesForTest)
-
-	_ = NewWithFormat("INFO", logPath, "common")
-	_ = NewWithFormat("INFO", logPath, "common")
-	_ = NewWithFormat("INFO", logPath, "json")
-
-	if count := sharedLogFileCountForTest(); count != 1 {
-		t.Fatalf("expected 1 shared log file, got %d", count)
-	}
-}
-
-func TestInvalidLogFile(t *testing.T) {
-	// Try to create logger with invalid file path
-	logger := New("INFO", "/invalid/path/that/does/not/exist/test.log")
-
-	// Logger should still be created (falls back to stdout)
-	if logger == nil {
-		t.Fatal("Expected logger to be created even with invalid file path")
-	}
-
-	// Should not panic when logging
-	logger.Info("test message")
-}
-
 func TestTraceLevelNameAndFiltering(t *testing.T) {
-	tracePath := filepath.Join(t.TempDir(), "trace.log")
-	debugPath := filepath.Join(t.TempDir(), "debug.log")
-	t.Cleanup(ResetSharedLogFilesForTest)
-
-	traceLog := NewWithFormat("TRACE", tracePath, "json")
+	traceBuf := captureOutput(t)
+	traceLog := NewWithFormat("TRACE", "json")
 	Trace(traceLog, "hotpath")
 	traceLog.Debug("startup")
 
-	debugLog := NewWithFormat("DEBUG", debugPath, "json")
+	debugBuf := captureOutput(t)
+	debugLog := NewWithFormat("DEBUG", "json")
 	Trace(debugLog, "hotpath")
 	debugLog.Debug("startup")
 
-	// #nosec G304 -- paths are test-generated temporary files
-	traceData, err := os.ReadFile(tracePath)
-	if err != nil {
-		t.Fatalf("read TRACE log: %v", err)
-	}
-	traceOut := string(traceData)
+	traceOut := traceBuf.String()
 	if !strings.Contains(traceOut, `"level":"TRACE"`) {
 		t.Fatalf("TRACE logger should name LevelTrace as TRACE, got %s", traceOut)
 	}
@@ -132,12 +128,7 @@ func TestTraceLevelNameAndFiltering(t *testing.T) {
 		t.Fatalf("TRACE logger should still emit Debug, got %s", traceOut)
 	}
 
-	// #nosec G304 -- paths are test-generated temporary files
-	debugData, err := os.ReadFile(debugPath)
-	if err != nil {
-		t.Fatalf("read DEBUG log: %v", err)
-	}
-	debugOut := string(debugData)
+	debugOut := debugBuf.String()
 	if strings.Contains(debugOut, `"msg":"hotpath"`) || strings.Contains(debugOut, `"level":"TRACE"`) {
 		t.Fatalf("DEBUG logger should drop Trace, got %s", debugOut)
 	}

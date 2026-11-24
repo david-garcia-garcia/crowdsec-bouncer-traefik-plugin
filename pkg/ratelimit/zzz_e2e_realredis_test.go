@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 )
@@ -195,7 +196,7 @@ func TestRealRedis_bucketEditKeepsTheCount(t *testing.T) {
 	charge := func(client *Client) Verdict {
 		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 		defer cancel()
-		return client.Buckets().Charge(ctx, client, middlewareName, httptest.NewRequest(http.MethodGet, "http://example.com/login", nil), net.ParseIP("198.51.100.9"), false)
+		return client.Buckets().Charge(ctx, client, middlewareName, clientrequest.New(httptest.NewRequest(http.MethodGet, "http://example.com/login", nil), "198.51.100.9", net.ParseIP("198.51.100.9")), false)
 	}
 	before, err := Open(context.Background(), middlewareName, settingsFor(3), slog.Default())
 	if err != nil {
@@ -249,7 +250,7 @@ func TestRealRedis_tokenBucketBurstRetryAfterAndRefill(t *testing.T) {
 	charge := func() Verdict {
 		ctx, cancel := context.WithTimeout(context.Background(), StepBudget)
 		defer cancel()
-		return client.Buckets().Charge(ctx, client, middlewareName, httptest.NewRequest(http.MethodGet, "http://example.com/", nil), net.ParseIP(clientIP), false)
+		return client.Buckets().Charge(ctx, client, middlewareName, clientrequest.New(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), clientIP, net.ParseIP(clientIP)), false)
 	}
 	// Burst: three at once, then the refill answers.
 	for hit := 1; hit <= 3; hit++ {

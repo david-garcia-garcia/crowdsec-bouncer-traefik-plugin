@@ -24,7 +24,7 @@ With the default settings:
 | LAPI, `stream` mode | Decisions already downloaded keep applying. Other clients pass until a refresh fails, then get the failure action. | [`bouncerLapiFailureAction`](configuration.md#bouncerlapifailureaction), [`lapiUpdateMaxFailure`](configuration.md#lapiupdatemaxfailure) | Ban clients without a known decision, from the first failed refresh. |
 | LAPI, `live` / `none` mode | Each lookup LAPI does not answer gets the failure action. After repeated failures, LAPI is not called for a cooldown and lookups get the backoff action. In `live`, answers already cached keep applying until they expire. | `bouncerLapiFailureAction`, [`bouncerLapiBackOffAction`](configuration.md#bouncerlapibackoffaction), [`lapiUnhealthyBackOffPeriodSecs`](configuration.md#lapiunhealthybackoffperiodsecs) | Ban the first failures, then ban at once, without waiting for LAPI, for 10 seconds at a time. |
 | CAPI, `alone` mode | At startup: the middleware does not load. Later: as `stream`, and the next try is 2 hours later. | `bouncerLapiFailureAction`, `lapiUpdateMaxFailure` | Ban clients without a known decision. |
-| Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. | [`bouncerRedisUnreachableBlock`](configuration.md#bouncerredisunreachableblock) | Ban (`ban:cache-fail`). |
+| Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. Every failed read counts: down, slower than about 1 second, or an error answer (TLS, password). | [`bouncerLapiRedisFailureAction`](configuration.md#bouncerlapiredisfailureaction) | Ban (`ban:cache-fail`). |
 | AppSec | The failure action; after repeated failures, AppSec is skipped for a cooldown and requests get the backoff action. | [`bouncerAppsecFailureAction`](configuration.md#bouncerappsecfailureaction), [`bouncerAppsecBackOffAction`](configuration.md#bouncerappsecbackoffaction), [`appsecUnhealthyBackOffPeriodSecs`](configuration.md#appsecunhealthybackoffperiodsecs) | Let requests through without AppSec, and stop calling it for 10 seconds at a time. |
 | ModSecurity sidecar | The failure action; after repeated failures, the sidecar is skipped for a cooldown and requests get the backoff action. | [`bouncerModsecFailureAction`](configuration.md#bouncermodsecfailureaction), [`bouncerModsecBackOffAction`](configuration.md#bouncermodsecbackoffaction), [`modsecUnhealthyBackOffPeriodSecs`](configuration.md#modsecunhealthybackoffperiodsecs) | Let the request through without CRS, and stop calling the sidecar for 10 seconds at a time. |
 | Redis of the rate limit | With the default sliding window, each Traefik replica keeps counting on its own. | [`rateLimitFailureAction`](configuration.md#ratelimitfailureaction), [`rateLimitSyncRate`](configuration.md#ratelimitsyncrate), [`rateLimitAlgorithm`](configuration.md#ratelimitalgorithm) | Limit per replica instead of across replicas. |
@@ -49,6 +49,7 @@ The new gates also change what a router that set its own failure action gets whi
 | Leg | Setting | Default | Where it is set |
 | --- | ------- | ------- | --------------- |
 | LAPI | `bouncerLapiFailureAction` | `ban` | Each router |
+| LAPI Redis cache | `bouncerLapiRedisFailureAction` | `ban` | Each router |
 | AppSec | `bouncerAppsecFailureAction` | `passthrough` | Each router |
 | ModSec | `bouncerModsecFailureAction` | `passthrough` | Each router |
 | Rate limit | `rateLimitFailureAction` | `passthrough` | The middleware with `rateLimitEnabled`, for every router that uses the policy |
@@ -107,10 +108,11 @@ How LAPI's outage reaches a request depends on [`lapiMode`](concepts.md#lapi-mod
 
 With [`lapiRedisEnabled`](configuration.md#lapiredisenabled), LAPI decisions are kept in Redis instead of memory (see [Cache](concepts.md#cache)). Every request in `live`, `stream` and `alone` reads Redis. There is no fallback: not to memory, not to LAPI.
 
-| Redis | What the request gets |
-| ----- | --------------------- |
-| Cannot be reached (connection refused, no connection available) | With `bouncerRedisUnreachableBlock: true` (default): a ban, verdict header `ban:cache-fail`, reason `TECHNICAL_ISSUE`. With `false`: the LAPI check is skipped and the request goes on to the next checks. Bans stored in Redis do not apply. |
-| Answers too slowly (more than about 1 second) | A ban (`ban:cache-fail`), whatever `bouncerRedisUnreachableBlock` says. |
+A failed read gets [`bouncerLapiRedisFailureAction`](configuration.md#bouncerlapiredisfailureaction) (default `ban`), whatever the cause: Redis cannot be reached (connection refused, no connection available), answers in more than about 1 second, or answers with an error (TLS rejected, wrong or missing password).
+
+- `ban`: the ban page, verdict header `ban:cache-fail`, reason `TECHNICAL_ISSUE`.
+- `captcha`: the captcha page, verdict header `captcha:cache-fail`.
+- `passthrough`: the LAPI check is skipped and the request goes on to the next checks. Bans stored in Redis do not apply.
 
 - `bouncerLapiFailureAction` does not apply to a Redis outage.
 - Reads go to [`lapiRedisReadHosts`](configuration.md#lapiredisreadhosts) in turn, and do not fall back to the primary.
@@ -205,7 +207,8 @@ When the provider does not answer, answers with an error page, or answers someth
 
 - Visitors who already solved a captcha keep passing for [`captchaGracePeriodSeconds`](configuration.md#captchagraceperiodseconds): their pass is a signed cookie, checked without the provider.
 - A failure action set to `captcha` therefore blocks during a provider outage too: the visitor can see the captcha but cannot solve it.
-- An unreachable provider logs INFO `captcha:ServeHTTP:validate` with the error, once per submit.
+- A submit the provider cannot decide logs WARN `captcha:ServeHTTP:validate` with the reason in `error`, at most once every 5 seconds: the transport error for an unreachable provider or a timeout; `siteverify: status <code>, content type "<type>"` when the provider answers a body that is not `application/json`, or a status outside 2xx and 4xx; `siteverify: decode response: ...` when a JSON answer cannot be decoded. The secret, the token and the response body are not logged. Those `siteverify:` reasons apply to hCaptcha, reCAPTCHA, Turnstile and `custom`; reCAPTCHA Enterprise and EU CAPTCHA log the same line with their own reasons (for example `enterprise: status 500`, `eucaptcha: empty body`).
+- A 4xx JSON answer is a wrong solve, not a failure: the visitor gets the captcha page again and nothing is logged, whatever `success` says.
 
 ## The connection is not there
 
@@ -233,7 +236,7 @@ A misspelled `lapiInstanceName` bans every request of that router with the defau
 | AppSec | ERROR `appsecQuery:unreachable` per unreachable call, with the transport error in `error`; INFO `appsecQuery:failure` at most every 5 seconds for a 500 (`statusCode`), and per response-body read error (`error`); WARN `crowdsec appsec backoff started` and INFO `crowdsec appsec backoff ended` per trip | `appsec-failure`, `appsec-backoff` | `plugin:appsec_failure` |
 | ModSec | ERROR `crowdsec modsec sidecar unavailable`, debounced, with `reason` plus the transport error in `error` or the `statusCode`; WARN `crowdsec modsec backoff started` and INFO `crowdsec modsec backoff ended` per trip | `modsec-failure`, `modsec-backoff` | `plugin:modsec_failure` |
 | Rate-limit Redis | None (DEBUG `serveRateLimit`) | `ratelimit-failure` | `plugin:ratelimit_failure` |
-| Captcha provider | INFO `captcha:ServeHTTP:validate` per failed submit | None | None |
+| Captcha provider | WARN `captcha:ServeHTTP:validate` at most every 5 seconds while submits fail (unreachable, 5xx, non-JSON, undecodable JSON), with the reason in `error` | None | None |
 
 - The verdict header is only sent when [`bouncerRemediationHeadersCustomName`](configuration.md#bouncerremediationheaderscustomname) is set, and only when the failure or backoff action is `ban` or `captcha`. A `passthrough` carries no header. See [See the verdict in access logs](how-to/verdict-in-access-logs.md).
 - A backoff answer counts under its leg's failure origin (`plugin:lapi_failure`, `plugin:appsec_failure`, `plugin:modsec_failure`); only the verdict header tells `-backoff` from `-failure`.

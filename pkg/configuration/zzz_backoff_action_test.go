@@ -77,7 +77,7 @@ func TestValidateParams_backOffActionsAndLapiPeriod(t *testing.T) {
 		"BouncerAppsecBackOffAction": func(cfg *Config, action string) { cfg.BouncerAppsecBackOffAction = action },
 		"BouncerModsecBackOffAction": func(cfg *Config, action string) { cfg.BouncerModsecBackOffAction = action },
 	}
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	for field, set := range setters {
 		t.Run(field+" unknown value fails", func(t *testing.T) {
 			cfg := getMinimalConfig()

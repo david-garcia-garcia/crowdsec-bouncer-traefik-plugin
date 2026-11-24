@@ -3,6 +3,7 @@ package captcha
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"mime"
 	"net/http"
@@ -134,7 +135,9 @@ func (v *siteverifyVerifier) postSiteverify(response, remoteIP string) (*http.Re
 
 // Pass posts the token to siteverify and returns the decoded success bit.
 // userAgent is unused; siteverify does not send it.
-// A Content-Type miss is Pass-false with no error. Transport and JSON decode are the error return.
+// A 4xx JSON answer is a reject with no error: a custom provider may answer a wrong solve that way.
+// Transport, a non-JSON answer, a status outside 2xx and 4xx, and JSON decode are the error return.
+// The error names the status and Content-Type only, never the secret, token, or body.
 func (v *siteverifyVerifier) Pass(token, remoteIP, userAgent string) (bool, error) {
 	_ = userAgent
 	res, err := v.postSiteverify(token, remoteIP)
@@ -145,15 +148,22 @@ func (v *siteverifyVerifier) Pass(token, remoteIP, userAgent string) (bool, erro
 		_ = res.Body.Close()
 	}()
 	// Classify siteverify as JSON when the type token equals application/json.
-	mediaType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	if err != nil || mediaType != "application/json" {
-		logger.Trace(v.log, "captcha:Validate responseType:noJson")
-		return false, nil
+	contentType := res.Header.Get("Content-Type")
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	isJSON := err == nil && mediaType == "application/json"
+	isSuccess := res.StatusCode >= 200 && res.StatusCode <= 299
+	isClientError := res.StatusCode >= 400 && res.StatusCode <= 499
+	if !isJSON || (!isSuccess && !isClientError) {
+		return false, fmt.Errorf("siteverify: status %d, content type %q", res.StatusCode, contentType)
 	}
 	var captchaResponse responseProvider
 	err = json.NewDecoder(res.Body).Decode(&captchaResponse)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("siteverify: decode response: %w", err)
+	}
+	if isClientError {
+		logger.Trace(v.log, "captcha:Validate", "statusCode", res.StatusCode, "success", false)
+		return false, nil
 	}
 	logger.Trace(v.log, "captcha:Validate", "success", captchaResponse.Success)
 	return captchaResponse.Success, nil
