@@ -40,32 +40,6 @@ When `modsecEnabled` is true and the trimmed `modsecInstanceName` is empty, `Pre
 - **THEN** the name stays empty
 - **AND** the middleware does not Watch ModSec
 
-### Requirement: ModSec Client owns the admission gate
-When `modsecUnhealthyBackOffPeriodSecs` is greater than 0, the Client SHALL hold one `backendbackoff.Gate` from dest utilities `v1.0.7` and MUST NOT copy that package into this repository. When that period is 0 or omitted, the Client SHALL hold no gate (every sidecar failure still applies `bouncerModsecFailureAction`). Default period SHALL be `0`. The period SHALL be the only gate knob. The trip rule SHALL be fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30): each failure spends one unit of a budget of 5, each success earns back `0.30/0.70`, so 5 failures in a row trip the gate. The cooldown SHALL be fixed at the period (max cooldown equals the base, no exponential growth). `Jitter` and `TTL` MUST NOT be set by this plugin (partial Config, jitter stays disabled). Client `Close` SHALL Close a non-nil Gate. The gate SHALL log one WARN `crowdsec modsec backoff started` (with `retryIn`) on the first skipped request after a trip, and one INFO `crowdsec modsec backoff ended` when a request admitted during the backoff (the probe) reports success. Skipped requests MUST NOT log one line each. A success from a request admitted before the trip MUST NOT log `backoff ended`. The wrapper that owns these two lines is `pkg/admission`, shared by the AppSec and ModSec Clients.
-
-#### Scenario: Omitted backoff builds no gate
-- **WHEN** the operator omits `modsecUnhealthyBackOffPeriodSecs` and the sidecar returns HTTP 500
-- **THEN** that request applies `bouncerModsecFailureAction`
-- **AND** the next request still calls the sidecar
-
-#### Scenario: Positive backoff builds one gate
-- **WHEN** `modsecUnhealthyBackOffPeriodSecs` is 30
-- **THEN** the Client holds one Gate
-- **AND** Client Close closes that Gate
-
-#### Scenario: Fifth failure in a row trips the gate
-- **WHEN** the gate is on and the sidecar fails 5 times in a row
-- **THEN** the sixth request does not call the sidecar
-
-#### Scenario: Cooldown does not grow
-- **WHEN** a probe after the cooldown fails
-- **THEN** the next cooldown is the same period
-
-#### Scenario: Backoff logs once per transition
-- **WHEN** the ModSec gate trips and several later requests are skipped
-- **THEN** exactly one `crowdsec modsec backoff started` line is logged
-- **AND** after a probe succeeds exactly one `crowdsec modsec backoff ended` line is logged
-
 ### Requirement: The plugin has no method list for bodies
 The plugin MUST NOT reject a request because of its method and body. A readable body up to `modsecBodyLimit` SHALL be forwarded to the sidecar on every method, with a `Content-Length` rebuilt from the forwarded bytes. CRS decides what a body means (rules 920170 and 920171 block a body on GET and HEAD). An operator who wants to block a body on another method SHALL add a `SecRule` to the sidecar.
 
@@ -86,3 +60,36 @@ Omitted `modsecBodyLimit` SHALL be 8388608 (8 MiB). There SHALL be no unlimited 
 #### Scenario: Zero is rejected when owned
 - **WHEN** `modsecEnabled` is true and `modsecBodyLimit` is `0`
 - **THEN** `New` fails with `ModsecBodyLimit: cannot be less than 1`
+
+### Requirement: ModSec Client holds one admission gate
+When `modsecUnhealthyBackOffPeriodSecs` is greater than 0, the Client SHALL hold one `backendbackoff.Gate` from dest utilities and MUST NOT copy that package into this repository. Default period SHALL be `10`. `0` SHALL build no gate. The period SHALL be the only knob: the trip rule is fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30), the cooldown stays at the period, and `Jitter` and `TTL` MUST NOT be set. `Close` SHALL Close a non-nil Gate.
+
+#### Scenario: Omitted backoff builds a 10 second gate
+- **WHEN** the operator omits `modsecUnhealthyBackOffPeriodSecs`
+- **THEN** the Client holds one Gate with cooldown 10 seconds
+
+#### Scenario: Zero builds no gate
+- **WHEN** `modsecUnhealthyBackOffPeriodSecs` is 0 and the sidecar returns HTTP 500 on every request
+- **THEN** every request applies `bouncerModsecFailureAction`
+- **AND** every request still calls the sidecar
+
+#### Scenario: Positive backoff builds one gate
+- **WHEN** `modsecUnhealthyBackOffPeriodSecs` is 30
+- **THEN** the Client holds one Gate
+- **AND** Client Close closes that Gate
+
+#### Scenario: Fifth failure in a row trips the gate
+- **WHEN** the gate is on and the sidecar fails 5 times in a row
+- **THEN** the sixth request does not call the sidecar
+
+#### Scenario: Cooldown does not grow
+- **WHEN** a probe after the cooldown fails
+- **THEN** the next cooldown is the same period
+
+### Requirement: ModSec backoff logs once per transition
+The ModSec gate SHALL log one WARN `crowdsec modsec backoff started` (with `retryIn`) on the first skipped request after a trip, and one INFO `crowdsec modsec backoff ended` when the probe admitted during the backoff reports success. Skipped requests MUST NOT log one line each. A success from a request admitted before the trip MUST NOT log `backoff ended`. `pkg/admission` owns both lines for the AppSec, ModSec, and LAPI Clients.
+
+#### Scenario: Backoff logs once per transition
+- **WHEN** the ModSec gate trips and several later requests are skipped
+- **THEN** exactly one `crowdsec modsec backoff started` line is logged
+- **AND** after a probe succeeds exactly one `crowdsec modsec backoff ended` line is logged

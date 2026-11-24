@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -422,5 +423,33 @@ func TestCrowdsecQuery_TransportErrorWrapsItsCause(t *testing.T) {
 	}
 	if errors.Unwrap(err) == nil {
 		t.Fatalf("transport error %q must wrap the transport cause", err)
+	}
+}
+
+// TestSendQuery_statusErrorCarriesCode proves every non-2xx answer comes back as a statusError with its
+// code, and a transport error does not.
+func TestSendQuery_statusErrorCarriesCode(t *testing.T) {
+	for _, code := range []int{http.StatusUnauthorized, http.StatusTooManyRequests, http.StatusServiceUnavailable} {
+		server := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+			rw.WriteHeader(code)
+		}))
+		client := newTestQueryClient(t, server, configuration.LiveMode)
+		_, err := client.crowdsecQuery(server.URL+"/v1/decisions?ip=1.2.3.4", nil)
+		server.Close()
+		var status *statusError
+		if !errors.As(err, &status) || status.code != code {
+			t.Fatalf("code %d: err=%v want a statusError with that code", code, err)
+		}
+		if !strings.Contains(err.Error(), "statusCode:"+strconv.Itoa(code)) {
+			t.Fatalf("code %d: message %q lost its statusCode text", code, err.Error())
+		}
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	client := newTestQueryClient(t, server, configuration.LiveMode)
+	server.Close()
+	_, err := client.crowdsecQuery(server.URL+"/v1/decisions?ip=1.2.3.4", nil)
+	var status *statusError
+	if err == nil || errors.As(err, &status) {
+		t.Fatalf("transport error=%v must not be a statusError", err)
 	}
 }

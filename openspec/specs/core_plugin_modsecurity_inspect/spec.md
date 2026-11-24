@@ -47,11 +47,16 @@ The plugin SHALL send a copy of the inbound request to `modsecUrl`. The sidecar 
 - **THEN** `Inspect` returns `ErrUnavailable` without calling the sidecar
 
 ### Requirement: Sidecar unavailability is logged once per window
-When the sidecar is unreachable or answers 5xx, `Inspect` SHALL log ERROR `crowdsec modsec sidecar unavailable` (`modsecurity.MsgUnavailable`) through `logger.Debounced` with a 5 second window keyed by the message text (process-wide), with attr `host` (the sidecar host, without query or userinfo) and `reason` (`unreachable` or `status`, plus `statusCode` for a status). An inbound cancel MUST NOT log this line.
+When the sidecar is unreachable or answers 5xx, `Inspect` SHALL log ERROR `crowdsec modsec sidecar unavailable` (`modsecurity.MsgUnavailable`) through `logger.Debounced` with a 5 second window keyed by the message text (process-wide), with attr `host` (the sidecar host, without query or userinfo) and `reason` (`unreachable` or `status`, plus `statusCode` for a status). For `unreachable` it SHALL add attr `error` with the transport error without the request URL, so the visitor's path and query stay off the log. An inbound cancel MUST NOT log this line. A Gate `Admit` error SHALL log ERROR `fail to admit ModSec request` with attr `error`.
 
 #### Scenario: An outage logs one line per window
 - **WHEN** the sidecar answers 503 to several requests within 5 seconds
 - **THEN** one `crowdsec modsec sidecar unavailable` line is logged
+
+#### Scenario: An unreachable sidecar log says why without the visitor URL
+- **WHEN** the sidecar refuses the connection for a request to `/visitor-path?token=visitor-secret`
+- **THEN** the `crowdsec modsec sidecar unavailable` line has attr `error` with the dial error
+- **AND** it contains neither `visitor-path` nor `visitor-secret`
 
 ### Requirement: Inspect copy reuses inbound identity owners
 The inspect copy SHALL set sidecar request `Host` to inbound `req.Host`. It SHALL copy Traefik's headers as Traefik left them, minus the shared hop-by-hop list and `Content-Length` (`core_plugin_wafhop_shared-request`). It MUST NOT set `X-Real-IP`. It MUST NOT append `RemoteAddr` to `X-Forwarded-For`. Plugin remediations and logs SHALL keep using `pkg/ip.GetRemoteIP` then `clientrequest.New`. Sidecar `REMOTE_ADDR` SHALL stay the Traefik-to-sidecar hop unless the CRS image is configured with `REMOTEIP_*` / `REAL_IP_*` (not this plugin).
@@ -104,19 +109,6 @@ Per-router `bouncerModsecFailureAction` SHALL be `passthrough` (default, call `n
 - **AND** the gate is not Recorded
 - **AND** `next` is not called
 
-### Requirement: Gate skip continues without the sidecar and without the failure action
-When the Client holds a Gate, `Inspect` SHALL `Admit` after the body is read and checked against the limit, and before the sidecar hop. A denied admission SHALL return `ErrGateSkip`: it SHALL NOT Report, SHALL NOT call the sidecar, and the bouncer SHALL continue to `next` without the failure action, as for AppSec. Failures before the trip SHALL still apply the failure action. A usable inspect (2xx or copied 3xx/4xx) SHALL Report success. Transport error or sidecar 5xx SHALL Report failure.
-
-#### Scenario: After the trip the request continues
-- **WHEN** `bouncerModsecFailureAction` is `ban` and the sidecar fails 5 times in a row
-- **THEN** those 5 requests answer `ban:modsec-failure`
-- **AND** the next request does not call the sidecar and reaches `next` with no remediation header
-
-#### Scenario: Body limit still applies after the trip
-- **WHEN** the Gate is skipping
-- **AND** a POST body exceeds `modsecBodyLimit`
-- **THEN** the response is HTTP 413
-
 ### Requirement: Action-rule skip skips inspect
 When a matching action rule skipped ModSec, ServeHTTP SHALL NOT buffer the body for ModSec, SHALL NOT consult the Gate, and SHALL NOT call the sidecar.
 
@@ -125,3 +117,39 @@ When a matching action rule skipped ModSec, ServeHTTP SHALL NOT buffer the body 
 - **AND** the query string would otherwise trip CRS
 - **THEN** the sidecar is not called
 - **AND** the request continues
+
+### Requirement: Gate skip answers with the ModSec backoff action
+When the Client holds a Gate, `Inspect` SHALL `Admit` after the body is read and checked against the limit, and before the sidecar hop. A denied admission SHALL return `ErrGateSkip` without a Report and without a sidecar call. An unreadable body that would be `ErrUnavailable` SHALL also be `ErrGateSkip` while the Gate is backing off. A usable inspect (2xx or copied 3xx/4xx) SHALL Report success; a transport error or sidecar 5xx SHALL Report failure.
+
+#### Scenario: After the trip the default skip continues
+- **WHEN** `bouncerModsecFailureAction` is `ban` and the sidecar fails 5 times in a row
+- **AND** `bouncerModsecBackOffAction` is omitted
+- **THEN** those 5 requests answer `ban:modsec-failure`
+- **AND** the next request does not call the sidecar and reaches `next` with no remediation header
+
+#### Scenario: Body limit still applies after the trip
+- **WHEN** the Gate is skipping
+- **AND** a POST body exceeds `modsecBodyLimit`
+- **THEN** the response is HTTP 413
+
+#### Scenario: Unreadable body while backing off is a skip
+- **WHEN** the Gate is backing off and `bouncerModsecFailureAction` is `ban`
+- **AND** a POST body arrives with no length
+- **THEN** `Inspect` returns `ErrGateSkip` without calling the sidecar
+
+### Requirement: ModSec gate skip uses bouncerModsecBackOffAction
+On `ErrGateSkip` the router SHALL apply its own `bouncerModsecBackOffAction` and MUST NOT apply `bouncerModsecFailureAction`. `passthrough` (default; empty means `passthrough`) SHALL call `next`. `ban` SHALL write the ban template with RemediationReason `MODSEC` and header `ban:modsec-backoff`. `captcha` SHALL serve this router's captcha gate with `captcha:modsec-backoff`. Both SHALL count under origin `plugin:modsec_failure`.
+
+#### Scenario: Backoff action ban
+- **WHEN** the ModSec Gate denies admission and `bouncerModsecBackOffAction` is `ban`
+- **THEN** the response is the ban template with reason `MODSEC` and `ban:modsec-backoff`
+- **AND** the sidecar is not called
+- **AND** `next` is not called
+
+#### Scenario: Backoff action captcha
+- **WHEN** the ModSec Gate denies admission, `bouncerModsecBackOffAction` is `captcha`, and the router has a usable captcha client
+- **THEN** the router's captcha page is served with `captcha:modsec-backoff`
+
+#### Scenario: Failure action does not decide a skip
+- **WHEN** the ModSec Gate denies admission, `bouncerModsecFailureAction` is `ban`, and `bouncerModsecBackOffAction` is `passthrough`
+- **THEN** the request reaches `next` with no remediation header

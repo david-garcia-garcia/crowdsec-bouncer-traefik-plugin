@@ -491,7 +491,7 @@ $knobs
         $holdRow = @(Get-SevFileRouters | Where-Object { $_.name -eq 'sev-t6-hold@file' }) | Select-Object -First 1
         $holdRow.status | Should -Be "enabled" -Because "noop@internal always builds, so the holder router loads"
 
-        # Unbound legs answer with the default failure action (ban, 403). The first
+        # An unbound LAPI leg answers with its default failure action (ban, 403). The first
         # answer that is not the pre-switch 404 must already be the bound 200.
         $ip = "10.90.0.56"
         $first = Wait-SevCodes -Path "/sev-t6-app" -IP $ip -Codes @(200, 403, 429) -TimeoutSeconds 15

@@ -26,7 +26,7 @@ var (
 	// could not be built, or a streamed body it cannot see. The bouncer applies bouncerModsecFailureAction.
 	ErrUnavailable = errors.New("modsecInspect:unavailable")
 	// ErrGateSkip means the admission gate is backing off and the sidecar was not called.
-	// As for AppSec, the bouncer continues without ModSec and without the failure action.
+	// As for AppSec, the bouncer answers it with bouncerModsecBackOffAction, not the failure action.
 	ErrGateSkip = errors.New("modsecInspect:unhealthySkip")
 	// ErrBodyTooLarge means the body is over modsecBodyLimit. The bouncer answers 413.
 	ErrBodyTooLarge = wafhop.ErrBodyTooLarge
@@ -66,6 +66,7 @@ func (c *Client) Inspect(req *http.Request, failureAction string) (*http.Respons
 		if wafhop.IsInboundCanceled(req, admitErr) {
 			return nil, wafhop.ErrClientDisconnected
 		}
+		c.log.Error("fail to admit ModSec request", "error", admitErr)
 		return nil, fmt.Errorf("%w: admission: %s", ErrUnavailable, admitErr.Error())
 	}
 	if !ticket.Admitted {
@@ -87,7 +88,7 @@ func (c *Client) Inspect(req *http.Request, failureAction string) (*http.Respons
 			return nil, wafhop.ErrClientDisconnected
 		}
 		c.gate.Record(ticket, false)
-		logger.Debounced(c.log, slog.LevelError, 5*time.Second, MsgUnavailable, "host", sidecarLogHost(c.modsecURL), "reason", "unreachable")
+		logger.Debounced(c.log, slog.LevelError, 5*time.Second, MsgUnavailable, "host", sidecarLogHost(c.modsecURL), "reason", "unreachable", "error", transportCause(err))
 		return nil, fmt.Errorf("%w: %s", ErrUnavailable, err.Error())
 	}
 
@@ -129,6 +130,16 @@ func (c *Client) closeSidecarBody(body io.ReadCloser) {
 	if errClose := body.Close(); errClose != nil {
 		c.log.Debug("modsecInspect:closeBody", "error", errClose)
 	}
+}
+
+// transportCause is the transport error without the request URL. The URL carries the visitor's path
+// and query, which stay off logs like in sidecarLogHost.
+func transportCause(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) && urlErr.Err != nil {
+		return urlErr.Err
+	}
+	return err
 }
 
 // sidecarLogHost is the sidecar host for error logs. Query and userinfo stay off it.

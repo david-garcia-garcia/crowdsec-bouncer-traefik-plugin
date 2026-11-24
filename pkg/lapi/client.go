@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
@@ -23,7 +24,18 @@ const (
 	MsgConnectionClosed   = "crowdsec lapi instance closed"
 	MsgStreamUnhealthy    = "crowdsec stream became unhealthy"
 	MsgStreamHealthy      = "crowdsec stream became healthy"
+	// MsgBackoffStarted is the WARN line when the live/none admission gate starts skipping LAPI.
+	MsgBackoffStarted = "crowdsec lapi backoff started"
+	// MsgBackoffEnded is the INFO line when a live/none LAPI probe succeeds after a backoff.
+	MsgBackoffEnded = "crowdsec lapi backoff ended"
 )
+
+// gateKey is the admission leg name and gate key of the live/none LAPI gate.
+const gateKey = "lapi"
+
+// ErrGateSkip is a denied live/none LAPI admission: no GET was sent and nothing was cached.
+// The router answers it with bouncerLapiBackOffAction, not bouncerLapiFailureAction.
+var ErrGateSkip = errors.New("lapiQuery:unhealthySkip")
 
 // Decision is the body returned from Crowdsec LAPI.
 type Decision struct {
@@ -76,6 +88,7 @@ type Client struct {
 	metricsTimer            *pollTimer
 	metricsReporter         *MetricsReporter
 	streamFetches           int64
+	gate                    *admission.Gate // live/none admission gate; nil in stream/alone or when the period is 0
 }
 
 // Prepare resolves secrets and CAPI/LAPI routing on cfg. Call before Key and New.
@@ -134,6 +147,11 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		startup = 0
 	}
 
+	gate, err := newLiveGate(config, log)
+	if err != nil {
+		return nil, err
+	}
+
 	scopeQuery := decisionscope.StreamScopeQuery(config.LapiStreamScopes)
 	scopeSet := make(map[string]struct{}, 8)
 	for _, name := range decisionscope.CanonicalStreamScopes(config.LapiStreamScopes) {
@@ -165,6 +183,7 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 		isCrowdsecStreamStartup: startup,
 		isCrowdsecStreamHealthy: 1,
 		decisionStore:           store,
+		gate:                    gate,
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
 	client.metricsReporter = newMetricsReporter(client, time.Now())
@@ -184,6 +203,25 @@ func New(config *configuration.Config, log *slog.Logger, pluginVersion string, s
 
 	client.log.Info(MsgConnectionStarted, "incarnation", client.incarnation, "mode", client.crowdsecMode, "host", client.crowdsecHost, "reason", "started")
 	return client, nil
+}
+
+// newLiveGate builds the live/none admission gate, or nil. stream and alone poll LAPI on a ticker
+// and already have lapiUpdateMaxFailure, so liveGatePeriodSecs is 0 there and no gate is built.
+func newLiveGate(config *configuration.Config, log *slog.Logger) (*admission.Gate, error) {
+	return admission.New(admission.Config{
+		Leg:        gateKey,
+		PeriodSecs: liveGatePeriodSecs(config),
+		MsgStarted: MsgBackoffStarted,
+		MsgEnded:   MsgBackoffEnded,
+	}, log)
+}
+
+// GateForTest is the live/none admission gate, or nil in stream/alone or when the period is 0.
+func (c *Client) GateForTest() *admission.Gate {
+	if c == nil {
+		return nil
+	}
+	return c.gate
 }
 
 // Close stops tickers and idle LAPI HTTP. Safe to call more than once.
@@ -208,6 +246,7 @@ func (c *Client) Close() {
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.gate.Close()
 	if current := c.currentTransport(); current != nil {
 		closeIdle(current.httpClient)
 	}

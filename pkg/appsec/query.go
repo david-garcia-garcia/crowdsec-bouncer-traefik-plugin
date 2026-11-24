@@ -60,7 +60,8 @@ var ErrClientDisconnected = wafhop.ErrClientDisconnected
 // Query does not call AppSec and does not apply FailureAction; the bouncer answers 400 without a ban.
 var ErrClientBodyRead = wafhop.ErrClientBodyRead
 
-// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction.
+// ErrGateSkip is a denied AppSec admission. Query MUST NOT call AppSec or apply FailureAction;
+// the bouncer answers it with bouncerAppsecBackOffAction.
 var ErrGateSkip = errors.New("appsecQuery:unhealthySkip")
 
 // errAppsecReadBody is the io failure from readCappedAppsecBody (not an oversized body).
@@ -72,7 +73,7 @@ var errUnreadableBody = errors.New("appsecQuery:unreadableBody")
 
 // resultForFailureAction maps a configured fallback to allow, captcha, or an error ban.
 func resultForFailureAction(action, errMsg string) (*Response, error) {
-	switch configuration.EffectiveFailureAction(action) {
+	switch configuration.EffectiveAppsecFailureAction(action) {
 	case configuration.FailureActionPassthrough:
 		return appsecAllow(), nil
 	case configuration.FailureActionCaptcha:
@@ -149,9 +150,9 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 		if wafhop.IsInboundCanceled(req.Request, err) {
 			return nil, ErrClientDisconnected
 		}
-		c.log.Error("appsecQuery:unreachable")
+		c.log.Error("appsecQuery:unreachable", "error", err)
 		c.gate.Record(ticket, false)
-		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable")
+		return resultForFailureAction(pol.FailureAction, "appsecQuery:unreachable: "+err.Error())
 	}
 	// Drain every live response, including unexpected statuses, so keep-alive can reuse the slot.
 	defer c.drainResponse(res)
@@ -171,7 +172,7 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	// and does not use FailureAction. 500 uses FailureAction. 401 uses FailureAction and logs the
 	// protocol sentence. Any other code uses FailureAction and logs a WARN debounced on that message text.
 	if res.StatusCode == http.StatusInternalServerError {
-		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure")
+		logger.Debounced(c.log, slog.LevelInfo, 5*time.Second, "appsecQuery:failure", "statusCode", res.StatusCode)
 		c.gate.Record(ticket, false)
 		return resultForFailureAction(pol.FailureAction, "appsecQuery statusCode:500")
 	}
@@ -192,7 +193,7 @@ func (c *Client) Query(req clientrequest.Request, pol Policy) (*Response, error)
 	if err != nil {
 		// Io errors use FailureAction; oversized bodies stay as dest (allow 200 / error otherwise).
 		if errors.Is(err, errAppsecReadBody) {
-			c.log.Info("appsecQuery:failure")
+			c.log.Info("appsecQuery:failure", "error", err)
 			c.gate.Record(ticket, false)
 			return resultForFailureAction(pol.FailureAction, err.Error())
 		}
@@ -262,7 +263,7 @@ func (c *Client) newAppsecForwardRequest(req clientrequest.Request, pol Policy) 
 func (c *Client) newAppsecBodyRequest(target string, httpReq *http.Request, pol Policy) (*http.Request, error) {
 	switch {
 	case wafhop.IsBodyUnreadable(httpReq):
-		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
+		if wafhop.IsMethodWithBody(httpReq.Method) && configuration.EffectiveAppsecFailureAction(pol.FailureAction) != configuration.FailureActionPassthrough {
 			return nil, errUnreadableBody
 		}
 		req, _ := http.NewRequest(http.MethodGet, target, nil)

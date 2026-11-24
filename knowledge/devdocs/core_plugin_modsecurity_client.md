@@ -7,7 +7,7 @@ The reclaim value for one OWASP CRS sidecar inspect listener (`pkg/modsecurity`)
 _Avoid_: AppSec client, `modSecurityUrl`, the failure action as ownership, `atomic.Pointer[T]`, `X-Crowdsec-Appsec-*`
 
 **Admission gate**:
-The `pkg/admission` wrapper around the utilities `backendbackoff.Gate`, on a WAF Client when that Client's unhealthy-backoff period is greater than zero. One Gate per Client. The trip rule is fixed (`admission.TripFailures` 5, `admission.FailureRatio` 0.30) and the cooldown is the period, with no growth. This plugin must not copy the utilities package. Jitter and TTL stay unset (partial Config disables jitter).
+The `pkg/admission` wrapper around the utilities `backendbackoff.Gate`, on a WAF Client or a `live` / `none` LAPI Client when that Client's unhealthy-backoff period is greater than zero. One Gate per Client. The trip rule is fixed (`admission.TripFailures` 5, `admission.FailureRatio` 0.30) and the cooldown is the period, with no growth. This plugin must not copy the utilities package. Jitter and TTL stay unset (partial Config disables jitter).
 _Avoid_: failure action, copying Gate into this repository, a ratio, threshold, or max-period knob
 
 ## Overview
@@ -20,7 +20,7 @@ _Avoid_: failure action, copying Gate into this repository, a ratio, threshold, 
 - Call `modsecurity.Prepare` from `New` after captcha Prepare. When `modsecEnabled` is true and `modsecInstanceName` is empty after trim, fill it to the Traefik name. When the flag is false, leave an empty name empty.
 - Open with `modsecurity.Open` (reclaim by `OwnershipKey`). A knob change is a new Client. Two middleware names with the same `modsecUrl` are two Clients.
 - Hash `OwnershipKey` from middleware name plus `modsecUrl`, timeout, body limit, and `modsecUnhealthyBackOffPeriodSecs`. Slot name, `bouncerEnabled`, bounce knobs, LAPI, AppSec, captcha, and per-router `bouncerModsecFailureAction` stay off it.
-- When `modsecUnhealthyBackOffPeriodSecs` is greater than 0, `admission.New` builds one gate on `backendbackoff.Gate` from utilities `v1.0.12`. `Allow` returns a `Permit` and takes no context, so `Gate.Admit` checks the request context itself; `Report` takes that `Permit`. A stale permit's report is ignored and does not log the healthy line. Period `0` or omitted builds no gate (default `0`). The period is the only knob: each failure spends 1 of a budget of 5, each success earns back `0.30/0.70`, so 5 failures in a row trip. Max cooldown equals the base. Do not set `Jitter` or `TTL`.
+- When `modsecUnhealthyBackOffPeriodSecs` is greater than 0, `admission.New` builds one gate on `backendbackoff.Gate` from utilities `v1.0.12`. `Allow` returns a `Permit` and takes no context, so `Gate.Admit` checks the request context itself; `Report` takes that `Permit`. A stale permit's report is ignored and does not log the healthy line. Period `0` builds no gate; omitted is the default `10`, which builds one. The period is the only knob: each failure spends 1 of a budget of 5, each success earns back `0.30/0.70`, so 5 failures in a row trip. Max cooldown equals the base. Do not set `Jitter` or `TTL`.
 - The gate logs WARN `crowdsec modsec backoff started` once on the first skipped request, and INFO `crowdsec modsec backoff ended` once when a probe's report is applied. A stale permit's report does not log that line.
 - Omitted `modsecBodyLimit` is 8388608 (8 MiB). There is no unlimited value: with `modsecEnabled`, a limit below 1 fails `New` (`validateModsecURL`). A middleware that does not own ModSec does not validate it. Exceeding the limit is HTTP 413 and does not call the sidecar.
 - There is no method list for bodies (`modsecDenyVerbsWithBody` is gone). A readable body on any method goes to the sidecar; CRS 920170/920171 block a body on GET/HEAD. An operator who wants more adds a `SecRule` to the sidecar.
@@ -54,6 +54,6 @@ err = reclaim.SetAlias(modsecurity.OwnershipKey(&config, name), instanceAlias("m
 ## Gotchas
 
 - Traefik decode drops source-plugin `modSecurityUrl`. The Config field is `modsecUrl`.
-- Default ModSec backoff is off (`0`). Default AppSec backoff is 30. Do not copy the AppSec default onto ModSec.
-- The failure action is per-router on Bouncer. Two routers on one published Client MAY disagree. It is not in the ownership key.
+- Default ModSec, AppSec, and LAPI live/none backoff is 10 (`configuration.Default*UnhealthyBackOffPeriodSecs`). Real-stack routes that run against a dead sidecar to assert the failure action pin `modsecUnhealthyBackOffPeriodSecs: 0`.
+- The failure action and the backoff action are per-router on Bouncer. Two routers on one published Client MAY disagree. Neither is in the ownership key.
 - Do not put a second slot table or `atomic.Pointer[T]` on this Client.

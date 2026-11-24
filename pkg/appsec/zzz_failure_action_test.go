@@ -268,3 +268,57 @@ func Test_appsecQuery_unexpectedStatusWarnsOnce(t *testing.T) {
 		t.Fatalf("500 must not warn, count %d, log %s", got, sink.String())
 	}
 }
+
+// Test_appsecQuery_failureLogsCarryCause proves every AppSec failure log says why: the transport error
+// on every unreachable call (no debounce, the admission gate bounds it), the read error, and the 500 status.
+func Test_appsecQuery_failureLogsCarryCause(t *testing.T) {
+	logger.ResetDebounceForTest()
+	appsecServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusOK)
+	}))
+	appsecURL, _ := url.Parse(appsecServer.URL)
+	var sink bytes.Buffer
+	log := slog.New(slog.NewJSONHandler(&sink, &slog.HandlerOptions{Level: slog.LevelInfo}))
+	client := NewTestClient(appsecURL, appsecServer.Client(), log)
+	appsecServer.Close()
+	req := httptest.NewRequest(http.MethodGet, "http://localhost/", nil)
+
+	for range 2 {
+		if _, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}); err != nil {
+			t.Fatalf("passthrough on unreachable: %v", err)
+		}
+	}
+	if got := strings.Count(sink.String(), `"msg":"appsecQuery:unreachable","error":"`); got != 2 {
+		t.Fatalf("unreachable ERROR with cause count %d want 2, log %s", got, sink.String())
+	}
+	if !strings.Contains(sink.String(), "dial tcp") {
+		t.Fatalf("unreachable ERROR missing the dial error: %s", sink.String())
+	}
+	_, err := client.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionBan})
+	if err == nil || !strings.Contains(err.Error(), "appsecQuery:unreachable: ") || !strings.Contains(err.Error(), "dial tcp") {
+		t.Fatalf("ban on unreachable error %v want appsecQuery:unreachable: <dial error>", err)
+	}
+
+	sink.Reset()
+	readClient := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: failBodyRoundTripper{}}, log)
+	if _, err := readClient.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}); err != nil {
+		t.Fatalf("passthrough on response-body read error: %v", err)
+	}
+	if !strings.Contains(sink.String(), `"msg":"appsecQuery:failure","error":"`) || !strings.Contains(sink.String(), "boom") {
+		t.Fatalf("read-error INFO missing the cause: %s", sink.String())
+	}
+
+	sink.Reset()
+	failServer := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
+		rw.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer failServer.Close()
+	failURL, _ := url.Parse(failServer.URL)
+	failClient := NewTestClient(failURL, failServer.Client(), log)
+	if _, err := failClient.Query(withTestAddress(req), Policy{FailureAction: configuration.FailureActionPassthrough}); err != nil {
+		t.Fatalf("passthrough on 500: %v", err)
+	}
+	if !strings.Contains(sink.String(), `"msg":"appsecQuery:failure","statusCode":500`) {
+		t.Fatalf("500 INFO missing statusCode: %s", sink.String())
+	}
+}

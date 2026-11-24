@@ -355,11 +355,17 @@ bouncerActionRules:
 
 To try the rules out, see [Test a ban or a captcha](how-to/test-ban-or-captcha.md).
 
+#### `bouncerAppsecBackOffAction`
+
+`string` · default `passthrough`
+
+What to do while the AppSec backoff gate skips AppSec (`appsecUnhealthyBackOffPeriodSecs`): `passthrough`, `ban`, or `captcha`. AppSec is not called. Per router: two routers on the same AppSec connection share the gate and can answer differently. Verdict header `ban:appsec-backoff` or `captcha:appsec-backoff`. `captcha` needs a captcha instance on this router. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
+
 #### `bouncerAppsecFailureAction`
 
-`string` · default `ban`
+`string` · default `passthrough` (was `ban`)
 
-What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `ban`, `passthrough`, or `captcha`. While the backoff gate skips AppSec (`appsecUnhealthyBackOffPeriodSecs`), this action does not apply. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `passthrough`, `ban`, or `captcha`. With `passthrough`, a POST, PUT, or PATCH body streamed without a length is sent to AppSec with its headers only. While the backoff gate skips AppSec, [`bouncerAppsecBackOffAction`](#bouncerappsecbackoffaction) applies instead. Set `ban` to keep the earlier default. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
 
 #### `bouncerBanFilePath`
 
@@ -397,11 +403,23 @@ Trust the header from any connection, as a single address. Only safe when Traefi
 
 IPs or ranges of the proxies in front of Traefik (for example Cloudflare's ranges). The forwarded header is only used when the connection comes from one of them; when empty, the connecting IP is used. Do not use a catch-all such as `0.0.0.0/0`: every address in the header is then treated as a proxy and the plugin silently falls back to the connecting IP. On a private network you can list private ranges (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), as long as real clients are not in them. See [Remediate the visitor, not the proxy](how-to/behind-proxy.md).
 
+#### `bouncerLapiBackOffAction`
+
+`string` · default `ban`
+
+What to do in `live` and `none` while the LAPI backoff gate skips LAPI (`lapiUnhealthyBackOffPeriodSecs`): `ban`, `passthrough`, or `captcha`. LAPI is not called and nothing is cached. Per router. Verdict header `ban:lapi-backoff` or `captcha:lapi-backoff`. Ignored in `stream` and `alone`. A router with `bouncerLapiFailureAction: passthrough` and this default logs a WARN at startup: set this to `passthrough` too to let requests through for the whole outage. See [LAPI](failure-modes.md#lapi).
+
 #### `bouncerLapiFailureAction`
 
 `string` · default `ban`
 
-What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. In `live` and `none`, this also applies when a country, AS, or other header-scope lookup fails. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. In `live` and `none`, this also applies when a country, AS, or other header-scope lookup fails, and [`bouncerLapiBackOffAction`](#bouncerlapibackoffaction) applies instead while the backoff gate skips LAPI. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+
+#### `bouncerModsecBackOffAction`
+
+`string` · default `passthrough`
+
+What to do while the ModSec backoff gate skips the sidecar (`modsecUnhealthyBackOffPeriodSecs`): `passthrough`, `ban`, or `captcha`, as for AppSec. The sidecar is not called. Per router. Verdict header `ban:modsec-backoff` or `captcha:modsec-backoff`. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
 
 #### `bouncerLapiRedisFailureAction`
 
@@ -413,7 +431,7 @@ What to do when the LAPI Redis cache cannot be read: `ban`, `passthrough`, or `c
 
 `string` · default `passthrough`
 
-What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreachable, or no connection published yet): `passthrough`, `ban`, or `captcha`, as for AppSec. A POST, PUT, or PATCH body streamed without a length is inspected on its headers only with `passthrough`, and gets this action otherwise. While the backoff gate skips the sidecar, this action does not apply. A 3xx or 4xx from the sidecar is a block, not a failure. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
+What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreachable, or no connection published yet): `passthrough`, `ban`, or `captcha`, as for AppSec. A POST, PUT, or PATCH body streamed without a length is inspected on its headers only with `passthrough`, and gets this action otherwise. While the backoff gate skips the sidecar, [`bouncerModsecBackOffAction`](#bouncermodsecbackoffaction) applies instead. A 3xx or 4xx from the sidecar is a block, not a failure. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
 
 #### `bouncerOriginBasedDecisionRemap`
 
@@ -489,13 +507,19 @@ Seconds between decision refreshes in `stream`. Fixed to `7200` in `alone`.
 
 `int64` · default `0`
 
-`stream` and `alone` only. Number of failed refreshes tolerated before `bouncerLapiFailureAction` applies to clients without a known decision. `0` reacts on the first failure; `-1` never. Known decisions keep applying. In `live` and `none` it has no effect: `bouncerLapiFailureAction` applies on the first failed lookup. To let traffic through while LAPI is down there, use `bouncerLapiFailureAction: passthrough`. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+`stream` and `alone` only. Number of failed refreshes tolerated before `bouncerLapiFailureAction` applies to clients without a known decision. `0` reacts on the first failure; `-1` never. Known decisions keep applying. In `live` and `none` it has no effect: `bouncerLapiFailureAction` applies on the first failed lookup, then the backoff gate (`lapiUnhealthyBackOffPeriodSecs`) takes over. To let traffic through while LAPI is down there, use `bouncerLapiFailureAction: passthrough` and `bouncerLapiBackOffAction: passthrough`. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
 
 #### `lapiDefaultDecisionSeconds`
 
 `int64` · default `60`
 
 `live` only. How long a LAPI answer is cached, at most.
+
+#### `lapiUnhealthyBackOffPeriodSecs`
+
+`int64` · default `10`
+
+`live` and `none` only. Cooldown in seconds of the LAPI backoff gate. After 5 live lookups in a row that LAPI does not answer (timeout, refused connection, 5xx, or 429; a 401 or 403 does not count), LAPI is not called for this long and lookups get each router's [`bouncerLapiBackOffAction`](#bouncerlapibackoffaction) (default `ban`) at once, instead of waiting up to `lapiHttpTimeoutSeconds` each. `0` turns the gate off: every lookup calls LAPI, as in earlier versions. Must be `0` or more. Set on the middleware that connects to LAPI; ignored in `stream` and `alone`. See [LAPI](failure-modes.md#lapi).
 
 #### `lapiStreamScopes`
 
@@ -651,9 +675,9 @@ Do not verify AppSec's certificate. Not for production.
 
 #### `appsecUnhealthyBackOffPeriodSecs`
 
-`int64` · default `30`
+`int64` · default `10` (was `30`)
 
-Cooldown in seconds of the AppSec backoff gate. After 5 AppSec failures in a row (or failures above about 30% of requests), AppSec is skipped for this long: requests continue without AppSec and without `bouncerAppsecFailureAction`. `0` turns the gate off, so every request calls AppSec and every failure gets the failure action. Set on the middleware that connects to AppSec. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
+Cooldown in seconds of the AppSec backoff gate. After 5 AppSec failures in a row (or failures above about 30% of requests), AppSec is skipped for this long: requests get each router's [`bouncerAppsecBackOffAction`](#bouncerappsecbackoffaction) (default `passthrough`), not `bouncerAppsecFailureAction`. `0` turns the gate off, so every request calls AppSec and every failure gets the failure action. Set on the middleware that connects to AppSec. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
 
 ### ModSecurity
 
@@ -679,9 +703,9 @@ Largest request body sent to the ModSecurity sidecar. A larger body gets HTTP 41
 
 #### `modsecUnhealthyBackOffPeriodSecs`
 
-`int64` · default `0`
+`int64` · default `10` (was `0`, off)
 
-Cooldown in seconds of the ModSec backoff gate, same rule as `appsecUnhealthyBackOffPeriodSecs`: after 5 sidecar failures in a row, the sidecar is skipped for this long, without `bouncerModsecFailureAction`. `0` turns the gate off. Set on the middleware that connects to the sidecar.
+Cooldown in seconds of the ModSec backoff gate, same rule as `appsecUnhealthyBackOffPeriodSecs`: after 5 sidecar failures in a row, the sidecar is skipped for this long and requests get each router's [`bouncerModsecBackOffAction`](#bouncermodsecbackoffaction) (default `passthrough`), not `bouncerModsecFailureAction`. `0` turns the gate off, as before. Set on the middleware that connects to the sidecar.
 
 ### Rate limit
 
