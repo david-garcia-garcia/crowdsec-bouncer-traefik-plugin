@@ -150,6 +150,33 @@ func TestReceiveLAPI_WarnsWhenHeaderScopeIsNotPolled(t *testing.T) {
 	}
 }
 
+// TestReceiveLAPI_QuietInLiveAndNone proves live and none, which ask LAPI for each header scope per request,
+// do not warn that the stream lacks those scopes.
+func TestReceiveLAPI_QuietInLiveAndNone(t *testing.T) {
+	for _, mode := range []string{configuration.LiveMode, configuration.NoneMode} {
+		log, sink := newTestLogSink(slog.LevelWarn)
+		b, client := newReceiveLAPIBouncer(log)
+		client.SetCrowdsecModeForTest(mode)
+		b.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
+		b.ReceiveLAPI(reclaim.Published{Value: client})
+		if strings.Contains(sink.String(), "stream scopes missing") {
+			t.Fatalf("%s must not warn about stream scopes, got %s", mode, sink.String())
+		}
+	}
+}
+
+// TestReceiveLAPI_WarnCarriesTraefikNameOnce proves the WARN does not repeat the traefikName key the
+// route logger already carries: some JSON parsers reject or collapse duplicate keys.
+func TestReceiveLAPI_WarnCarriesTraefikNameOnce(t *testing.T) {
+	log, sink := newTestLogSink(slog.LevelWarn)
+	b, client := newReceiveLAPIBouncer(log.With("traefikName", "edge"))
+	b.decisionScopeHeaders = map[string]string{decisionscope.ScopeCountry: "CF-IPCountry"}
+	b.ReceiveLAPI(reclaim.Published{Value: client})
+	if got := strings.Count(sink.String(), "traefikName"); got != 1 {
+		t.Fatalf("want traefikName once, got %d in %s", got, sink.String())
+	}
+}
+
 func TestReceiveLAPI_QuietWhenNoHeaderScopes(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelWarn)
 	b, client := newReceiveLAPIBouncer(log)
