@@ -395,7 +395,7 @@ Header holding the real client IP. Only read when the connection comes from an I
 
 `bool` · default `false`
 
-Trust the header from any connection, as a single address. Only safe when Traefik's entrypoint already restricts forwarded headers with `forwardedHeaders.trustedIPs`. Otherwise any visitor can choose the IP the plugin checks.
+Trust the header from any connection, as a single address. With the default `bouncerForwardedHeadersCustomName` (`X-Forwarded-For`), the plugin reads `X-Real-Ip` instead and ignores `X-Forwarded-For`. Traefik keeps an `X-Real-Ip` sent by a proxy in the entrypoint's `forwardedHeaders.trustedIPs` and otherwise fills it in with the connecting IP. With any other name, the plugin reads that header. The header must hold one address: a list such as `a, b` is unreadable and answers `502`. Only safe when Traefik's entrypoint already restricts forwarded headers with `forwardedHeaders.trustedIPs`. Otherwise any visitor can choose the IP the plugin checks. The plugin logs INFO `BouncerForwardedHeadersInsecure enabled` with the header it reads.
 
 #### `bouncerForwardedHeadersTrustedIps`
 
