@@ -1,5 +1,5 @@
 // Package clientrequest holds one inbound HTTP request together with the
-// client address GetRemoteIP already chose and the constructor-owned scheme token.
+// client address GetRemoteIP already chose, the constructor-owned scheme token, and the host name.
 package clientrequest
 
 import (
@@ -18,9 +18,9 @@ const (
 	maxContentLengthContribution = 50 * 1024 * 1024
 )
 
-// Request is one inbound request plus the GetRemoteIP address plus the scheme token.
+// Request is one inbound request plus the GetRemoteIP address, the scheme token, and the host name.
 // Callers keep the name req. Scopes, remediation origin, and captcha state stay off this type.
-// Address, scheme, and absolute URL are fixed by New.
+// Address, scheme, absolute URL, and host name are fixed by New.
 type Request struct {
 	*http.Request
 	ipAddr       net.IP // copy of the parsed address; nil when unparseable
@@ -28,11 +28,12 @@ type Request struct {
 	ipAddrString string // ipAddr.String() when parsed; otherwise the raw extract for fail logs
 	scheme       string // constructor token: http or https
 	absoluteURL  string // constructor snapshot of the client-facing URL
+	hostname     string // hostnameOf(Host): lower case, no port, no trailing dot
 }
 
 // New builds Request from the live request and the address GetRemoteIP already chose.
 // When ipAddr is non-nil, IPAddrString is stored as ipAddr.String(). The family is ip.FamilyOfIP(ipAddr).
-// Scheme and AbsoluteURL are fixed here. Later edits to Host, URL, or the passed net.IP do not change them.
+// Scheme, AbsoluteURL, and Hostname are fixed here. Later edits to Host, URL, or the passed net.IP do not change them.
 // New does not write onto the live *http.Request.
 func New(httpReq *http.Request, remoteIP string, ipAddr net.IP) Request {
 	if ipAddr != nil {
@@ -47,6 +48,7 @@ func New(httpReq *http.Request, remoteIP string, ipAddr net.IP) Request {
 		ipAddrString: remoteIP,
 		scheme:       scheme,
 		absoluteURL:  absoluteURL(httpReq, scheme),
+		hostname:     hostnameOf(httpReq.Host),
 	}
 }
 
@@ -73,6 +75,14 @@ func (r Request) IPAddrString() string {
 // Scheme is the constructor-owned client-facing scheme token (http or https).
 func (r Request) Scheme() string {
 	return r.scheme
+}
+
+// Hostname is the host name captured by New: Host in lower case, without the port and without one trailing dot.
+// Host names are case-insensitive (RFC 4343) and Traefik routes Host() the same way, so
+// "EXAMPLE.com." and "example.com:443" both read "example.com". Rule and bucket host conditions,
+// the rate-limit host key, and the domain on the captcha and ban pages read it.
+func (r Request) Hostname() string {
+	return r.hostname
 }
 
 // AbsoluteURL is the client-facing URL captured by New: constructor scheme, URL.Host else Request.Host, path and query preserved.
@@ -124,6 +134,14 @@ func absoluteURL(httpReq *http.Request, scheme string) string {
 		RawQuery: httpReq.URL.RawQuery,
 	}
 	return abs.String()
+}
+
+// hostnameOf drops the port when SplitHostPort succeeds, then one trailing dot, then lowers the case.
+func hostnameOf(host string) string {
+	if withoutPort, _, err := net.SplitHostPort(host); err == nil {
+		host = withoutPort
+	}
+	return strings.ToLower(strings.TrimSuffix(host, "."))
 }
 
 // schemeOf derives the scheme token from proto-then-TLS. It does not re-check hop trust.

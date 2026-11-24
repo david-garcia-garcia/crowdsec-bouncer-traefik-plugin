@@ -46,7 +46,7 @@ func (b *Bouncer) handleBanStatusServeHTTP(rw http.ResponseWriter, req clientreq
 	templateData := map[string]string{
 		"RemediationReason": reason,
 		"ClientIP":          req.IPAddrString(),
-		"Domain":            html.EscapeString(captcha.RequestDomain(req.Host)),
+		"Domain":            html.EscapeString(captcha.RequestDomain(req)),
 	}
 
 	if b.traceCustomHeader != "" {

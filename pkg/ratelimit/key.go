@@ -4,11 +4,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net"
-	"net/http"
 	"net/url"
 	"strings"
 
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	ip "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ip"
 )
 
@@ -24,10 +23,15 @@ const (
 // keySource is one request as the key parts read it. The query string is parsed at most once,
 // and only when a part asks for it.
 type keySource struct {
-	httpReq     *http.Request
+	req         clientrequest.Request
 	clientIP    net.IP
 	query       url.Values
 	queryParsed bool
+}
+
+// newKeySource reads the client address of req once for every bucket of one Charge.
+func newKeySource(req clientrequest.Request) *keySource {
+	return &keySource{req: req, clientIP: req.IPAddr()}
 }
 
 // queryValues parses the URL query on first use.
@@ -36,10 +40,10 @@ func (source *keySource) queryValues() url.Values {
 		return source.query
 	}
 	source.queryParsed = true
-	if source.httpReq.URL == nil {
+	if source.req.URL == nil {
 		return nil
 	}
-	source.query = source.httpReq.URL.Query()
+	source.query = source.req.URL.Query()
 	return source.query
 }
 
@@ -76,7 +80,7 @@ func (part *compiledKeyPart) value(source *keySource) (string, bool) {
 
 // rawValue is the request value the part's source names, before the pattern. Empty means missing.
 func (part *compiledKeyPart) rawValue(source *keySource) string {
-	httpReq := source.httpReq
+	req := source.req
 	switch part.from {
 	case KeyFromIP:
 		masked := ip.MaskPrefix(source.clientIP, part.ipv4Prefix, part.ipv6Prefix)
@@ -85,9 +89,9 @@ func (part *compiledKeyPart) rawValue(source *keySource) string {
 		}
 		return masked.String()
 	case KeyFromHeader:
-		return httpReq.Header.Get(part.name)
+		return req.Header.Get(part.name)
 	case KeyFromCookie:
-		cookie, err := httpReq.Cookie(part.name)
+		cookie, err := req.Cookie(part.name)
 		if err != nil {
 			return ""
 		}
@@ -95,14 +99,14 @@ func (part *compiledKeyPart) rawValue(source *keySource) string {
 	case KeyFromQuery:
 		return source.queryValues().Get(part.name)
 	case KeyFromHost:
-		return httprule.RequestHostname(httpReq)
+		return req.Hostname()
 	case KeyFromPath:
-		if httpReq.URL == nil {
+		if req.URL == nil {
 			return ""
 		}
-		return httpReq.URL.Path
+		return req.URL.Path
 	case KeyFromMethod:
-		return httpReq.Method
+		return req.Method
 	}
 	return ""
 }

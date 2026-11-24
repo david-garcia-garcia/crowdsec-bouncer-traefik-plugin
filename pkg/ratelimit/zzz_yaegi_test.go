@@ -28,6 +28,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 )
 
@@ -89,7 +90,7 @@ func main() {
 		var verdicts [2]ratelimit.Verdict
 		for i := range verdicts {
 			ctx, cancel := context.WithTimeout(context.Background(), ratelimit.StepBudget)
-			verdicts[i] = set.Charge(ctx, counter, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, false)
+			verdicts[i] = set.Charge(ctx, counter, "yaegi", clientrequest.New(httptest.NewRequest("GET", "http://example.com/", nil), clientIP.String(), clientIP), false)
 			cancel()
 		}
 		if algorithm == ratelimit.AlgorithmTokenBucket {
@@ -107,11 +108,11 @@ func main() {
 	}
 	burstCounter := &inMemoryCounter{hits: map[string]int64{}}
 	var fake ratelimit.Counter = burstCounter
-	first := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, false)
+	first := set.Charge(context.Background(), fake, "yaegi", clientrequest.New(httptest.NewRequest("GET", "http://example.com/", nil), clientIP.String(), clientIP), false)
 	if burstCounter.lastBurst != 1 {
 		exitWithFailure("the counter must see the bucket's burst (requests when unset)")
 	}
-	second := set.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, false)
+	second := set.Charge(context.Background(), fake, "yaegi", clientrequest.New(httptest.NewRequest("GET", "http://example.com/", nil), clientIP.String(), clientIP), false)
 	if first.RateLimit.Name != "" || second.RateLimit.Name != "per-ip" || second.RateLimit.RetryAfter != 3*time.Second {
 		exitWithFailure("interpreted counter: want the second request answered by per-ip")
 	}
@@ -129,7 +130,7 @@ func main() {
 		fake = &inMemoryCounter{hits: map[string]int64{}}
 		var answers [3]ratelimit.Verdict
 		for i := range answers {
-			answers[i] = stacked.Charge(context.Background(), fake, "yaegi", httptest.NewRequest("GET", "http://example.com/", nil), clientIP, gateCleared)
+			answers[i] = stacked.Charge(context.Background(), fake, "yaegi", clientrequest.New(httptest.NewRequest("GET", "http://example.com/", nil), clientIP.String(), clientIP), gateCleared)
 		}
 		wantCaptcha := "soft"
 		if gateCleared {

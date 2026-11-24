@@ -12,6 +12,7 @@ import (
 	"text/template"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/appsec"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
@@ -68,11 +69,11 @@ func TestBouncerNew_compilesActionRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	appsecReq := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
-	if hits := got.actionRules.Matching(appsecReq); len(hits) != 1 || !got.actionRules.SkipAppsec(hits[0]) {
+	if hits := got.actionRules.Matching(clientrequest.New(appsecReq, "", nil)); len(hits) != 1 || !got.actionRules.SkipAppsec(hits[0]) {
 		t.Fatal("appsec action rule must compile")
 	}
 	lapiReq := httptest.NewRequest(http.MethodGet, "http://example.com/ok/x", nil)
-	if hits := got.actionRules.Matching(lapiReq); len(hits) != 1 || !got.actionRules.SkipLapi(hits[0]) {
+	if hits := got.actionRules.Matching(clientrequest.New(lapiReq, "", nil)); len(hits) != 1 || !got.actionRules.SkipLapi(hits[0]) {
 		t.Fatal("lapi action rule must compile")
 	}
 }
@@ -85,7 +86,7 @@ func TestBouncerNew_emptyActionRulesMatchNothing(t *testing.T) {
 		t.Fatal(err)
 	}
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
-	if len(got.actionRules.Matching(req)) != 0 {
+	if len(got.actionRules.Matching(clientrequest.New(req, "", nil))) != 0 {
 		t.Fatal("empty action lists must match nothing")
 	}
 }

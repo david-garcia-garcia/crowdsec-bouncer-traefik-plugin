@@ -4,7 +4,6 @@ package captcha
 import (
 	"html"
 	"log/slog"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -154,20 +153,16 @@ func (c *Client) ServeHTTP(rw http.ResponseWriter, req clientrequest.Request, re
 		"BootScript":   bootScript,
 		"Action":       c.widget.Action,
 		"DrawCheckbox": c.widget.drawCheckbox(),
-		"Domain":       html.EscapeString(RequestDomain(req.Host)),
+		"Domain":       html.EscapeString(RequestDomain(req)),
 	})
 	if err != nil {
 		c.log.Info("captcha:ServeHTTP captchaTemplateServe", "error", err)
 	}
 }
 
-// RequestDomain is the hostname the browser showed, without a port.
-func RequestDomain(host string) string {
-	name := host
-	if parsed, _, err := net.SplitHostPort(host); err == nil {
-		name = parsed
-	}
-	name = strings.TrimSpace(name)
+// RequestDomain is the host name shown on the captcha and ban pages: req.Hostname(), or "This site" when empty.
+func RequestDomain(req clientrequest.Request) string {
+	name := strings.TrimSpace(req.Hostname())
 	if name == "" {
 		return "This site"
 	}

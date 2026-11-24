@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/captcha"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
@@ -255,11 +256,11 @@ func TestBouncerNew_compilesActionHeaderRules(t *testing.T) {
 		t.Fatal(err)
 	}
 	banReq := testForcedDecisionRequest("b")
-	if hits := got.actionRules.Matching(banReq); len(hits) != 1 || !got.actionRules.Ban(hits[0]) {
+	if hits := got.actionRules.Matching(clientrequest.New(banReq, "", nil)); len(hits) != 1 || !got.actionRules.Ban(hits[0]) {
 		t.Fatal("ban header rule must compile")
 	}
 	captchaReq := testForcedDecisionRequest("c")
-	if hits := got.actionRules.Matching(captchaReq); len(hits) != 1 || !got.actionRules.Captcha(hits[0]) {
+	if hits := got.actionRules.Matching(clientrequest.New(captchaReq, "", nil)); len(hits) != 1 || !got.actionRules.Captcha(hits[0]) {
 		t.Fatal("captcha header rule must compile")
 	}
 }

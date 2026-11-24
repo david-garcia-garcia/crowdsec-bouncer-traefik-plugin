@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 )
 
@@ -61,7 +62,7 @@ func chargeTest(set *BucketSet, counter Counter, method, target, clientIP string
 // chargeTestWithGate charges one request from clientIP to method target; gateCleared says the client
 // holds the router's valid captcha gate.
 func chargeTestWithGate(set *BucketSet, counter Counter, method, target, clientIP string, gateCleared bool) Verdict {
-	return set.Charge(context.Background(), counter, "edge", httptest.NewRequest(method, "http://example.com"+target, nil), net.ParseIP(clientIP), gateCleared)
+	return set.Charge(context.Background(), counter, "edge", clientrequest.New(httptest.NewRequest(method, "http://example.com"+target, nil), clientIP, net.ParseIP(clientIP)), gateCleared)
 }
 
 // TestCharge_firstRateLimitAnswersAndLaterBucketsAreNotCharged is the spec scenario with login then per-ip.
