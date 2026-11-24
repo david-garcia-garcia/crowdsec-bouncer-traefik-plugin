@@ -221,13 +221,16 @@ func (rule compiledRule) match(httpReq *http.Request, cookies []*http.Cookie) bo
 	return matchCookies(rule.cookies, cookies)
 }
 
-// RequestHostname is the hostname of req.Host. SplitHostPort success drops the port.
+// RequestHostname is the hostname of req.Host in lower case, without the port and without one trailing dot.
+// Host names are case-insensitive (RFC 4343) and Traefik routes Host() the same way, so
+// "EXAMPLE.com." and "example.com:443" both read "example.com".
 // It is the one owner of the text a host predicate and a rate-limit host key read.
 func RequestHostname(httpReq *http.Request) string {
-	if hostname, _, err := net.SplitHostPort(httpReq.Host); err == nil {
-		return hostname
+	hostname := httpReq.Host
+	if withoutPort, _, err := net.SplitHostPort(hostname); err == nil {
+		hostname = withoutPort
 	}
-	return httpReq.Host
+	return strings.ToLower(strings.TrimSuffix(hostname, "."))
 }
 
 // matchMethod applies unanchored RE2 on req.Method. Any always matches. methodNeg inverts.

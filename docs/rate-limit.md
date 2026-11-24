@@ -77,7 +77,7 @@ http:
 | ------ | ----- |
 | `ip` | The client IP, the one the [trusted proxy settings](how-to/behind-proxy.md) resolve. `ipv4Prefix` (1–32) and `ipv6Prefix` (1–128) count a whole network instead. |
 | `header`, `cookie`, `query` | The value of the header, cookie, or query parameter named by `name`. Header names ignore case; cookie and query names do not. |
-| `host` | The host name of the request, without the port. |
+| `host` | The host name of the request in lower case, without the port and without a trailing dot. The `host` condition of a bucket reads the same value. |
 | `path` | The request path. |
 | `method` | The request method. |
 

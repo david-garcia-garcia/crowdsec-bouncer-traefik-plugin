@@ -70,6 +70,22 @@ func TestCounterKey_eachSource(t *testing.T) {
 	}
 }
 
+// TestCounterKey_hostIgnoresCaseAndTrailingDot proves "SHOP.example." and "shop.example:8443" share the
+// counter of "shop.example", so changing the Host case does not start a fresh count.
+func TestCounterKey_hostIgnoresCaseAndTrailingDot(t *testing.T) {
+	bucket := validTestBucket("b")
+	bucket.Key = []KeyPart{{From: KeyFromHost}}
+	want := redisCounterKey("edge", "b", []string{"shop.example"})
+	for _, host := range []string{"shop.example", "SHOP.EXAMPLE", "Shop.Example:8443", "shop.example."} {
+		httpReq := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
+		httpReq.Host = host
+		key, found := testKeyOf(t, "edge", []BucketRule{bucket}, httpReq, "198.51.100.7")
+		if !found || key != want {
+			t.Errorf("host %q key=%s found=%v want %s", host, key, found, want)
+		}
+	}
+}
+
 // TestCounterKey_groupsAndSeparates proves tenant capture, IPv6 /64 grouping, the fixed key of an empty
 // key list, the hashed Redis key, and separate middleware names.
 func TestCounterKey_groupsAndSeparates(t *testing.T) {

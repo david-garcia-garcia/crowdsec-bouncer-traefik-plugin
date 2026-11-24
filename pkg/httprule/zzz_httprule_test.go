@@ -536,13 +536,39 @@ func TestNewWithCatchAll_ruleWithNoPredicateMatchesEverything(t *testing.T) {
 	}
 }
 
-// TestRequestHostname_dropsThePort proves the exported host owner reads req.Host without its port.
+// TestRequestHostname_dropsThePort proves the exported host owner reads req.Host without its port,
+// in lower case and without a trailing dot.
 func TestRequestHostname_dropsThePort(t *testing.T) {
-	for host, want := range map[string]string{"example.com:443": "example.com", "[::1]:443": "::1", "example.com": "example.com"} {
+	for host, want := range map[string]string{
+		"example.com:443":   "example.com",
+		"[::1]:443":         "::1",
+		"example.com":       "example.com",
+		"EXAMPLE.com":       "example.com",
+		"Example.Com:8080":  "example.com",
+		"example.com.":      "example.com",
+		"EXAMPLE.COM.:443":  "example.com",
+		"[2001:DB8::1]:443": "2001:db8::1",
+	} {
 		req := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
 		req.Host = host
 		if got := RequestHostname(req); got != want {
 			t.Errorf("RequestHostname(%q)=%q want %q", host, got, want)
+		}
+	}
+}
+
+// TestHostRule_matchesWhateverTheCaseOrTrailingDot proves a host condition cannot be dodged by
+// changing the case of the Host header or adding the trailing dot Traefik still routes.
+func TestHostRule_matchesWhateverTheCaseOrTrailingDot(t *testing.T) {
+	set, err := New([]Rule{{Host: `^rules\.test$`}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, host := range []string{"rules.test", "rules.test:80", "RULES.TEST", "Rules.Test", "rules.test.", "RULES.TEST.:443"} {
+		req := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
+		req.Host = host
+		if !set.Match(req) {
+			t.Errorf("host %q must match the rules.test condition", host)
 		}
 	}
 }
