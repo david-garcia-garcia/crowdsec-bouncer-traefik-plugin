@@ -365,7 +365,7 @@ What to do while the AppSec backoff gate skips AppSec (`appsecUnhealthyBackOffPe
 
 `string` · default `passthrough` (was `ban`)
 
-What to do when AppSec cannot give an answer (unreachable, error, or request body cannot be read): `passthrough`, `ban`, or `captcha`. With `passthrough`, a POST, PUT, or PATCH body streamed without a length is sent to AppSec with its headers only. While the backoff gate skips AppSec, [`bouncerAppsecBackOffAction`](#bouncerappsecbackoffaction) applies instead. Set `ban` to keep the earlier default. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
+What to do when AppSec cannot give an answer (unreachable, a timeout, or an error): `passthrough`, `ban`, or `captcha`. A request body the client fails to send is not a failure: it gets HTTP 400 `error:client-body-read` (see [What AppSec and ModSec count as a failure](failure-modes.md#what-appsec-and-modsec-count-as-a-failure)). With `passthrough`, a POST, PUT, or PATCH body streamed without a length is sent to AppSec with its headers only. While the backoff gate skips AppSec, [`bouncerAppsecBackOffAction`](#bouncerappsecbackoffaction) applies instead. Set `ban` to keep the earlier default. See [Choose what happens when CrowdSec is down](how-to/crowdsec-down.md).
 
 #### `bouncerBanFilePath`
 

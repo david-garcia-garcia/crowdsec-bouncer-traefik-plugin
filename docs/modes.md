@@ -218,7 +218,7 @@ sequenceDiagram
 
 ## Captcha
 
-A captcha decision shows a challenge. After the provider accepts it, the IP is clean for `captchaGracePeriodSeconds`.
+A captcha decision shows a challenge. After the provider accepts it, the browser gets a signed cookie valid for `captchaGracePeriodSeconds` and tied to the visitor's IP (unless `captchaGateBindIp` is `false`). Nothing is stored in the decision cache: the same IP without the cookie gets the challenge again.
 
 ```mermaid
 sequenceDiagram
@@ -234,9 +234,11 @@ sequenceDiagram
     TraefikPlugin-->>ProviderCaptcha: Is the validation OK ?
     destroy ProviderCaptcha
     ProviderCaptcha-->>TraefikPlugin: Yes
-    TraefikPlugin-->>PluginCache: Set the User IP Clean for captchaGracePeriodSeconds
+    TraefikPlugin->>User: Signed cookie for captchaGracePeriodSeconds, redirect to the page
+    User->>TraefikPlugin: Same request, with the cookie
+    TraefikPlugin-->>PluginCache: Does the User IP has a Crowdsec Decision ?
     destroy PluginCache
-    PluginCache-->>TraefikPlugin: Done
+    PluginCache-->>TraefikPlugin: Yes a Captcha Decision, but the cookie is valid for this IP
     destroy TraefikPlugin
     TraefikPlugin->>Webserver: Forwarding this HTTP Request from User
     Webserver->>User: HTTP Response
