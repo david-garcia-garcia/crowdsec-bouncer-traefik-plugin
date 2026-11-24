@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 // Test_ServeHTTP_dummyProviderSolveIssuesGateCookie is the in-process stand-in
@@ -249,5 +251,17 @@ func Test_readFieldFromRequest_rawBodyWithoutContentType(t *testing.T) {
 	got := readFieldFromRequest(req, "dummy-captcha-response")
 	if got != "ok" {
 		t.Fatalf("got %q, want ok", got)
+	}
+}
+
+// TestRequestDomain_readsTheRequestHostname proves the captcha and ban pages show req.Hostname(),
+// and "This site" when the request has no host.
+func TestRequestDomain_readsTheRequestHostname(t *testing.T) {
+	for host, want := range map[string]string{"Shop.Example.:8443": "shop.example", "": "This site"} {
+		httpReq := httptest.NewRequest(http.MethodGet, "/", nil)
+		httpReq.Host = host
+		if got := RequestDomain(clientrequest.New(httpReq, "", nil)); got != want {
+			t.Errorf("RequestDomain for Host %q = %q want %q", host, got, want)
+		}
 	}
 }

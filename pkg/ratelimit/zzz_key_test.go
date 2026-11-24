@@ -7,13 +7,15 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 // testKeyOf returns the counter key the first bucket of rules gives the request, or false when a part is missing.
 func testKeyOf(t *testing.T, middlewareName string, rules []BucketRule, httpReq *http.Request, clientIP string) (string, bool) {
 	t.Helper()
 	set := mustNewTestBucketSet(t, rules)
-	return set.buckets[0].counterKey(middlewareName, &keySource{httpReq: httpReq, clientIP: net.ParseIP(clientIP)})
+	return set.buckets[0].counterKey(middlewareName, newKeySource(clientrequest.New(httpReq, clientIP, net.ParseIP(clientIP))))
 }
 
 // TestCounterKey_eachSource proves every source reads its own request value and a missing value skips.

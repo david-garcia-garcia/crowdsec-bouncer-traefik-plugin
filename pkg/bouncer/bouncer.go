@@ -209,7 +209,7 @@ func (b *Bouncer) ServeHTTP(rw http.ResponseWriter, httpReq *http.Request) {
 // The challenge prefix belongs to CrowdSec, not to the site: AppSec must answer it to solve the challenge,
 // so a bypass or bypassAppsec rule that also matches it does not skip AppSec there. LAPI skips stay.
 func (b *Bouncer) foldActionRules(req clientrequest.Request) httprule.ActionMatch {
-	match := b.actionRules.Fold(req.Request)
+	match := b.actionRules.Fold(req)
 	if match.AmbiguousPathName != "" {
 		logger.Trace(b.log, "foldActionRules", "ip", req.IPAddrString(), "ambiguousPathRule", match.AmbiguousPathName)
 	}

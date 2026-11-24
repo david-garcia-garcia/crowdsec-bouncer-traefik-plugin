@@ -4,11 +4,12 @@ package httprule
 import (
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"net/textproto"
 	"regexp"
 	"strings"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 const matchEverythingPattern = ".*"
@@ -63,20 +64,20 @@ func compileSet(rules []Rule, allowCatchAll bool) (*Set, error) {
 	return set, nil
 }
 
-// Match reports whether any compiled rule matches httpReq. First match wins.
+// Match reports whether any compiled rule matches req. First match wins.
 // Cookie is parsed once only when this set has a cookie predicate.
-func (set *Set) Match(httpReq *http.Request) bool {
-	if set == nil || httpReq == nil {
+func (set *Set) Match(req clientrequest.Request) bool {
+	if set == nil || req.Request == nil {
 		return false
 	}
 	// Parse Cookie once when hasCookiePredicate.
 	var cookies []*http.Cookie
 	if set.hasCookiePredicate {
-		cookies = httpReq.Cookies()
+		cookies = req.Cookies()
 	}
 	// First matching rule wins.
 	for i := range set.rules {
-		if set.rules[i].match(httpReq, cookies) {
+		if set.rules[i].match(req, cookies) {
 			return true
 		}
 	}
@@ -84,17 +85,17 @@ func (set *Set) Match(httpReq *http.Request) bool {
 }
 
 // Matching returns every matching index in list order. Cookie is parsed once when this set has a cookie predicate.
-func (set *Set) Matching(httpReq *http.Request) []int {
-	if set == nil || httpReq == nil {
+func (set *Set) Matching(req clientrequest.Request) []int {
+	if set == nil || req.Request == nil {
 		return nil
 	}
 	var cookies []*http.Cookie
 	if set.hasCookiePredicate {
-		cookies = httpReq.Cookies()
+		cookies = req.Cookies()
 	}
 	var hits []int
 	for i := range set.rules {
-		if set.rules[i].match(httpReq, cookies) {
+		if set.rules[i].match(req, cookies) {
 			hits = append(hits, i)
 		}
 	}
@@ -200,37 +201,25 @@ func compileValuePredicates(raw map[string]string, canonicalize bool) ([]valuePr
 	return predicates, nil
 }
 
-// match is AND of method, path, host, headers, then cookies.
-func (rule compiledRule) match(httpReq *http.Request, cookies []*http.Cookie) bool {
-	if !rule.matchMethod(httpReq.Method) {
+// match is AND of method, path, host, headers, then cookies. Host reads req.Hostname().
+func (rule compiledRule) match(req clientrequest.Request, cookies []*http.Cookie) bool {
+	if !rule.matchMethod(req.Method) {
 		return false
 	}
 	path := ""
-	if httpReq.URL != nil {
-		path = httpReq.URL.Path
+	if req.URL != nil {
+		path = req.URL.Path
 	}
 	if rule.pathRe != nil && !rule.pathRe.MatchString(path) {
 		return false
 	}
-	if rule.hostRe != nil && !rule.hostRe.MatchString(RequestHostname(httpReq)) {
+	if rule.hostRe != nil && !rule.hostRe.MatchString(req.Hostname()) {
 		return false
 	}
-	if !matchValuePredicates(rule.headers, httpReq.Header) {
+	if !matchValuePredicates(rule.headers, req.Header) {
 		return false
 	}
 	return matchCookies(rule.cookies, cookies)
-}
-
-// RequestHostname is the hostname of req.Host in lower case, without the port and without one trailing dot.
-// Host names are case-insensitive (RFC 4343) and Traefik routes Host() the same way, so
-// "EXAMPLE.com." and "example.com:443" both read "example.com".
-// It is the one owner of the text a host predicate and a rate-limit host key read.
-func RequestHostname(httpReq *http.Request) string {
-	hostname := httpReq.Host
-	if withoutPort, _, err := net.SplitHostPort(hostname); err == nil {
-		hostname = withoutPort
-	}
-	return strings.ToLower(strings.TrimSuffix(hostname, "."))
 }
 
 // matchMethod applies unanchored RE2 on req.Method. Any always matches. methodNeg inverts.

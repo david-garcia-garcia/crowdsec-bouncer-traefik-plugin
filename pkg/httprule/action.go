@@ -3,9 +3,10 @@ package httprule
 import (
 	"errors"
 	"fmt"
-	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 // Action tokens on one ActionRule. Order in the authoring array does not matter.
@@ -93,11 +94,11 @@ type ActionMatch struct {
 }
 
 // Matching returns every matching index in list order. Cookie is parsed once when needed.
-func (set *ActionSet) Matching(httpReq *http.Request) []int {
+func (set *ActionSet) Matching(req clientrequest.Request) []int {
 	if set == nil || set.set == nil {
 		return nil
 	}
-	return set.set.Matching(httpReq)
+	return set.set.Matching(req)
 }
 
 // Fold reduces every matching row. A nil set matches nothing.
@@ -105,13 +106,13 @@ func (set *ActionSet) Matching(httpReq *http.Request) []int {
 // The first bypassCaptcha name wins, and it clears the captcha name: a request that gets no captcha has no captcha rule.
 // A row with a path predicate skips no leg when the path has more than one reading: its regex saw
 // one reading and the backend may serve another. Its captcha and bypassCaptcha tokens still apply.
-func (set *ActionSet) Fold(httpReq *http.Request) ActionMatch {
+func (set *ActionSet) Fold(req clientrequest.Request) ActionMatch {
 	var match ActionMatch
 	if set == nil {
 		return match
 	}
-	reading := pathReading{requestURL: httpReq.URL}
-	for _, i := range set.Matching(httpReq) {
+	reading := pathReading{requestURL: req.URL}
+	for _, i := range set.Matching(req) {
 		if set.Ban(i) {
 			if match.BanName == "" {
 				match.BanName = set.Name(i)

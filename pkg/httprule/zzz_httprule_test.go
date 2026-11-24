@@ -6,6 +6,8 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 func mustNew(t *testing.T, rules []Rule) *Set {
@@ -20,37 +22,37 @@ func mustNew(t *testing.T, rules []Rule) *Set {
 func TestNew_emptyListMatchesNothing(t *testing.T) {
 	set := mustNew(t, nil)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
-	if set.Match(req) {
+	if set.Match(testReq(req)) {
 		t.Fatal("empty list must match nothing")
 	}
-	if set.Match(nil) {
+	if set.Match(clientrequest.Request{}) {
 		t.Fatal("nil request must not match")
 	}
 }
 
 func TestNew_methodOnly(t *testing.T) {
 	set := mustNew(t, []Rule{{Method: "^OPTIONS$"}})
-	if !set.Match(httptest.NewRequest(http.MethodOptions, "http://example.com/", nil)) {
+	if !set.Match(testReq(httptest.NewRequest(http.MethodOptions, "http://example.com/", nil))) {
 		t.Fatal("method-only must match OPTIONS")
 	}
-	if set.Match(httptest.NewRequest(http.MethodGet, "http://example.com/", nil)) {
+	if set.Match(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/", nil))) {
 		t.Fatal("method-only must not match GET")
 	}
 }
 
 func TestNew_bangNegatesMethod(t *testing.T) {
 	set := mustNew(t, []Rule{{Method: "!POST"}})
-	if !set.Match(httptest.NewRequest(http.MethodGet, "http://example.com/", nil)) {
+	if !set.Match(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/", nil))) {
 		t.Fatal("!POST must match GET")
 	}
-	if set.Match(httptest.NewRequest(http.MethodPost, "http://example.com/", nil)) {
+	if set.Match(testReq(httptest.NewRequest(http.MethodPost, "http://example.com/", nil))) {
 		t.Fatal("!POST must not match POST")
 	}
 }
 
 func TestNew_methodIsCaseSensitive(t *testing.T) {
 	set := mustNew(t, []Rule{{Method: "^post$"}})
-	if set.Match(httptest.NewRequest(http.MethodPost, "http://example.com/", nil)) {
+	if set.Match(testReq(httptest.NewRequest(http.MethodPost, "http://example.com/", nil))) {
 		t.Fatal("POST must not match ^post$ unless the operator writes (?i)")
 	}
 }
@@ -88,13 +90,13 @@ func TestNew_rejectsInvalidRE2(t *testing.T) {
 
 func TestMatch_methodAndPathAreAnd(t *testing.T) {
 	set := mustNew(t, []Rule{{Method: "^GET$", Path: "^/healthz$"}})
-	if set.Match(httptest.NewRequest(http.MethodGet, "http://example.com/other", nil)) {
+	if set.Match(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/other", nil))) {
 		t.Fatal("GET /other must not match method+path AND")
 	}
-	if !set.Match(httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)) {
+	if !set.Match(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil))) {
 		t.Fatal("GET /healthz must match method+path AND")
 	}
-	if set.Match(httptest.NewRequest(http.MethodPost, "http://example.com/healthz", nil)) {
+	if set.Match(testReq(httptest.NewRequest(http.MethodPost, "http://example.com/healthz", nil))) {
 		t.Fatal("POST /healthz must not match method+path AND")
 	}
 }
@@ -102,7 +104,7 @@ func TestMatch_methodAndPathAreAnd(t *testing.T) {
 func TestMatch_unanchoredPath(t *testing.T) {
 	set := mustNew(t, []Rule{{Path: "health"}})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/unhealthy", nil)
-	if !set.Match(req) {
+	if !set.Match(testReq(req)) {
 		t.Fatal("unanchored health must match /unhealthy")
 	}
 }
@@ -111,24 +113,24 @@ func TestMatch_headerAndAndEmptyPresent(t *testing.T) {
 	andSet := mustNew(t, []Rule{{Headers: map[string]string{"X-Health": "^ok$", "X-Role": "^probe$"}}})
 	okOnly := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	okOnly.Header.Set("X-Health", "ok")
-	if andSet.Match(okOnly) {
+	if andSet.Match(testReq(okOnly)) {
 		t.Fatal("header AND must fail when X-Role is missing")
 	}
 	okAndRole := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	okAndRole.Header.Set("X-Health", "ok")
 	okAndRole.Header.Set("X-Role", "probe")
-	if !andSet.Match(okAndRole) {
+	if !andSet.Match(testReq(okAndRole)) {
 		t.Fatal("header AND must match when both names hit")
 	}
 
 	presentSet := mustNew(t, []Rule{{Headers: map[string]string{"X-Health": ""}}})
 	missing := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
-	if presentSet.Match(missing) {
+	if presentSet.Match(testReq(missing)) {
 		t.Fatal("empty header pattern must not match a missing header")
 	}
 	present := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	present.Header.Set("X-Health", "anything")
-	if !presentSet.Match(present) {
+	if !presentSet.Match(testReq(present)) {
 		t.Fatal("empty header pattern must match a present header")
 	}
 }
@@ -137,12 +139,12 @@ func TestMatch_cookieNamesAreCaseSensitive(t *testing.T) {
 	set := mustNew(t, []Rule{{Cookies: map[string]string{"session": "^[a-f0-9]+$"}}})
 	wrongCase := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	wrongCase.AddCookie(&http.Cookie{Name: "Session", Value: "abc"})
-	if set.Match(wrongCase) {
+	if set.Match(testReq(wrongCase)) {
 		t.Fatal("cookie Session must not match name session")
 	}
 	rightCase := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
 	rightCase.AddCookie(&http.Cookie{Name: "session", Value: "abc"})
-	if !set.Match(rightCase) {
+	if !set.Match(testReq(rightCase)) {
 		t.Fatal("cookie session must match")
 	}
 }
@@ -150,7 +152,7 @@ func TestMatch_cookieNamesAreCaseSensitive(t *testing.T) {
 func TestNew_hostOnly(t *testing.T) {
 	set := mustNew(t, []Rule{{Host: "^example.com$"}})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/", nil)
-	if !set.Match(req) {
+	if !set.Match(testReq(req)) {
 		t.Fatal("host-only must match a bare example.com")
 	}
 }
@@ -166,7 +168,7 @@ func TestMatch_hostPortIsStripped(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			set := mustNew(t, []Rule{{Host: tc.host}})
 			req := httptest.NewRequest(http.MethodGet, tc.rawURL, nil)
-			if !set.Match(req) {
+			if !set.Match(testReq(req)) {
 				t.Fatalf("host must match after stripping the port from %s", tc.rawURL)
 			}
 		})
@@ -176,11 +178,11 @@ func TestMatch_hostPortIsStripped(t *testing.T) {
 func TestMatch_hostAndPathAreAnd(t *testing.T) {
 	set := mustNew(t, []Rule{{Host: "^example.com$", Path: "^/healthz$"}})
 	wrongPath := httptest.NewRequest(http.MethodGet, "http://example.com/other", nil)
-	if set.Match(wrongPath) {
+	if set.Match(testReq(wrongPath)) {
 		t.Fatal("host+path AND must fail when the path misses")
 	}
 	ok := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
-	if !set.Match(ok) {
+	if !set.Match(testReq(ok)) {
 		t.Fatal("host+path AND must match example.com /healthz")
 	}
 }
@@ -188,7 +190,7 @@ func TestMatch_hostAndPathAreAnd(t *testing.T) {
 func TestMatch_nonMatchingHostDoesNotBypass(t *testing.T) {
 	set := mustNew(t, []Rule{{Host: "^probe.example$"}})
 	req := httptest.NewRequest(http.MethodGet, "http://other.example/", nil)
-	if set.Match(req) {
+	if set.Match(testReq(req)) {
 		t.Fatal("non-matching host must not match")
 	}
 }
@@ -205,11 +207,11 @@ func mustNewActionSet(t *testing.T, rules []ActionRule) *ActionSet {
 func TestMatching_returnsEveryHitInOrder(t *testing.T) {
 	set := mustNew(t, []Rule{{Path: "^/ab"}, {Path: "^/a"}, {Path: "^/ab"}})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/ab", nil)
-	got := set.Matching(req)
+	got := set.Matching(testReq(req))
 	if len(got) != 3 || got[0] != 0 || got[1] != 1 || got[2] != 2 {
 		t.Fatalf("Matching=%v want [0 1 2]", got)
 	}
-	if !set.Match(req) {
+	if !set.Match(testReq(req)) {
 		t.Fatal("Match dest first-wins must still be true")
 	}
 }
@@ -217,14 +219,14 @@ func TestMatching_returnsEveryHitInOrder(t *testing.T) {
 func TestMatching_emptyListAndNilRequest(t *testing.T) {
 	set := mustNew(t, nil)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
-	if hits := set.Matching(req); hits != nil {
+	if hits := set.Matching(testReq(req)); hits != nil {
 		t.Fatalf("empty list Matching=%v want nil", hits)
 	}
-	if hits := set.Matching(nil); hits != nil {
+	if hits := set.Matching(clientrequest.Request{}); hits != nil {
 		t.Fatalf("nil request Matching=%v want nil", hits)
 	}
 	var nilSet *Set
-	if hits := nilSet.Matching(req); hits != nil {
+	if hits := nilSet.Matching(testReq(req)); hits != nil {
 		t.Fatalf("nil set Matching=%v want nil", hits)
 	}
 }
@@ -232,7 +234,7 @@ func TestMatching_emptyListAndNilRequest(t *testing.T) {
 func TestNewActionSet_emptyListMatchesNothing(t *testing.T) {
 	set := mustNewActionSet(t, nil)
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/health", nil)
-	if hits := set.Matching(req); len(hits) != 0 {
+	if hits := set.Matching(testReq(req)); len(hits) != 0 {
 		t.Fatalf("empty ActionSet Matching=%v", hits)
 	}
 }
@@ -278,7 +280,7 @@ func TestNewActionSet_zipsTokensWithMatching(t *testing.T) {
 		{Name: "other", Action: []string{ActionBan}, Rule: Rule{Path: "^/nope$"}},
 	})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/ab", nil)
-	hits := set.Matching(req)
+	hits := set.Matching(testReq(req))
 	if len(hits) != 2 || hits[0] != 0 || hits[1] != 1 {
 		t.Fatalf("Matching=%v want [0 1]", hits)
 	}
@@ -295,7 +297,7 @@ func TestNewActionSet_zipsTokensWithMatching(t *testing.T) {
 
 func TestActionSet_fold(t *testing.T) {
 	var nilSet *ActionSet
-	if got := nilSet.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/", nil)); got != (ActionMatch{}) {
+	if got := nilSet.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/", nil))); got != (ActionMatch{}) {
 		t.Fatalf("nil set Fold=%+v", got)
 	}
 	set := mustNewActionSet(t, []ActionRule{
@@ -306,11 +308,11 @@ func TestActionSet_fold(t *testing.T) {
 		{Name: "appsec", Action: []string{ActionBypassAppsec}, Rule: Rule{Path: "^/ab"}},
 		{Name: "narrow-captcha", Action: []string{ActionCaptcha, ActionBypass}, Rule: Rule{Path: "^/abc"}},
 	})
-	miss := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/z", nil))
+	miss := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/z", nil)))
 	if miss != (ActionMatch{}) {
 		t.Fatalf("miss Fold=%+v", miss)
 	}
-	got := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/abc", nil))
+	got := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/abc", nil)))
 	want := ActionMatch{BanName: "first-ban", CaptchaName: "wide-captcha", SkipAppsec: true, SkipLapi: true, SkipModsec: true}
 	if got != want {
 		t.Fatalf("Fold=%+v want %+v", got, want)
@@ -322,7 +324,7 @@ func TestNewActionSet_bypassTokenSkipsBothLegs(t *testing.T) {
 		{Name: "challenge-health", Action: []string{ActionCaptcha, ActionBypass}, Rule: Rule{Path: "^/healthz$"}},
 	})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
-	hits := set.Matching(req)
+	hits := set.Matching(testReq(req))
 	if len(hits) != 1 || hits[0] != 0 {
 		t.Fatalf("Matching=%v want [0]", hits)
 	}
@@ -336,14 +338,14 @@ func TestNewActionSet_bypassModsecToken(t *testing.T) {
 		{Name: "healthz", Action: []string{ActionBypassModsec}, Rule: Rule{Path: "^/healthz$"}},
 	})
 	req := httptest.NewRequest(http.MethodGet, "http://example.com/healthz", nil)
-	hits := set.Matching(req)
+	hits := set.Matching(testReq(req))
 	if len(hits) != 1 || hits[0] != 0 {
 		t.Fatalf("Matching=%v want [0]", hits)
 	}
 	if set.SkipLapi(0) || set.SkipAppsec(0) || !set.SkipModsec(0) {
 		t.Fatal("bypassModsec must skip only ModSec")
 	}
-	got := set.Fold(req)
+	got := set.Fold(testReq(req))
 	if !got.SkipModsec || got.SkipLapi || got.SkipAppsec {
 		t.Fatalf("Fold=%+v", got)
 	}
@@ -395,16 +397,16 @@ func TestActionSet_foldAmbiguousPathDropsPathSkipsOnly(t *testing.T) {
 		{Name: "login-captcha", Action: []string{ActionCaptcha, ActionBypassLapi}, Rule: Rule{Path: "^/healthz/"}},
 		{Name: "internal-host", Action: []string{ActionBypassLapi}, Rule: Rule{Host: `^internal\.example$`}},
 	})
-	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/live", nil))
+	clean := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/live", nil)))
 	if want := (ActionMatch{CaptchaName: "login-captcha", SkipAppsec: true, SkipLapi: true, SkipModsec: true}); clean != want {
 		t.Fatalf("clean Fold=%+v want %+v", clean, want)
 	}
-	ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/..;/admin", nil))
+	ambiguous := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/healthz/..;/admin", nil)))
 	if want := (ActionMatch{AmbiguousPathName: "healthz", CaptchaName: "login-captcha"}); ambiguous != want {
 		t.Fatalf("ambiguous Fold=%+v want %+v", ambiguous, want)
 	}
 	// A rule without a path predicate does not read the path, so its skip stays.
-	hostOnly := set.Fold(httptest.NewRequest(http.MethodGet, "http://internal.example/healthz/..;/admin", nil))
+	hostOnly := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://internal.example/healthz/..;/admin", nil)))
 	if want := (ActionMatch{AmbiguousPathName: "healthz", CaptchaName: "login-captcha", SkipLapi: true}); hostOnly != want {
 		t.Fatalf("host-only Fold=%+v want %+v", hostOnly, want)
 	}
@@ -437,15 +439,15 @@ func TestActionSet_foldBypassCaptcha(t *testing.T) {
 		{Name: "api-v2", Action: []string{ActionBypassCaptcha}, Rule: Rule{Path: "^/api/v2/"}},
 		{Name: "api-admin-ban", Action: []string{ActionBan}, Rule: Rule{Path: "^/api/admin"}},
 	})
-	outside := set.Fold(httptest.NewRequest(http.MethodGet, "http://shop.example/catalog", nil))
+	outside := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://shop.example/catalog", nil)))
 	if want := (ActionMatch{CaptchaName: "shop-captcha"}); outside != want {
 		t.Fatalf("outside Fold=%+v want %+v", outside, want)
 	}
-	api := set.Fold(httptest.NewRequest(http.MethodGet, "http://shop.example/api/v2/items", nil))
+	api := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://shop.example/api/v2/items", nil)))
 	if want := (ActionMatch{BypassCaptchaName: "api"}); api != want {
 		t.Fatalf("api Fold=%+v want %+v", api, want)
 	}
-	banned := set.Fold(httptest.NewRequest(http.MethodGet, "http://shop.example/api/admin", nil))
+	banned := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://shop.example/api/admin", nil)))
 	if want := (ActionMatch{BanName: "api-admin-ban", BypassCaptchaName: "api"}); banned != want {
 		t.Fatalf("banned Fold=%+v want %+v", banned, want)
 	}
@@ -458,12 +460,12 @@ func TestActionSet_foldBypassCaptchaIgnoresPathReading(t *testing.T) {
 	set := mustNewActionSet(t, []ActionRule{
 		{Name: "api", Action: []string{ActionBypassCaptcha, ActionBypassLapi}, Rule: Rule{Path: "^/api/"}},
 	})
-	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/api/items", nil))
+	clean := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/api/items", nil)))
 	if want := (ActionMatch{BypassCaptchaName: "api", SkipLapi: true}); clean != want {
 		t.Fatalf("clean Fold=%+v want %+v", clean, want)
 	}
 	for _, target := range []string{"/api/..;/admin", "/api/..%2Fadmin", "/api/..%5Cadmin", "/api/items%20x"} {
-		ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com"+target, nil))
+		ambiguous := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com"+target, nil)))
 		if want := (ActionMatch{AmbiguousPathName: "api", BypassCaptchaName: "api"}); ambiguous != want {
 			t.Errorf("%s Fold=%+v want %+v", target, ambiguous, want)
 		}
@@ -486,7 +488,7 @@ func TestNewActionSet_bypassRateLimitSkipsOnlyTheRateLimit(t *testing.T) {
 	if set.SkipRateLimit(2) || (*ActionSet)(nil).SkipRateLimit(0) {
 		t.Fatal("out of range and nil set must report no rate-limit skip")
 	}
-	api := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/api/items", nil))
+	api := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/api/items", nil)))
 	if want := (ActionMatch{SkipAppsec: true, SkipLapi: true, SkipModsec: true}); api != want {
 		t.Fatalf("bypass Fold=%+v want %+v", api, want)
 	}
@@ -503,11 +505,11 @@ func TestActionSet_foldBypassRateLimit(t *testing.T) {
 		{Name: "health", Action: []string{ActionBypassRateLimit}, Rule: Rule{Path: "^/x/"}},
 		{Name: "lapi", Action: []string{ActionBypassLapi}, Rule: Rule{Path: "^/x/"}},
 	})
-	clean := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/x/y", nil))
+	clean := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/x/y", nil)))
 	if want := (ActionMatch{SkipLapi: true, SkipRateLimit: true}); clean != want {
 		t.Fatalf("clean Fold=%+v want %+v", clean, want)
 	}
-	ambiguous := set.Fold(httptest.NewRequest(http.MethodGet, "http://example.com/x/..;/y", nil))
+	ambiguous := set.Fold(testReq(httptest.NewRequest(http.MethodGet, "http://example.com/x/..;/y", nil)))
 	if want := (ActionMatch{AmbiguousPathName: "health"}); ambiguous != want {
 		t.Fatalf("ambiguous Fold=%+v want %+v", ambiguous, want)
 	}
@@ -521,7 +523,7 @@ func TestNewWithCatchAll_ruleWithNoPredicateMatchesEverything(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, target := range []string{"/", "/login", "/anything?q=1"} {
-		hits := set.Matching(httptest.NewRequest(http.MethodPost, "http://example.com"+target, nil))
+		hits := set.Matching(testReq(httptest.NewRequest(http.MethodPost, "http://example.com"+target, nil)))
 		if len(hits) == 0 || hits[0] != 0 {
 			t.Fatalf("%s Matching=%v want catch-all first", target, hits)
 		}
@@ -536,27 +538,6 @@ func TestNewWithCatchAll_ruleWithNoPredicateMatchesEverything(t *testing.T) {
 	}
 }
 
-// TestRequestHostname_dropsThePort proves the exported host owner reads req.Host without its port,
-// in lower case and without a trailing dot.
-func TestRequestHostname_dropsThePort(t *testing.T) {
-	for host, want := range map[string]string{
-		"example.com:443":   "example.com",
-		"[::1]:443":         "::1",
-		"example.com":       "example.com",
-		"EXAMPLE.com":       "example.com",
-		"Example.Com:8080":  "example.com",
-		"example.com.":      "example.com",
-		"EXAMPLE.COM.:443":  "example.com",
-		"[2001:DB8::1]:443": "2001:db8::1",
-	} {
-		req := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
-		req.Host = host
-		if got := RequestHostname(req); got != want {
-			t.Errorf("RequestHostname(%q)=%q want %q", host, got, want)
-		}
-	}
-}
-
 // TestHostRule_matchesWhateverTheCaseOrTrailingDot proves a host condition cannot be dodged by
 // changing the case of the Host header or adding the trailing dot Traefik still routes.
 func TestHostRule_matchesWhateverTheCaseOrTrailingDot(t *testing.T) {
@@ -567,8 +548,47 @@ func TestHostRule_matchesWhateverTheCaseOrTrailingDot(t *testing.T) {
 	for _, host := range []string{"rules.test", "rules.test:80", "RULES.TEST", "Rules.Test", "rules.test.", "RULES.TEST.:443"} {
 		req := httptest.NewRequest(http.MethodGet, "http://placeholder/", nil)
 		req.Host = host
-		if !set.Match(req) {
+		if !set.Match(testReq(req)) {
 			t.Errorf("host %q must match the rules.test condition", host)
 		}
 	}
+}
+
+// TestRule_caseInsensitiveOnlyWithTheIFlag proves conditions are case-sensitive and that a leading (?i),
+// as the docs tell users to write, makes path, header, cookie and an upper-case host pattern ignore case.
+func TestRule_caseInsensitiveOnlyWithTheIFlag(t *testing.T) {
+	newReq := func() *http.Request {
+		req := httptest.NewRequest(http.MethodGet, "http://placeholder/Admin/x", nil)
+		req.Host = "Rules.Test"
+		req.Header.Set("User-Agent", "SomeBOT/1.0")
+		req.AddCookie(&http.Cookie{Name: "role", Value: "ADMIN"})
+		return req
+	}
+	for _, tc := range []struct {
+		name string
+		rule Rule
+		want bool
+	}{
+		{"path without flag", Rule{Path: `^/admin/`}, false},
+		{"path with flag", Rule{Path: `(?i)^/admin/`}, true},
+		{"header without flag", Rule{Headers: map[string]string{"User-Agent": `bot`}}, false},
+		{"header with flag", Rule{Headers: map[string]string{"User-Agent": `(?i)bot`}}, true},
+		{"cookie without flag", Rule{Cookies: map[string]string{"role": `^admin$`}}, false},
+		{"cookie with flag", Rule{Cookies: map[string]string{"role": `(?i)^admin$`}}, true},
+		{"upper-case host without flag", Rule{Host: `^RULES\.test$`}, false},
+		{"upper-case host with flag", Rule{Host: `(?i)^RULES\.test$`}, true},
+	} {
+		set, err := New([]Rule{tc.rule})
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if got := set.Match(testReq(newReq())); got != tc.want {
+			t.Errorf("%s: Match=%v want %v", tc.name, got, tc.want)
+		}
+	}
+}
+
+// testReq wraps httpReq the way the bouncer does, without a client address.
+func testReq(httpReq *http.Request) clientrequest.Request {
+	return clientrequest.New(httpReq, "", nil)
 }

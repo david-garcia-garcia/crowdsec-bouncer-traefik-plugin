@@ -69,7 +69,7 @@ http:
 
 **Where it runs.** After the CrowdSec decision lookup and before AppSec, ModSecurity, and the captcha of a `captcha` rule (see [Order of the checks](how-it-works.md#order-of-the-checks)). A client that CrowdSec already bans or challenges gets that answer and is not counted. A request answered by the rate limit never reaches AppSec or ModSecurity. Clients in `bouncerClientTrustedIps` and requests banned by a `ban` rule are not counted either.
 
-**Which requests a bucket counts.** The same conditions as a [`bouncerActionRules`](configuration.md#bounceractionrules) rule, written on the bucket: `method`, `path`, `host`, `headers`, `cookies`. A bucket with none counts every request.
+**Which requests a bucket counts.** The same conditions as a [`bouncerActionRules`](configuration.md#bounceractionrules) rule, written on the bucket: `method`, `path`, `host`, `headers`, `cookies`. A bucket with none counts every request. Matching is case-sensitive: to ignore case, start the pattern with `(?i)` (`(?i)^/api/`). The `host` condition reads the host name in lower case, without the port and without a trailing dot.
 
 **What each counter is per.** `key` is a list of parts joined into one counter key:
 

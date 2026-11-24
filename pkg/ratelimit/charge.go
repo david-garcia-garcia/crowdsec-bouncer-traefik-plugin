@@ -3,9 +3,9 @@ package ratelimit
 import (
 	"context"
 	"fmt"
-	"net"
-	"net/http"
 	"time"
+
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 )
 
 // ExceededBucket is a log bucket that was over its limit for one request.
@@ -35,20 +35,20 @@ type Verdict struct {
 	RateLimit AnsweringBucket
 }
 
-// Charge walks the buckets that match httpReq in list order and counts one hit on each bucket whose
+// Charge walks the buckets that match req in list order and counts one hit on each bucket whose
 // key has a value. A ratelimit bucket over its limit stops the walk; the first captcha bucket over its
 // limit is kept and the walk goes on; a log bucket over its limit is recorded and the walk goes on; a
 // matching final bucket stops the walk after it; the first counter error stops the walk and is returned.
 // skipCaptchaBuckets (the caller's client solved its captcha) skips every captcha bucket: it is not
 // charged, cannot answer, and its final does not apply, as for a bucket whose key has no value.
-// clientIP is the address GetRemoteIP resolved for the request. A nil set or counter charges nothing.
-func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareName string, httpReq *http.Request, clientIP net.IP, skipCaptchaBuckets bool) Verdict {
+// The ip key part reads req.IPAddr(), the address GetRemoteIP resolved. A nil set or counter charges nothing.
+func (set *BucketSet) Charge(ctx context.Context, counter Counter, middlewareName string, req clientrequest.Request, skipCaptchaBuckets bool) Verdict {
 	var verdict Verdict
 	if set == nil || counter == nil {
 		return verdict
 	}
-	source := &keySource{httpReq: httpReq, clientIP: clientIP}
-	for _, i := range set.predicates.Matching(httpReq) {
+	source := newKeySource(req)
+	for _, i := range set.predicates.Matching(req) {
 		bucket := &set.buckets[i]
 		// A solved client is not counted by captcha buckets.
 		if skipCaptchaBuckets && bucket.action == ActionCaptcha {
