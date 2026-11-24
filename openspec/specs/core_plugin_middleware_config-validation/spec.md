@@ -444,6 +444,21 @@ Public config `bouncerModsecFailureAction` SHALL be validated by the same rule a
 - **WHEN** `bouncerModsecFailureAction` is `captcha` and the router has no captcha instance name after owner-fill
 - **THEN** `ValidateParams` returns an error naming `BouncerModsecFailureAction`
 
+### Requirement: bouncerLapiRedisFailureAction is passthrough, ban, or captcha
+Public config `bouncerLapiRedisFailureAction` SHALL be validated by the same rule as `bouncerLapiFailureAction`: empty, `passthrough`, `ban`, or `captcha`; `captcha` SHALL need a captcha instance name after owner-fill. Empty or omitted SHALL be `ban` at runtime (`configuration.EffectiveLapiRedisFailureAction`). This key SHALL be per-router (not on LAPI Client identity). It SHALL apply to every failed LAPI Redis cache read (unreachable, timeout, NOAUTH, TLS, protocol error). `passthrough` SHALL skip the LAPI leg without falling through to LiveLookup.
+
+#### Scenario: Default is ban
+- **WHEN** the operator omits `bouncerLapiRedisFailureAction`
+- **THEN** a failed LAPI Redis read bans with verdict header `ban:cache-fail`
+
+#### Scenario: An error reply follows the action
+- **WHEN** `bouncerLapiRedisFailureAction` is `passthrough` and Redis answers a read with `-NOAUTH`
+- **THEN** the request skips the LAPI leg and continues
+
+#### Scenario: Captcha without a captcha instance fails
+- **WHEN** `bouncerLapiRedisFailureAction` is `captcha` and the router has no captcha instance name after owner-fill
+- **THEN** `ValidateParams` returns an error naming `BouncerLapiRedisFailureAction`
+
 ### Requirement: Rate-limit settings are validated only on the owner
 `rateLimitEnabled` SHALL default to false. Only a router with `rateLimitEnabled` true (the owner) SHALL have its `rateLimit*` settings validated, failing with an error that names the setting when a value is invalid; on any other router a leftover invalid bucket, duration, status, or password file SHALL NOT fail startup. `rateLimitFailureAction: captcha` SHALL pass whether or not the owner has a captcha instance name.
 

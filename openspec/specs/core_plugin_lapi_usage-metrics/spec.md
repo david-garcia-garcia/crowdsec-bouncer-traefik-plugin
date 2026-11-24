@@ -29,7 +29,7 @@ Each dropped request SHALL increment a `dropped` item with unit `request`. Label
 - **AND** no `dropped` item is recorded for that request
 
 #### Scenario: Cache fail-closed uses plugin origin
-- **WHEN** the bouncer bans because a cache error is fail-closed
+- **WHEN** the bouncer bans because a LAPI Redis cache read failed and `bouncerLapiRedisFailureAction` is `ban`
 - **THEN** the `dropped` item has `origin=plugin:tech_cachefail`
 
 #### Scenario: Stream unhealthy uses plugin origin

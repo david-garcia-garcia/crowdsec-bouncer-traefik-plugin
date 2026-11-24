@@ -147,12 +147,12 @@ http:
             - 10.0.10.23/32
             - 10.0.20.0/24
           bouncerLapiFailureAction: ban
+          bouncerLapiRedisFailureAction: ban
           bouncerOriginBasedDecisionRemap:
             CAPI:
               ban: captcha
             lists:firehol_level1:
               ban: captcha
-          bouncerRedisUnreachableBlock: true
           bouncerRemediationHeadersCustomName: cs-remediation
           bouncerRemediationStatusCode: 403
           bouncerTraceHeadersCustomName: X-Request-ID
@@ -420,6 +420,12 @@ What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. 
 
 What to do while the ModSec backoff gate skips the sidecar (`modsecUnhealthyBackOffPeriodSecs`): `passthrough`, `ban`, or `captcha`, as for AppSec. The sidecar is not called. Per router. Verdict header `ban:modsec-backoff` or `captcha:modsec-backoff`. See [When a WAF is down](failure-modes.md#when-a-waf-is-down-failure-action-and-backoff).
 
+#### `bouncerLapiRedisFailureAction`
+
+`string` · default `ban`
+
+What to do when the LAPI Redis cache cannot be read: `ban`, `passthrough`, or `captcha`. Every failure counts: Redis cannot be reached, answers in more than about 1 second, or answers with an error (TLS rejected, wrong or missing password). `passthrough` skips the LAPI check and the request goes on to the next checks. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
+
 #### `bouncerModsecFailureAction`
 
 `string` · default `passthrough`
@@ -431,12 +437,6 @@ What to do when the ModSecurity sidecar gives no verdict (5xx, timeout, unreacha
 `map[string]map[string]string` · default `{}`
 
 Turn bans or captchas from specific origins into a captcha or a pass on this router. See [Show a community ban as a captcha](how-to/community-ban-as-captcha.md).
-
-#### `bouncerRedisUnreachableBlock`
-
-`bool` · default `true`
-
-When the LAPI Redis cache cannot be reached, ban (`true`) or skip the LAPI check (`false`). A Redis that answers too slowly bans either way. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
 
 #### `bouncerRemediationHeadersCustomName`
 
@@ -594,7 +594,7 @@ Redis primary, `host:port`.
 
 `[]string` · default `[]`
 
-Redis replicas for reads, used in turn. Defaults to `lapiRedisHost`. Reads do not fall back to the primary, so an outage of the replicas blocks requests (see `bouncerRedisUnreachableBlock`) even if the primary is up.
+Redis replicas for reads, used in turn. Defaults to `lapiRedisHost`. Reads do not fall back to the primary, so an outage of the replicas blocks requests (see [`bouncerLapiRedisFailureAction`](#bouncerlapiredisfailureaction)) even if the primary is up.
 
 #### `lapiRedisPassword`
 

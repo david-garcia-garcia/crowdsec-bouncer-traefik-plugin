@@ -24,7 +24,7 @@ With the default settings:
 | LAPI, `stream` mode | Decisions already downloaded keep applying. Other clients pass until a refresh fails, then get the failure action. | [`bouncerLapiFailureAction`](configuration.md#bouncerlapifailureaction), [`lapiUpdateMaxFailure`](configuration.md#lapiupdatemaxfailure) | Ban clients without a known decision, from the first failed refresh. |
 | LAPI, `live` / `none` mode | Each lookup LAPI does not answer gets the failure action. After repeated failures, LAPI is not called for a cooldown and lookups get the backoff action. In `live`, answers already cached keep applying until they expire. | `bouncerLapiFailureAction`, [`bouncerLapiBackOffAction`](configuration.md#bouncerlapibackoffaction), [`lapiUnhealthyBackOffPeriodSecs`](configuration.md#lapiunhealthybackoffperiodsecs) | Ban the first failures, then ban at once, without waiting for LAPI, for 10 seconds at a time. |
 | CAPI, `alone` mode | At startup: the middleware does not load. Later: as `stream`, and the next try is 2 hours later. | `bouncerLapiFailureAction`, `lapiUpdateMaxFailure` | Ban clients without a known decision. |
-| Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. | [`bouncerRedisUnreachableBlock`](configuration.md#bouncerredisunreachableblock) | Ban (`ban:cache-fail`). |
+| Redis cache of LAPI (`lapiRedisEnabled`) | No fallback to memory or to LAPI. Every failed read counts: down, slower than about 1 second, or an error answer (TLS, password). | [`bouncerLapiRedisFailureAction`](configuration.md#bouncerlapiredisfailureaction) | Ban (`ban:cache-fail`). |
 | AppSec | The failure action; after repeated failures, AppSec is skipped for a cooldown and requests get the backoff action. | [`bouncerAppsecFailureAction`](configuration.md#bouncerappsecfailureaction), [`bouncerAppsecBackOffAction`](configuration.md#bouncerappsecbackoffaction), [`appsecUnhealthyBackOffPeriodSecs`](configuration.md#appsecunhealthybackoffperiodsecs) | Let requests through without AppSec, and stop calling it for 10 seconds at a time. |
 | ModSecurity sidecar | The failure action; after repeated failures, the sidecar is skipped for a cooldown and requests get the backoff action. | [`bouncerModsecFailureAction`](configuration.md#bouncermodsecfailureaction), [`bouncerModsecBackOffAction`](configuration.md#bouncermodsecbackoffaction), [`modsecUnhealthyBackOffPeriodSecs`](configuration.md#modsecunhealthybackoffperiodsecs) | Let the request through without CRS, and stop calling the sidecar for 10 seconds at a time. |
 | Redis of the rate limit | With the default sliding window, each Traefik replica keeps counting on its own. | [`rateLimitFailureAction`](configuration.md#ratelimitfailureaction), [`rateLimitSyncRate`](configuration.md#ratelimitsyncrate), [`rateLimitAlgorithm`](configuration.md#ratelimitalgorithm) | Limit per replica instead of across replicas. |
@@ -49,6 +49,7 @@ The new gates also change what a router that set its own failure action gets whi
 | Leg | Setting | Default | Where it is set |
 | --- | ------- | ------- | --------------- |
 | LAPI | `bouncerLapiFailureAction` | `ban` | Each router |
+| LAPI Redis cache | `bouncerLapiRedisFailureAction` | `ban` | Each router |
 | AppSec | `bouncerAppsecFailureAction` | `passthrough` | Each router |
 | ModSec | `bouncerModsecFailureAction` | `passthrough` | Each router |
 | Rate limit | `rateLimitFailureAction` | `passthrough` | The middleware with `rateLimitEnabled`, for every router that uses the policy |
@@ -107,10 +108,11 @@ How LAPI's outage reaches a request depends on [`lapiMode`](concepts.md#lapi-mod
 
 With [`lapiRedisEnabled`](configuration.md#lapiredisenabled), LAPI decisions are kept in Redis instead of memory (see [Cache](concepts.md#cache)). Every request in `live`, `stream` and `alone` reads Redis. There is no fallback: not to memory, not to LAPI.
 
-| Redis | What the request gets |
-| ----- | --------------------- |
-| Cannot be reached (connection refused, no connection available) | With `bouncerRedisUnreachableBlock: true` (default): a ban, verdict header `ban:cache-fail`, reason `TECHNICAL_ISSUE`. With `false`: the LAPI check is skipped and the request goes on to the next checks. Bans stored in Redis do not apply. |
-| Answers too slowly (more than about 1 second) | A ban (`ban:cache-fail`), whatever `bouncerRedisUnreachableBlock` says. |
+A failed read gets [`bouncerLapiRedisFailureAction`](configuration.md#bouncerlapiredisfailureaction) (default `ban`), whatever the cause: Redis cannot be reached (connection refused, no connection available), answers in more than about 1 second, or answers with an error (TLS rejected, wrong or missing password).
+
+- `ban`: the ban page, verdict header `ban:cache-fail`, reason `TECHNICAL_ISSUE`.
+- `captcha`: the captcha page, verdict header `captcha:cache-fail`.
+- `passthrough`: the LAPI check is skipped and the request goes on to the next checks. Bans stored in Redis do not apply.
 
 - `bouncerLapiFailureAction` does not apply to a Redis outage.
 - Reads go to [`lapiRedisReadHosts`](configuration.md#lapiredisreadhosts) in turn, and do not fall back to the primary.

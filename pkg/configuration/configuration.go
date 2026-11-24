@@ -105,10 +105,10 @@ type Config struct {
 	BouncerForwardedHeadersTrustedIPs   []string                     `json:"bouncerForwardedHeadersTrustedIps,omitempty"`
 	BouncerLapiBackOffAction            string                       `json:"bouncerLapiBackOffAction,omitempty"`
 	BouncerLapiFailureAction            string                       `json:"bouncerLapiFailureAction,omitempty"`
+	BouncerLapiRedisFailureAction       string                       `json:"bouncerLapiRedisFailureAction,omitempty"`
 	BouncerModsecBackOffAction          string                       `json:"bouncerModsecBackOffAction,omitempty"`
 	BouncerModsecFailureAction          string                       `json:"bouncerModsecFailureAction,omitempty"`
 	BouncerOriginBasedDecisionRemap     map[string]map[string]string `json:"bouncerOriginBasedDecisionRemap,omitempty"`
-	BouncerRedisUnreachableBlock        bool                         `json:"bouncerRedisUnreachableBlock,omitempty"`
 	BouncerRemediationHeadersCustomName string                       `json:"bouncerRemediationHeadersCustomName,omitempty"`
 	BouncerRemediationStatusCode        int                          `json:"bouncerRemediationStatusCode,omitempty"`
 	BouncerTraceHeadersCustomName       string                       `json:"bouncerTraceHeadersCustomName,omitempty"`
@@ -226,6 +226,7 @@ func validateGatedLegActions(config *Config) error {
 	captchaInstanceReady := captchaInstanceNameReadyAfterOwnerFill(config)
 	fieldActions := [][2]string{
 		{"BouncerLapiFailureAction", config.BouncerLapiFailureAction},
+		{"BouncerLapiRedisFailureAction", config.BouncerLapiRedisFailureAction},
 		{"BouncerAppsecFailureAction", config.BouncerAppsecFailureAction},
 		{"BouncerModsecFailureAction", config.BouncerModsecFailureAction},
 		{"BouncerLapiBackOffAction", config.BouncerLapiBackOffAction},
@@ -252,6 +253,15 @@ func captchaInstanceNameReadyAfterOwnerFill(config *Config) bool {
 // EffectiveLapiFailureAction maps empty config to ban: a LAPI outage never lets a
 // banned IP through unless the operator asks otherwise.
 func EffectiveLapiFailureAction(action string) string {
+	if action == "" {
+		return FailureActionBan
+	}
+	return action
+}
+
+// EffectiveLapiRedisFailureAction maps empty config to ban: a LAPI Redis cache that cannot be
+// read never lets a banned IP through unless the operator asks otherwise.
+func EffectiveLapiRedisFailureAction(action string) string {
 	if action == "" {
 		return FailureActionBan
 	}
@@ -336,10 +346,10 @@ func New() *Config {
 		BouncerForwardedHeadersTrustedIPs:   []string{},
 		BouncerLapiBackOffAction:            FailureActionBan,
 		BouncerLapiFailureAction:            FailureActionBan,
+		BouncerLapiRedisFailureAction:       FailureActionBan,
 		BouncerModsecBackOffAction:          FailureActionPassthrough,
 		BouncerModsecFailureAction:          FailureActionPassthrough,
 		BouncerOriginBasedDecisionRemap:     map[string]map[string]string{},
-		BouncerRedisUnreachableBlock:        true,
 		BouncerRemediationHeadersCustomName: "",
 		BouncerRemediationStatusCode:        http.StatusForbidden,
 		BouncerTraceHeadersCustomName:       "",

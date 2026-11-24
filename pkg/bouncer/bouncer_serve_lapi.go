@@ -7,7 +7,6 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/clientrequest"
 	configuration "github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
-	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionstore"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/httprule"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
@@ -33,13 +32,10 @@ func (b *Bouncer) serveLAPI(rw http.ResponseWriter, req clientrequest.Request, m
 	if crowdsecMode == configuration.LiveMode || crowdsecMode == configuration.StreamMode || crowdsecMode == configuration.AloneMode {
 		kind, origin, originID, lookupErr := lapiClient.LookupRemediation(req.IPAddrString(), req.IPAddr(), scopes)
 		if lookupErr != nil {
-			if errors.Is(lookupErr, decisionstore.ErrUnreachable) && !b.redisUnreachableBlock {
-				b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "redisUnreachable", true)
-				return false
-			}
-			b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "error", lookupErr)
-			b.banWarnCaptchaRule(rw, req, match, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
-			return true
+			// Only the Redis engine fails a lookup. Any failure (down, timeout, auth, TLS) gets this router's
+			// Redis failure action; passthrough skips the LAPI leg and does not fall through to LiveLookup.
+			b.log.Error("serveLAPI:Get", "ip", req.IPAddrString(), "failureAction", b.lapiRedisFailureAction, "error", lookupErr)
+			return b.applyFailureAction(rw, req, match, b.lapiRedisFailureAction, configuration.ReasonTECH, headerReasonCacheFail, lapi.OriginPluginTechCacheFail)
 		}
 		kind, origin = b.appliedLAPIRemediation(match, kind, origin, originID)
 		switch {
@@ -97,7 +93,13 @@ func (b *Bouncer) answerLiveLookupError(rw http.ResponseWriter, req clientreques
 // failure: it uses applyBackOffAction. False means the response was not written, and ServeHTTP
 // continues with AppSec.
 func (b *Bouncer) applyLapiFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, banReason, headerReason, origin string) bool {
-	switch b.lapiFailureAction {
+	return b.applyFailureAction(rw, req, match, b.lapiFailureAction, banReason, headerReason, origin)
+}
+
+// applyFailureAction applies passthrough, captcha, or ban (any other value) for a LAPI-leg failure:
+// bouncerLapiFailureAction, or bouncerLapiRedisFailureAction for a failed Redis cache read.
+func (b *Bouncer) applyFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, action, banReason, headerReason, origin string) bool {
+	switch action {
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
