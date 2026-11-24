@@ -3,6 +3,7 @@ package bouncer
 import (
 	"strings"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/decisionscope"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/lapi"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
@@ -22,11 +23,16 @@ func (b *Bouncer) ReceiveLAPI(published any) {
 }
 
 // warnMissingStreamScopes warns when a decision scope header names a scope the bound LAPI client does not poll.
+// Only stream and alone answer from the polled stream; live and none ask LAPI for each header scope per request.
+// b.log already carries traefikName.
 func (b *Bouncer) warnMissingStreamScopes() {
-	missing := decisionscope.MissingStreamScopes(b.decisionScopeHeaders, b.loadedLAPI().StreamScopes())
+	client := b.loadedLAPI()
+	if mode := client.Mode(); mode != configuration.StreamMode && mode != configuration.AloneMode {
+		return
+	}
+	missing := decisionscope.MissingStreamScopes(b.decisionScopeHeaders, client.StreamScopes())
 	if len(missing) > 0 {
 		b.log.Warn("crowdsec bouncer stream scopes missing",
-			"traefikName", b.name,
 			"missing", strings.Join(missing, ","),
 		)
 	}
