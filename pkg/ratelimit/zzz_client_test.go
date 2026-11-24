@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
 
@@ -308,11 +309,14 @@ func assertTakeFailsWithinBudget(t *testing.T, client *Client) {
 	}
 }
 
-// TestClient_wrongPasswordLogsAtDebugOnly proves a Redis that rejects AUTH costs DEBUG lines only:
-// the simpleredis WARN and ERROR lines of each failed dial are capped at DEBUG.
-func TestClient_wrongPasswordLogsAtDebugOnly(t *testing.T) {
+// TestClient_wrongPasswordLogsLibraryLinesAtDebug proves a Redis that rejects AUTH costs DEBUG lines from
+// the library: the simpleredis WARN and ERROR lines of each failed dial are capped at DEBUG, and the only
+// line above DEBUG is the Client's debounced ERROR MsgRedisUnavailable, however many takes fail.
+func TestClient_wrongPasswordLogsLibraryLinesAtDebug(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
+	logger.ResetDebounceForTest()
+	t.Cleanup(logger.ResetDebounceForTest)
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
@@ -346,9 +350,11 @@ func TestClient_wrongPasswordLogsAtDebugOnly(t *testing.T) {
 	}
 	defer client.Close()
 	assertTakeFailsWithinBudget(t, client)
+	assertTakeFailsWithinBudget(t, client)
 	logs := sink.String()
-	if strings.Contains(logs, `"level":"WARN"`) || strings.Contains(logs, `"level":"ERROR"`) {
-		t.Fatalf("a failed dial must not log WARN or ERROR:\n%s", logs)
+	if strings.Contains(logs, `"level":"WARN"`) || strings.Count(logs, `"level":"ERROR"`) != 1 ||
+		countTestLogLines(t, logs, "ERROR", MsgRedisUnavailable) != 1 {
+		t.Fatalf("a failed dial must log no library WARN or ERROR, only one ERROR %q:\n%s", MsgRedisUnavailable, logs)
 	}
 	if !strings.Contains(logs, `"msg":"dial: redis:noauth"`) {
 		t.Fatalf("the library NOAUTH line must still be written at DEBUG:\n%s", logs)

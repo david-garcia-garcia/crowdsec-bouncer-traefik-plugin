@@ -27,6 +27,7 @@ const (
 	headerReasonAppsecBackoff        = "appsec-backoff"
 	headerReasonRateLimit            = "ratelimit"
 	headerReasonRateLimitFailure     = "ratelimit-failure"
+	headerReasonRateLimitBackoff     = "ratelimit-backoff"
 	headerReasonModsec               = "modsec"
 	headerReasonModsecFailure        = "modsec-failure"
 	headerReasonModsecBackoff        = "modsec-backoff"

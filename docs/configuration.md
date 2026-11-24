@@ -207,6 +207,7 @@ http:
           logFormat: common
           logLevel: DEBUG
           rateLimitAlgorithm: slidingWindow
+          rateLimitBackOffAction: passthrough
           rateLimitBuckets:
             - name: login
               method: "^POST$"
@@ -225,6 +226,7 @@ http:
           rateLimitStatusCode: 429
           rateLimitStore: redis
           rateLimitSyncRate: 200ms
+          rateLimitUnhealthyBackOffPeriodSecs: 10
           reclaimGraceSeconds: 30
 ```
 
@@ -727,7 +729,19 @@ How every bucket of the policy counts: `slidingWindow` (`requests` per rolling `
 
 `string` · default `passthrough`
 
-What to do when the rate-limit Redis cannot answer: `passthrough`, `ban`, or `captcha` (the captcha of each router that applies the policy; a router without one serves `ban:captcha-downgrade`). Read only on the middleware with `rateLimitEnabled`. With the sliding window and the default buffered `rateLimitSyncRate`, an unreachable Redis does not trigger it: each replica keeps its own count. It applies with `rateLimitSyncRate: 0`, always with `rateLimitAlgorithm: tokenBucket`, and in every mode to a bucket reached after the 250ms the rate limit may spend on Redis.
+What to do when the rate-limit Redis cannot answer: `passthrough`, `ban`, or `captcha` (the captcha of each router that applies the policy; a router without one serves `ban:captcha-downgrade`). Read only on the middleware with `rateLimitEnabled`. With the sliding window and the default buffered `rateLimitSyncRate`, an unreachable Redis does not trigger it: each replica keeps its own count. It applies with `rateLimitSyncRate: 0`, always with `rateLimitAlgorithm: tokenBucket`, and in every mode to a bucket reached after the 250ms the rate limit may spend on Redis. In the first two, while the backoff gate skips Redis ([`rateLimitUnhealthyBackOffPeriodSecs`](#ratelimitunhealthybackoffperiodsecs)), [`rateLimitBackOffAction`](#ratelimitbackoffaction) applies instead. `ban` or `captcha` with the buffered sliding window loads, and logs WARN `crowdsec ratelimit failure action does not apply to a redis outage` once.
+
+#### `rateLimitBackOffAction`
+
+`string` · default `passthrough`
+
+What to do while the backoff gate skips the rate-limit Redis: `passthrough`, `ban`, or `captcha`, with the same rules as `rateLimitFailureAction`. The verdict header is `ban:ratelimit-backoff` or `captcha:ratelimit-backoff`, and the drop counts under `plugin:ratelimit_failure`. Read only on the middleware with `rateLimitEnabled`. Never applies with the buffered sliding window, which has no gate; `ban` or `captcha` there logs the same load WARN as `rateLimitFailureAction`. See [Rate limit › When Redis is down](rate-limit.md).
+
+#### `rateLimitUnhealthyBackOffPeriodSecs`
+
+`int64` · default `10`
+
+Cooldown in seconds of the rate-limit Redis backoff gate, same rule as [`appsecUnhealthyBackOffPeriodSecs`](#appsecunhealthybackoffperiodsecs): after 5 Redis failures in a row (or failures above about 30% of counted buckets), Redis is not called for this long and `rateLimitBackOffAction` applies; then one request probes Redis. `0` turns the gate off, so every counted bucket calls Redis and every failure gets `rateLimitFailureAction`, after waiting up to 250ms. Only with `rateLimitSyncRate: 0` or `rateLimitAlgorithm: tokenBucket`: the buffered sliding window already stops calling Redis for one sync interval after a failure. Read only on the middleware with `rateLimitEnabled`.
 
 #### `rateLimitStatusCode`
 
@@ -745,7 +759,7 @@ Send `Retry-After` on a `ratelimit` answer. Read only on the middleware with `ra
 
 `string` · default `200ms`
 
-How often each replica writes its local sliding-window counts to Redis. `0` writes every hit before answering (exact counts). A positive value below `20ms` is treated as `20ms`. Not read with `rateLimitAlgorithm: tokenBucket`, which calls Redis for every counted bucket. Read only on the middleware with `rateLimitEnabled`.
+How often each replica writes its local sliding-window counts to Redis. `0` writes every hit before answering (exact counts), and is what lets [`rateLimitFailureAction`](#ratelimitfailureaction) and the backoff gate ([`rateLimitUnhealthyBackOffPeriodSecs`](#ratelimitunhealthybackoffperiodsecs)) see a Redis outage. A positive value below `20ms` is treated as `20ms`. Not read with `rateLimitAlgorithm: tokenBucket`, which calls Redis for every counted bucket. Read only on the middleware with `rateLimitEnabled`.
 
 #### `rateLimitStore`
 

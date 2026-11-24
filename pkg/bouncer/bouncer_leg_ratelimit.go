@@ -56,10 +56,12 @@ func (b *Bouncer) logRateLimitCaptchaUnsubscribed() {
 }
 
 // rateLimitAnswersWithCaptcha reports whether client's policy can answer with a captcha: a captcha bucket,
-// or failure action captcha. False on a nil client.
+// failure action captcha, or backoff action captcha. False on a nil client.
 func rateLimitAnswersWithCaptcha(client *ratelimit.Client) bool {
 	if client == nil {
 		return false
 	}
-	return client.Buckets().HasCaptchaBucket() || client.Policy().FailureAction == configuration.FailureActionCaptcha
+	policy := client.Policy()
+	return client.Buckets().HasCaptchaBucket() || policy.FailureAction == configuration.FailureActionCaptcha ||
+		policy.BackOffAction == configuration.FailureActionCaptcha
 }
