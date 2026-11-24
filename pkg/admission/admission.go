@@ -1,7 +1,7 @@
 // Package admission wraps the utilities backoff Gate for one backend leg (LAPI, AppSec or ModSec).
 // It logs once when the leg enters backoff and once when a probe shows it healthy again, never per
-// request. The utilities gate forgets a leg that sees no request for 60 seconds; the wrapper then
-// clears its backoff state without a log line, so the next trip logs entering backoff again.
+// request. When the utilities gate drops an idle leg, the wrapper clears its backoff state without a
+// log line, so the next trip logs entering backoff again.
 package admission
 
 import (
@@ -21,11 +21,6 @@ const (
 	TripFailures = 5
 	FailureRatio = 0.30
 )
-
-// idleTTL is how long the utilities gate keeps a leg that sees no admission. Every Admit, admitted
-// or not, and every Report the gate applies restart it. Once it elapses, the next Admit starts from a
-// closed gate with a full budget.
-const idleTTL = 60 * time.Second
 
 // Config is the cooldown for one leg plus its two transition log lines.
 type Config struct {
@@ -47,27 +42,22 @@ type Gate struct {
 	msgStarted string
 	msgEnded   string
 
-	// mu also serializes the calls into inner, so lastSeen follows the order inner saw them in.
+	// mu also serializes the calls into inner, so backingOff changes in the order inner saw them.
 	mu         sync.Mutex
-	now        func() time.Time
 	backingOff bool
-	// lastSeen is when inner last restarted the leg's idleTTL: the last Admit or applied Report.
-	lastSeen time.Time
 }
 
 // Ticket is one Admit outcome. Pass it to Report once after a real backend attempt.
 type Ticket struct {
 	// Admitted means the caller may call the backend.
 	Admitted bool
-	// probe marks an admission granted while the leg was backing off.
-	probe bool
 	// permit is the utilities generation for this admission. Report counts only when it still matches.
 	permit backendbackoff.Permit
 }
 
 // New builds a Gate when cfg.PeriodSecs is greater than zero, else returns nil.
-// The cooldown is fixed (no exponential growth). Jitter stays unset so a partial utilities Config
-// disables jitter. TTL is idleTTL, so the wrapper knows when the utilities gate forgets the leg.
+// The cooldown is fixed (no exponential growth). Jitter and TTL stay unset so a partial utilities
+// Config disables jitter and keeps the utilities idle TTL.
 func New(cfg Config, log *slog.Logger) (*Gate, error) {
 	if cfg.PeriodSecs <= 0 {
 		return nil, nil //nolint:nilnil // omitted backoff means no gate
@@ -78,7 +68,6 @@ func New(cfg Config, log *slog.Logger) (*Gate, error) {
 		FailureRatio: FailureRatio,
 		BaseCooldown: cooldown,
 		MaxCooldown:  cooldown,
-		TTL:          idleTTL,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("%s admission gate: %w", cfg.Leg, err)
@@ -89,13 +78,12 @@ func New(cfg Config, log *slog.Logger) (*Gate, error) {
 		log:        log,
 		msgStarted: cfg.MsgStarted,
 		msgEnded:   cfg.MsgEnded,
-		now:        time.Now,
 	}, nil
 }
 
 // Admit asks the gate whether this request may call the backend.
 // The first denied admission logs MsgStarted. Later denials stay silent until a probe succeeds or
-// the leg is forgotten after idleTTL.
+// the utilities gate drops the idle leg.
 func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 	if g == nil {
 		return Ticket{Admitted: true}, nil
@@ -106,13 +94,10 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	now := g.now()
-	g.forgetIfIdleLocked(now)
 	permit, wait, err := g.inner.Allow(g.key)
 	if err != nil {
 		return Ticket{}, err
 	}
-	g.lastSeen = now
 	if !permit.Allowed() {
 		if !g.backingOff {
 			g.backingOff = true
@@ -120,8 +105,12 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 		}
 		return Ticket{}, nil
 	}
-	// Admitted while backing off: the gate let a probe through.
-	return Ticket{Admitted: true, probe: g.backingOff, permit: permit}, nil
+	if !permit.Probe() {
+		// The leg is closed. If it was backing off, the utilities gate dropped it idle: no probe
+		// showed the backend healthy, so nothing is logged.
+		g.backingOff = false
+	}
+	return Ticket{Admitted: true, permit: permit}, nil
 }
 
 // Report records a real backend attempt. MsgEnded is logged only when a probe's report is applied.
@@ -132,15 +121,11 @@ func (g *Gate) Report(ticket Ticket, success bool) error {
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	now := g.now()
 	applied, err := g.inner.Report(ticket.permit, success)
 	if err != nil {
 		return err
 	}
-	if applied {
-		g.lastSeen = now
-	}
-	if !success || !ticket.probe || !applied {
+	if !success || !ticket.permit.Probe() || !applied {
 		return nil
 	}
 	if g.backingOff {
@@ -157,25 +142,21 @@ func (g *Gate) Record(ticket Ticket, success bool) {
 	}
 }
 
-// BackingOff reports whether the leg is backing off: MsgStarted was logged, and neither a probe's
-// success nor idleTTL without an admission has cleared it since.
+// BackingOff reports whether the leg is backing off: MsgStarted was logged, no probe has succeeded
+// since, and the utilities gate still holds the leg tripped.
 func (g *Gate) BackingOff() bool {
 	if g == nil {
 		return false
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	g.forgetIfIdleLocked(g.now())
-	return g.backingOff
-}
-
-// forgetIfIdleLocked clears backingOff once idleTTL has passed since inner last saw the leg: inner
-// has forgotten it, and its next Allow starts from a closed gate. Nothing is logged, because no probe
-// showed the backend healthy. Caller holds g.mu.
-func (g *Gate) forgetIfIdleLocked(now time.Time) {
-	if g.backingOff && !now.Before(g.lastSeen.Add(idleTTL)) {
-		g.backingOff = false
+	if g.backingOff {
+		// A leg the utilities gate dropped idle is not tripped; clear it as Admit would, silently.
+		if tripped, err := g.inner.Tripped(g.key); err == nil && !tripped {
+			g.backingOff = false
+		}
 	}
+	return g.backingOff
 }
 
 // Close releases the utilities gate. Later Admit and Report return an error.
@@ -186,22 +167,7 @@ func (g *Gate) Close() {
 	g.inner.Close()
 }
 
-// SetNowForTest replaces the clock of the wrapper and of the utilities gate. nil restores time.Now.
-// Production callers must not use this.
-func (g *Gate) SetNowForTest(now func() time.Time) {
-	if g == nil {
-		return
-	}
-	g.inner.SetNowForTest(now)
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if now == nil {
-		now = time.Now
-	}
-	g.now = now
-}
-
-// Inner is the utilities gate, for tests that call it directly.
+// Inner is the utilities gate for tests that freeze the clock.
 func (g *Gate) Inner() *backendbackoff.Gate {
 	if g == nil {
 		return nil
