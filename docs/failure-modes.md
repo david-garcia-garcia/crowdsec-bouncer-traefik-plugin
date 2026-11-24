@@ -176,7 +176,7 @@ A POST, PUT or PATCH body streamed over HTTP/2 or HTTP/3 without a length (gRPC,
 - The budget: each failure spends one unit out of 5, each answered request earns back 0.3/0.7 of one. Five failures in a row trip it from a full budget; a steady failure rate above about 30% trips it over time. The request that spends the last unit still gets the failure action; skipping starts with the next one.
 - The probe: when the cooldown ends, one request calls the backend; the others keep skipping until it answers. A probe that answers closes the gate with a full budget. A probe that fails starts another cooldown, without a new log line.
 - The cooldown does not grow: every trip waits the same `*UnhealthyBackOffPeriodSecs`.
-- A gate that sees no request for 60 seconds is forgotten: the next request calls the WAF as if it were healthy.
+- A gate that sees no request for 60 seconds is forgotten: the next request calls the WAF as if it were healthy, with a full budget. No ended line is logged for a forgotten gate, and its next trip logs the started line again.
 - A reload keeps the gate when the connection is kept. Changing the cooldown, the host, the timeout or the body limit opens a new connection with a closed gate. Changing only a router's failure or backoff action keeps it.
 
 **Both WAFs on one router.** They run one after the other (AppSec first) and fail independently. With AppSec's gate skipping, ModSec still inspects the request, and the other way round. With AppSec down and `bouncerAppsecFailureAction: ban`, the ban answers before ModSec runs. With ModSec down and `bouncerModsecFailureAction: ban`, an AppSec allow does not save the request.

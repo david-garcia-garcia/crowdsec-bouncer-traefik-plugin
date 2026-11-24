@@ -288,7 +288,7 @@ func TestLiveLookup_probeRecoversAndLogsOnce(t *testing.T) {
 	log, sink := newTestLogSink(slog.LevelInfo)
 	client := newTestGatedClient(t, mock, configuration.LiveMode, 10, log)
 	now := time.Now()
-	client.GateForTest().Inner().SetNowForTest(func() time.Time { return now })
+	client.GateForTest().SetNowForTest(func() time.Time { return now })
 
 	tripTestGate(t, client, mock)
 	for range 2 {

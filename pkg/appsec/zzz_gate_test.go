@@ -179,7 +179,7 @@ func TestQuery_backoffLogsStartedAndEndedOnce(t *testing.T) {
 	}
 	defer client.Close()
 	now := time.Now()
-	client.GateForTest().Inner().SetNowForTest(func() time.Time { return now })
+	client.GateForTest().SetNowForTest(func() time.Time { return now })
 	pol := Policy{FailureAction: configuration.FailureActionPassthrough}
 
 	for range admission.TripFailures {
@@ -277,7 +277,7 @@ func TestQuery_bodyReadErrorDoesNotHoldProbe(t *testing.T) {
 	status := http.StatusOK
 	client, hits := trippedAppsecClient(t, &status)
 	later := time.Now().Add(31 * time.Second)
-	client.GateForTest().Inner().SetNowForTest(func() time.Time { return later })
+	client.GateForTest().SetNowForTest(func() time.Time { return later })
 
 	if _, err := client.Query(withTestAddress(newReadablePostWithFailingBody(errors.New("i/o timeout"))), Policy{FailureAction: configuration.FailureActionBan}); err == nil || errors.Is(err, ErrGateSkip) {
 		t.Fatalf("body read error want a client error, got %v", err)
