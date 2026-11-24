@@ -257,7 +257,7 @@ This middleware connects to LAPI and shares the connection as `lapiInstanceName`
 
 #### `lapiInstanceName`
 
-`string` · default the middleware name
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md))
 
 Name under which the LAPI connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -269,7 +269,7 @@ This middleware connects to AppSec and shares the connection as `appsecInstanceN
 
 #### `appsecInstanceName`
 
-`string` · default the middleware name
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md))
 
 Name under which the AppSec connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -281,7 +281,7 @@ This middleware sets up the captcha provider and shares it as `captchaInstanceNa
 
 #### `captchaInstanceName`
 
-`string` · default the middleware name
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md))
 
 Name under which the captcha provider is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -293,7 +293,7 @@ This middleware connects to the ModSecurity CRS sidecar and shares the connectio
 
 #### `modsecInstanceName`
 
-`string` · default the middleware name when it connects
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md)) when it connects
 
 Name under which the sidecar connection is shared, or which one to use. See [Middleware architecture](middleware-architecture.md).
 
@@ -305,7 +305,7 @@ Open the rate-limit Redis connection and share it, with `rateLimitBuckets` and t
 
 #### `rateLimitInstanceName`
 
-`string` · default the middleware name when `rateLimitEnabled`
+`string` · default the middleware name with its provider (`<middleware>@<provider>`, see [Middleware architecture](middleware-architecture.md)) when `rateLimitEnabled`
 
 On the middleware with `rateLimitEnabled`: the name its policy is shared as. On a middleware with `bouncerEnabled`: the policy this router applies, counted under this middleware's name. A middleware with neither `bouncerEnabled` nor `rateLimitEnabled` fails at startup when it sets it. See [Limit how often a client calls a route](rate-limit.md).
 

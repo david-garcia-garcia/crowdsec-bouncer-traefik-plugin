@@ -6,7 +6,7 @@ Most installs need a single middleware with everything enabled (see [One middlew
 
 A middleware can do two jobs:
 
-1. **Connect** to CrowdSec. Each connection is turned on separately and is shared under a name, which defaults to the middleware's own name:
+1. **Connect** to CrowdSec. Each connection is turned on separately and is shared under a name. The default is the name Traefik gives the middleware, which includes the provider: `stream@file` for a middleware `stream` in the file provider, `<namespace>-<name>@kubernetescrd` for a Kubernetes CRD. A router that subscribes with the bare `stream` does not find that connection; set the instance name explicitly on the middleware that connects, or write the full name:
 
    | Connection | Turn on with | Shared as |
    | ---------- | ------------ | --------- |
