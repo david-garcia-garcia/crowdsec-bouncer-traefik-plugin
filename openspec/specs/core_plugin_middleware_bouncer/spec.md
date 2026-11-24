@@ -276,6 +276,7 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `ban:modsec-backoff` | ModSec gate backing off, backoff action `ban` (sidecar not called; RemediationReason `MODSEC`) |
 | `ban:ratelimit:<bucket>` | A rate-limit bucket with `action: ratelimit` answered, or a `captcha` bucket answered as `ratelimit` (`bypassCaptcha`, or no usable captcha); third field is the bucket name |
 | `ban:ratelimit-failure` | Rate-limit counter could not answer, failure action `ban` |
+| `ban:ratelimit-backoff` | Rate-limit Redis gate backing off, backoff action `ban` |
 | `ban:captcha-downgrade` | Kind was captcha; this router served a ban page (unsubscribed / unpublished / invalid captcha client) |
 | `captcha:rules` | Matching action rule applied captcha |
 | `captcha:lapi` / `captcha:lapi:<origin>` | CrowdSec decision type captcha (same origin encoding) |
@@ -288,6 +289,7 @@ Closed reasons never take a third field, except `lapi` (the metrics origin) and 
 | `captcha:modsec-backoff` | ModSec gate backing off, backoff action `captcha` |
 | `captcha:ratelimit:<bucket>` | Router captcha page for a rate-limit bucket with `action: captcha`; third field is the bucket name |
 | `captcha:ratelimit-failure` | Rate-limit counter could not answer, failure action `captcha` |
+| `captcha:ratelimit-backoff` | Rate-limit Redis gate backing off, backoff action `captcha` |
 | `captcha:ratelimit` | Router captcha page for a challenge-marker POST that the rate-limit leg's captcha gate answered with the challenge again (no bucket answered) |
 | `captcha:appsec` | Router captcha page for an AppSec JSON `action: captcha`, or for a challenge-marker POST that AppSec let through |
 | `captcha:challenge` | AppSec bot-detection `action: challenge` with non-empty body |

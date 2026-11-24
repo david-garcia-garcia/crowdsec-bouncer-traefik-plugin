@@ -9,8 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/bouncer"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/configuration"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/ratelimit"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -38,6 +40,8 @@ func enableTestRateLimit(c *configuration.Config, redisHost string) {
 	c.RateLimitStatusCode = defaults.RateLimitStatusCode
 	c.RateLimitResponseHeaders = defaults.RateLimitResponseHeaders
 	c.RateLimitFailureAction = defaults.RateLimitFailureAction
+	c.RateLimitBackOffAction = defaults.RateLimitBackOffAction
+	c.RateLimitUnhealthyBackOffPeriodSecs = defaults.RateLimitUnhealthyBackOffPeriodSecs
 	c.RateLimitBuckets = []ratelimit.BucketRule{
 		{Name: "per-ip", Requests: 5, Window: "1m", Key: []ratelimit.KeyPart{{From: ratelimit.KeyFromIP}}},
 	}
@@ -429,5 +433,107 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	}
 	if got := countRateLimitOwnerLines(t, logFilePath, warnMsg, "WARN"); got != warnedBeforeOwner+1 {
 		t.Fatalf("owner restored: WARN lines=%d want %d", got, warnedBeforeOwner+1)
+	}
+}
+
+// countRateLimitClientWarns is how many WARN lines of logFilePath carry msg for owner traefikName.
+func countRateLimitClientWarns(t *testing.T, logFilePath, msg, traefikName string) int {
+	t.Helper()
+	total := 0
+	for _, entry := range readLogEntries(t, logFilePath, msg) {
+		// fmt.Sprint, not comma-ok assertions: yaegi runs this file.
+		if fmt.Sprint(entry["level"]) == "WARN" && fmt.Sprint(entry["traefikName"]) == traefikName {
+			total++
+		}
+	}
+	return total
+}
+
+// TestNew_RateLimitRedisOutageBacksOffAtDefaultLevel proves, through New at the default INFO level, that an
+// owner whose failure action ban cannot reach a Redis outage (buffered sliding window) logs one WARN at load
+// and is not rejected; and that in exact mode, with the default rateLimitUnhealthyBackOffPeriodSecs (10), a
+// dead Redis answers the failure action for the first admission.TripFailures requests, then the backoff
+// action: the default passthrough, or ban with header ban:ratelimit-backoff. The outage logs one debounced
+// ERROR "crowdsec ratelimit redis unavailable" and, per owner, one WARN "crowdsec ratelimit backoff started";
+// the owner whose backoff action is laxer than its failure action logs one WARN at load.
+func TestNew_RateLimitRedisOutageBacksOffAtDefaultLevel(t *testing.T) {
+	reclaim.ResetForTestWith(0)
+	t.Cleanup(func() { reclaim.ResetForTest() })
+	logger.ResetDebounceForTest()
+	t.Cleanup(logger.ResetDebounceForTest)
+	logFilePath := newTestLogFile(t)
+	const loadWarn = "crowdsec ratelimit failure action does not apply to a redis outage"
+	withLog := func(cfg *configuration.Config) *configuration.Config {
+		cfg.LogLevel = "INFO"
+		cfg.LogFormat = "json"
+		cfg.LogFilePath = logFilePath
+		cfg.RateLimitFailureAction = configuration.FailureActionBan
+		return cfg
+	}
+
+	if _, err := New(context.Background(), testNextOK(), withLog(cfgRateLimitDeadRedis()), "rl-buffered-ban"); err != nil {
+		t.Fatalf("buffered ban must load: %v", err)
+	}
+	if got := countRateLimitClientWarns(t, logFilePath, loadWarn, "rl-buffered-ban"); got != 1 {
+		t.Fatalf("buffered ban: %d load WARN lines, want 1", got)
+	}
+
+	exactCfg := withLog(cfgRateLimitDeadRedis())
+	exactCfg.RateLimitSyncRate = "0"
+	exact, err := New(context.Background(), testNextOK(), exactCfg, "rl-exact-ban")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := countRateLimitClientWarns(t, logFilePath, loadWarn, "rl-exact-ban"); got != 0 {
+		t.Fatalf("exact ban: %d load WARN lines, want 0", got)
+	}
+	assertRateLimitTripThenBackoff(t, exact, "203.0.113.48", http.StatusOK, "")
+
+	backOffBanCfg := withLog(cfgRateLimitDeadRedis())
+	backOffBanCfg.RateLimitSyncRate = "0"
+	backOffBanCfg.RateLimitBackOffAction = configuration.FailureActionBan
+	backOffBan, err := New(context.Background(), testNextOK(), backOffBanCfg, "rl-exact-backoff-ban")
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertRateLimitTripThenBackoff(t, backOffBan, "203.0.113.49", http.StatusForbidden, "ban:ratelimit-backoff")
+
+	for _, name := range []string{"rl-exact-ban", "rl-exact-backoff-ban"} {
+		if got := countRateLimitClientWarns(t, logFilePath, ratelimit.MsgBackoffStarted, name); got != 1 {
+			t.Fatalf("%s: %d WARN %q lines, want 1", name, got, ratelimit.MsgBackoffStarted)
+		}
+	}
+	const laxerWarn = "crowdsec bouncer backoff action laxer than failure action"
+	if got := countRateLimitClientWarns(t, logFilePath, laxerWarn, "rl-exact-ban"); got != 1 {
+		t.Fatalf("exact ban with the default backoff passthrough: %d laxer WARN lines, want 1", got)
+	}
+	if got := countRateLimitClientWarns(t, logFilePath, laxerWarn, "rl-exact-backoff-ban"); got != 0 {
+		t.Fatalf("exact ban with backoff ban: %d laxer WARN lines, want 0", got)
+	}
+	entries := readLogEntries(t, logFilePath, ratelimit.MsgRedisUnavailable)
+	if len(entries) != 1 || fmt.Sprint(entries[0]["level"]) != "ERROR" || fmt.Sprint(entries[0]["traefikName"]) != "rl-exact-ban" ||
+		fmt.Sprint(entries[0]["host"]) != testRateLimitDeadRedis {
+		t.Fatalf("dead Redis: %d %q lines (%v), want one debounced ERROR for rl-exact-ban on %s", len(entries), ratelimit.MsgRedisUnavailable, entries, testRateLimitDeadRedis)
+	}
+}
+
+// assertRateLimitTripThenBackoff sends admission.TripFailures requests from clientIP that must answer
+// 403 ban:ratelimit-failure, then two that must answer wantStatus with header wantHeader (the backoff action).
+func assertRateLimitTripThenBackoff(t *testing.T, handler http.Handler, clientIP string, wantStatus int, wantHeader string) {
+	t.Helper()
+	// A slice, not range-over-int, because yaegi runs this file.
+	for range make([]struct{}, admission.TripFailures) {
+		rw := httptest.NewRecorder()
+		handler.ServeHTTP(rw, reqForIP(clientIP))
+		if rw.Code != http.StatusForbidden || rw.Header().Get("X-Remediation") != "ban:ratelimit-failure" {
+			t.Fatalf("before the trip: status %d header %q, want 403 ban:ratelimit-failure", rw.Code, rw.Header().Get("X-Remediation"))
+		}
+	}
+	for range make([]struct{}, 2) {
+		rw := httptest.NewRecorder()
+		handler.ServeHTTP(rw, reqForIP(clientIP))
+		if rw.Code != wantStatus || rw.Header().Get("X-Remediation") != wantHeader {
+			t.Fatalf("after the trip: status %d header %q, want %d %q", rw.Code, rw.Header().Get("X-Remediation"), wantStatus, wantHeader)
+		}
 	}
 }

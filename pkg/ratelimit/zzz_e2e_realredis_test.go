@@ -32,7 +32,7 @@ func realRedisTestLimit() Limit {
 
 // newRealRedisSlidingWindowClient builds a sliding-window Client on addr with syncRate, outside the reclaim table.
 func newRealRedisSlidingWindowClient(addr string, syncRate time.Duration) (*Client, error) {
-	return newClient(RedisSettings{Host: addr, SyncRate: syncRate}, AlgorithmSlidingWindow, nil, slog.Default())
+	return newClient(RedisSettings{Host: addr, SyncRate: syncRate}, AlgorithmSlidingWindow, 0, nil, slog.Default())
 }
 
 // TestMain waits for Dragonfly (or Redis) at REALREDIS_ADDR before the suite.

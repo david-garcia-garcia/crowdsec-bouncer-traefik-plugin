@@ -21,6 +21,7 @@ BeforeAll {
             @{ Path = "/rate-limit-log/ready"; Status = 200 }
             @{ Path = "/rate-limit-down-pass/ready"; Status = 200 }
             @{ Path = "/rate-limit-down-ban/ready"; Status = 403 }
+            @{ Path = "/rate-limit-down-backoff/ready"; Status = 403 }
             @{ Path = "/rate-limit-down-local/ready"; Status = @(200, 429) }
             @{ Path = "/rate-limit-token-bucket/ready"; Status = @(200, 429) }
         )) {
@@ -131,6 +132,29 @@ Describe "Redis rate limit" {
             $response = Test-HttpRequest -Endpoint "/rate-limit-down-ban/page" -IP $ip -TraefikUrl $script:TraefikUrl
             $response.StatusCode | Should -Be 403 -Because "the failure action ban uses bouncerRemediationStatusCode"
             [string]$response.Headers["X-Crowdsec-Remediation"] | Should -Be "ban:ratelimit-failure"
+        }
+
+        It "Should stop calling Redis after 5 failures and answer the backoff action" {
+            $ip = Get-RateLimitClientIP -HostNumber 23
+
+            # The readiness probe (or an earlier run on the same stack) may already have spent part of the
+            # budget or tripped the gate, so count the failures before the first backoff answer instead of
+            # expecting exactly 5. Requests are fast (connection refused), well inside the 10s cooldown.
+            $answers = @()
+            foreach ($attempt in 1..8) {
+                $response = Test-HttpRequest -Endpoint "/rate-limit-down-backoff/page" -IP $ip -TraefikUrl $script:TraefikUrl
+                $response.StatusCode | Should -Be 403 -Because "both the failure action and the backoff action are ban"
+                $answers += [string]$response.Headers["X-Crowdsec-Remediation"]
+            }
+            $firstBackoff = [array]::IndexOf($answers, "ban:ratelimit-backoff")
+            $firstBackoff | Should -BeGreaterOrEqual 0 -Because "the gate trips after 5 failures in a row (answers: $($answers -join ', '))"
+            $firstBackoff | Should -BeLessOrEqual 5 -Because "at most 5 failures reach the failure action before the gate skips Redis (answers: $($answers -join ', '))"
+            @($answers[0..($firstBackoff)] | Select-Object -SkipLast 1 | Where-Object { $_ -ne "ban:ratelimit-failure" }).Count | Should -Be 0 -Because "every answer before the trip is the failure action"
+            @($answers[$firstBackoff..($answers.Count - 1)] | Where-Object { $_ -ne "ban:ratelimit-backoff" }).Count | Should -Be 0 -Because "inside the cooldown every request is skipped (answers: $($answers -join ', '))"
+
+            $lines = (docker logs traefik-test 2>&1 | Out-String) -split "`r?`n"
+            $started = @($lines | Where-Object { $_ -match '"traefikName":"bouncer-rate-limit-down-backoff(@file)?"' -and $_.Contains('"msg":"crowdsec ratelimit backoff started"') })
+            $started.Count | Should -BeGreaterOrEqual 1 -Because "the gate logs WARN crowdsec ratelimit backoff started when it trips"
         }
 
         It "Should keep the replica's local limit in buffered mode instead of the failure action" {

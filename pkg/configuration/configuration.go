@@ -69,6 +69,8 @@ const (
 	DefaultModsecUnhealthyBackOffPeriodSecs int64 = 10
 	// DefaultLapiUnhealthyBackOffPeriodSecs is the LAPI live/none gate cooldown when omitted.
 	DefaultLapiUnhealthyBackOffPeriodSecs int64 = 10
+	// DefaultRateLimitUnhealthyBackOffPeriodSecs is the rate-limit Redis gate cooldown when omitted.
+	DefaultRateLimitUnhealthyBackOffPeriodSecs int64 = 10
 	// RateLimitStoreRedis is the only rate-limit store in this version.
 	RateLimitStoreRedis = "redis"
 )
@@ -180,6 +182,7 @@ type Config struct {
 	ModsecUnhealthyBackOffPeriodSecs    int64                        `json:"modsecUnhealthyBackOffPeriodSecs,omitempty"`
 	ModsecURL                           string                       `json:"modsecUrl,omitempty"`
 	RateLimitAlgorithm                  string                       `json:"rateLimitAlgorithm,omitempty"`
+	RateLimitBackOffAction              string                       `json:"rateLimitBackOffAction,omitempty"`
 	RateLimitBuckets                    []ratelimit.BucketRule       `json:"rateLimitBuckets,omitempty"`
 	RateLimitEnabled                    bool                         `json:"rateLimitEnabled,omitempty"`
 	RateLimitFailureAction              string                       `json:"rateLimitFailureAction,omitempty"`
@@ -192,6 +195,7 @@ type Config struct {
 	RateLimitStatusCode                 int                          `json:"rateLimitStatusCode,omitempty"`
 	RateLimitStore                      string                       `json:"rateLimitStore,omitempty"`
 	RateLimitSyncRate                   string                       `json:"rateLimitSyncRate,omitempty"`
+	RateLimitUnhealthyBackOffPeriodSecs int64                        `json:"rateLimitUnhealthyBackOffPeriodSecs,omitempty"`
 	ReclaimGraceSeconds                 int64                        `json:"reclaimGraceSeconds,omitempty"`
 }
 
@@ -313,6 +317,15 @@ func EffectiveRateLimitFailureAction(action string) string {
 	return action
 }
 
+// EffectiveRateLimitBackOffAction maps empty config to passthrough, the CreateConfig default: while the
+// rate-limit Redis gate is backing off, traffic goes through unless the operator asks otherwise.
+func EffectiveRateLimitBackOffAction(action string) string {
+	if action == "" {
+		return FailureActionPassthrough
+	}
+	return action
+}
+
 // New creates the default plugin configuration.
 func New() *Config {
 	return &Config{
@@ -390,6 +403,7 @@ func New() *Config {
 		ModsecHTTPTimeoutSeconds:            10,
 		ModsecUnhealthyBackOffPeriodSecs:    DefaultModsecUnhealthyBackOffPeriodSecs,
 		RateLimitAlgorithm:                  ratelimit.AlgorithmSlidingWindow,
+		RateLimitBackOffAction:              FailureActionPassthrough,
 		RateLimitBuckets:                    []ratelimit.BucketRule{},
 		RateLimitEnabled:                    false,
 		RateLimitFailureAction:              FailureActionPassthrough,
@@ -401,6 +415,7 @@ func New() *Config {
 		RateLimitStatusCode:                 http.StatusTooManyRequests,
 		RateLimitStore:                      RateLimitStoreRedis,
 		RateLimitSyncRate:                   "200ms",
+		RateLimitUnhealthyBackOffPeriodSecs: DefaultRateLimitUnhealthyBackOffPeriodSecs,
 		ReclaimGraceSeconds:                 30,
 	}
 }
@@ -565,7 +580,7 @@ func ValidateParams(config *Config, log *slog.Logger) error {
 }
 
 // validateRateLimit checks every rate-limit setting of the owner (rateLimitEnabled): store, Redis host,
-// password file, algorithm, sync rate, failure action, status, and the bucket list (compiled for the
+// password file, algorithm, sync rate, failure and backoff actions, backoff period, status, and the bucket list (compiled for the
 // algorithm, then discarded).
 func validateRateLimit(config *Config) error {
 	if config.RateLimitStore != RateLimitStoreRedis {
@@ -586,6 +601,12 @@ func validateRateLimit(config *Config) error {
 	// captcha needs no captcha instance here: the subscribing router decides at request time.
 	if err := validateFailureAction("RateLimitFailureAction", config.RateLimitFailureAction, true); err != nil {
 		return err
+	}
+	if err := validateFailureAction("RateLimitBackOffAction", config.RateLimitBackOffAction, true); err != nil {
+		return err
+	}
+	if config.RateLimitUnhealthyBackOffPeriodSecs < 0 {
+		return errors.New("RateLimitUnhealthyBackOffPeriodSecs: cannot be less than 0")
 	}
 	if config.RateLimitStatusCode < 100 || config.RateLimitStatusCode >= 600 {
 		return errors.New("RateLimitStatusCode: cannot be less than 100 and more than 600")

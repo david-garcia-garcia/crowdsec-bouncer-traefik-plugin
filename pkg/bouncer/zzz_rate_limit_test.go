@@ -72,6 +72,7 @@ func testRateLimitOwnerSettings(cfg *configuration.Config) ratelimit.Settings {
 	return ratelimit.Settings{
 		Buckets: cfg.RateLimitBuckets,
 		Policy: ratelimit.Policy{
+			BackOffAction:   configuration.EffectiveRateLimitBackOffAction(cfg.RateLimitBackOffAction),
 			FailureAction:   configuration.EffectiveRateLimitFailureAction(cfg.RateLimitFailureAction),
 			ResponseHeaders: cfg.RateLimitResponseHeaders,
 			StatusCode:      cfg.RateLimitStatusCode,
@@ -364,6 +365,49 @@ func TestRateLimit_failureActions(t *testing.T) {
 			}
 			assertRateLimitFailureDrop(t, fixture.lapiClient, tc.wantDrop)
 			assertRateLimitFailureLoggedAtDebug(t, sink.String())
+		})
+	}
+}
+
+// TestRateLimit_backOffActions proves each rateLimitBackOffAction while the owner's Redis gate backs off
+// (ratelimit.ErrGateSkip), with header ratelimit-backoff and the plugin:ratelimit_failure drop, whatever
+// rateLimitFailureAction says, and no WARN or ERROR per request.
+func TestRateLimit_backOffActions(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		backOffAction string
+		failureAction string
+		captcha       bool
+		wantNext      bool
+		wantStatus    int
+		wantHeader    string
+		wantDrop      string
+	}{
+		{name: "passthrough with failure action ban", backOffAction: configuration.FailureActionPassthrough, failureAction: configuration.FailureActionBan, wantNext: true, wantStatus: http.StatusOK},
+		{name: "empty is passthrough", backOffAction: "", failureAction: configuration.FailureActionBan, wantNext: true, wantStatus: http.StatusOK},
+		{name: "ban with failure action passthrough", backOffAction: configuration.FailureActionBan, failureAction: configuration.FailureActionPassthrough, wantStatus: http.StatusForbidden, wantHeader: "ban:ratelimit-backoff", wantDrop: "ban"},
+		{name: "captcha", backOffAction: configuration.FailureActionCaptcha, captcha: true, wantStatus: http.StatusOK, wantHeader: "captcha:ratelimit-backoff", wantDrop: "captcha"},
+		{name: "captcha without a captcha client", backOffAction: configuration.FailureActionCaptcha, wantStatus: http.StatusForbidden, wantHeader: "ban:captcha-downgrade", wantDrop: "ban"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture := newTestRateLimitFixture(t, []ratelimit.BucketRule{perIPTestBucket("per-ip", 100)}, func(cfg *configuration.Config) {
+				cfg.RateLimitBackOffAction = tc.backOffAction
+				cfg.RateLimitFailureAction = tc.failureAction
+			})
+			fixture.counter.err = ratelimit.ErrGateSkip
+			if tc.captcha {
+				bindTestCaptcha(fixture.b, testCaptchaClient(t, "/fast.js", "", "", nil))
+			}
+			log, sink := newTestLogSink(slog.LevelDebug)
+			fixture.b.log = log
+			rw := fixture.serve(http.MethodGet, "/", testRateLimitClientIP)
+			if fixture.next.called != tc.wantNext || rw.Code != tc.wantStatus || rw.Header().Get("X-Remediation") != tc.wantHeader {
+				t.Fatalf("next=%v status=%d header=%q, want next=%v status=%d header=%q", fixture.next.called, rw.Code, rw.Header().Get("X-Remediation"), tc.wantNext, tc.wantStatus, tc.wantHeader)
+			}
+			assertRateLimitFailureDrop(t, fixture.lapiClient, tc.wantDrop)
+			if logged := sink.String(); strings.Contains(logged, `"level":"ERROR"`) || strings.Contains(logged, `"level":"WARN"`) {
+				t.Fatalf("a gate skip must not log WARN or ERROR per request: %s", logged)
+			}
 		})
 	}
 }

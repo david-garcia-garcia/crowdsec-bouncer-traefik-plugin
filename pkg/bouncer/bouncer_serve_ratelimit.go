@@ -2,6 +2,7 @@ package bouncer
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -30,12 +31,12 @@ const (
 
 // serveRateLimit charges req to the buckets of the rate-limit client this route subscribes to, under this
 // route's own name, and answers with that client's policy. True means the response was written: a
-// ratelimit bucket over its limit, a captcha bucket over its limit, or the failure action when the
-// counter could not answer; or this router's captcha gate answering a challenge-form POST
-// (isRateLimitChallengeFormAnswer).
+// ratelimit bucket over its limit, a captcha bucket over its limit, the failure action when the counter
+// could not answer, or the backoff action while the owner's Redis gate backs off; or this router's captcha
+// gate answering a challenge-form POST (isRateLimitChallengeFormAnswer).
 // False means the request continues to the AppSec step: no subscription or an unpublished owner, a
-// bypassRateLimit rule, a widget asset of this router's captcha page, no bucket that answers, failure
-// action passthrough, or a failure captcha that a cleared gate or a bypassCaptcha rule let through.
+// bypassRateLimit rule, a widget asset of this router's captcha page, no bucket that answers, a failure or
+// backoff action passthrough, or a captcha answer that a cleared gate or a bypassCaptcha rule let through.
 func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch) bool {
 	rateLimitClient := b.loadedRateLimit()
 	if rateLimitClient == nil || match.SkipRateLimit {
@@ -69,10 +70,14 @@ func (b *Bouncer) serveRateLimit(rw http.ResponseWriter, req clientrequest.Reque
 			"requests", exceeded.Requests, "window", exceeded.Window.String())
 	}
 
-	// Answer by precedence: the counter error, then a ratelimit bucket, then a captcha bucket.
+	// Answer by precedence: the counter error (a gate skip first), then a ratelimit bucket, then a captcha bucket.
+	if errors.Is(verdict.Err, ratelimit.ErrGateSkip) {
+		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "gateSkip", true)
+		return b.applyRateLimitAction(rw, req, match, policy.BackOffAction, headerReasonRateLimitBackoff, captchaClient)
+	}
 	if verdict.Err != nil {
 		b.log.Debug("serveRateLimit", "ip", req.IPAddrString(), "error", verdict.Err)
-		return b.applyRateLimitFailureAction(rw, req, match, policy.FailureAction, captchaClient)
+		return b.applyRateLimitAction(rw, req, match, policy.FailureAction, headerReasonRateLimitFailure, captchaClient)
 	}
 	if verdict.RateLimit.Name != "" {
 		logger.Trace(b.log, "serveRateLimit", "ip", req.IPAddrString(), "bucket", verdict.RateLimit.Name)
@@ -130,26 +135,28 @@ func (b *Bouncer) answerCaptchaBucket(rw http.ResponseWriter, req clientrequest.
 	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimit, origin)
 }
 
-// applyRateLimitFailureAction applies the owner's failureAction when the counter errored, on this router.
+// applyRateLimitAction applies the owner's action on this router when the counter gave no verdict: the
+// failure action for a counter error (headerReason ratelimit-failure), or the backoff action while the
+// owner's Redis gate backs off (ratelimit-backoff). Both count under the origin plugin:ratelimit_failure.
 // captchaClient is this router's usable captcha, or nil.
 // False means the response was not written, and the request continues to the AppSec step.
-func (b *Bouncer) applyRateLimitFailureAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, failureAction string, captchaClient *captcha.Client) bool {
-	switch failureAction {
+func (b *Bouncer) applyRateLimitAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, action, headerReason string, captchaClient *captcha.Client) bool {
+	switch action {
 	case configuration.FailureActionPassthrough:
 		return false
 	case configuration.FailureActionCaptcha:
-		return b.captchaRateLimitFailure(rw, req, match, captchaClient)
+		return b.captchaRateLimitAction(rw, req, match, headerReason, captchaClient)
 	default:
-		b.banWarnCaptchaRule(rw, req, match, configuration.ReasonRateLimit, headerReasonRateLimitFailure, lapi.OriginPluginRateLimitFailure)
+		b.banWarnCaptchaRule(rw, req, match, configuration.ReasonRateLimit, headerReason, lapi.OriginPluginRateLimitFailure)
 		return true
 	}
 }
 
-// captchaRateLimitFailure serves the captcha gate for the rate-limit failure action. Without a usable
-// captcha (captchaClient nil) it logs the downgrade like a captcha bucket does and writes the ban page
-// with ban:captcha-downgrade.
+// captchaRateLimitAction serves the captcha gate for the rate-limit failure or backoff action, with
+// headerReason. Without a usable captcha (captchaClient nil) it logs the downgrade like a captcha bucket
+// does and writes the ban page with ban:captcha-downgrade.
 // False means a cleared gate or a bypassCaptcha rule, and the caller continues.
-func (b *Bouncer) captchaRateLimitFailure(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, captchaClient *captcha.Client) bool {
+func (b *Bouncer) captchaRateLimitAction(rw http.ResponseWriter, req clientrequest.Request, match httprule.ActionMatch, headerReason string, captchaClient *captcha.Client) bool {
 	if b.bypassesCaptcha(req, match) {
 		return false
 	}
@@ -158,7 +165,7 @@ func (b *Bouncer) captchaRateLimitFailure(rw http.ResponseWriter, req clientrequ
 		b.handleBanServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonCaptchaDowngrade, lapi.OriginPluginRateLimitFailure)
 		return true
 	}
-	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReasonRateLimitFailure, lapi.OriginPluginRateLimitFailure)
+	return b.handleCaptchaKindServeHTTP(rw, req, configuration.ReasonRateLimit, headerReason, lapi.OriginPluginRateLimitFailure)
 }
 
 // logRateLimitCaptchaDowngrade logs a rate-limit captcha answer this router gives without a captcha:

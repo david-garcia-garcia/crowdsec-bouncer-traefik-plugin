@@ -7,7 +7,8 @@ import (
 
 // debugCappedHandler writes every record of the wrapped handler at DEBUG at most.
 // The simpleredis client logs WARN and ERROR per failed dial or command; under this leg one failing
-// request is one DEBUG line, so the library lines it causes stay at DEBUG too.
+// request is one DEBUG line, so the library lines it causes stay at DEBUG too. The outage itself is
+// logged by the Client: MsgRedisUnavailable debounced, and the admission gate's backoff lines.
 type debugCappedHandler struct {
 	inner slog.Handler
 }

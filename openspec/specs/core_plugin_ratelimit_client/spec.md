@@ -54,6 +54,12 @@ When the client cannot be created (invalid Redis settings), `New` SHALL fail and
 - **WHEN** `rateLimitEnabled` is true and nothing listens at `rateLimitRedisHost`
 - **THEN** `New` returns a handler
 
+#### Scenario: A blocking failure action on the buffered sliding window warns at load
+- **WHEN** the owner's `rateLimitAlgorithm` is `slidingWindow`, `rateLimitSyncRate` is `200ms`, and `rateLimitFailureAction` or `rateLimitBackOffAction` is `ban` or `captcha`
+- **THEN** `New` returns a handler
+- **AND** the client logs WARN `crowdsec ratelimit failure action does not apply to a redis outage` once, when it is created, with `failureAction`, `backOffAction`, `algorithm`, `syncRate`, and a hint naming `rateLimitSyncRate: 0` and `rateLimitAlgorithm: tokenBucket`
+- **AND** with both actions `passthrough`, with `rateLimitSyncRate: 0`, or with `tokenBucket` that WARN is not logged
+
 ### Requirement: Counters are shared across replicas through Redis keys
 Each bucket counter SHALL live in Redis under the key `rl:<middleware name>:<bucket name>:<key hash>` followed by the suffix of the owner's algorithm: `:<window start>` (one string per window) with `slidingWindow`, `:tb` (one hash holding the tokens and the last refill time) with `tokenBucket`. The two key sets SHALL NOT overlap, so switching `rateLimitAlgorithm` starts every bucket from zero and never reads the other algorithm's value. `<middleware name>` SHALL be the Traefik name of the subscribing middleware that charges the request, not the owner's name. `<key hash>` SHALL be the first 16 hexadecimal characters of the SHA-256 of the bucket's key parts joined with a NUL byte. A bucket with an empty `key` list SHALL hash the empty string and so has one counter. Raw header, cookie, query, or path values SHALL NOT appear in Redis keys.
 
@@ -116,7 +122,7 @@ When counting a hit returns an error (in exact mode or with `tokenBucket`: Redis
 
 When the counter returns an error together with a local verdict, the failure action SHALL decide and the local verdict SHALL be ignored.
 
-Each failing request SHALL log at DEBUG with the client address and the error. The plugin MUST NOT log a WARN or ERROR per failing request.
+Each failing request SHALL log at DEBUG with the client address and the error. The plugin MUST NOT log a WARN or ERROR per failing request: a counter error SHALL log ERROR `crowdsec ratelimit redis unavailable` with the owner's `traefikName` and `instanceName`, `host` and `error` through the 5-second debounce ModSec uses for `crowdsec modsec sidecar unavailable`. An error caused by the request context being canceled SHALL NOT log it. The library's own per-dial and per-command lines SHALL stay at DEBUG.
 
 #### Scenario: Unreachable Redis with passthrough lets the request through
 - **WHEN** `rateLimitSyncRate` is `0`, `rateLimitFailureAction` is `passthrough`, and Redis is unreachable
@@ -153,6 +159,45 @@ Each failing request SHALL log at DEBUG with the client address and the error. T
 - **WHEN** Redis accepts the connection but does not answer
 - **THEN** the rate-limit step returns within the 250ms budget
 - **AND** in exact mode it applies `rateLimitFailureAction`
+
+### Requirement: A Redis that keeps failing is skipped by the owner's backoff gate
+In exact mode (`rateLimitSyncRate` `0`) and with `tokenBucket`, where a successful take proves that Redis answered, the owner's client SHALL hold one `pkg/admission` gate (key `ratelimit`) with cooldown `rateLimitUnhealthyBackOffPeriodSecs` (default `10`), shared by every subscriber of that client. Every take SHALL be admitted by the gate before it calls Redis and reported after it: success when the counter answered or Redis rejected the password (`simpleredis.ErrNoAuth`, a setting to fix, as AppSec reports a 401), failure on any other counter error. A take whose request context was canceled SHALL NOT be reported. The trip rule, the probe, and the fixed cooldown SHALL be the AppSec and ModSec gate's (`admission.TripFailures`, `admission.FailureRatio`).
+
+While the gate backs off, a take SHALL NOT call Redis and SHALL return `ratelimit.ErrGateSkip`. The subscribing router SHALL then stop evaluating buckets and apply the owner's `rateLimitBackOffAction` instead of `rateLimitFailureAction`, with the same three answers and remediation headers `ban:ratelimit-backoff` / `captcha:ratelimit-backoff`, drop origin `plugin:ratelimit_failure`. `passthrough` (default) continues to the AppSec step with no header and no drop.
+
+The gate SHALL log WARN `crowdsec ratelimit backoff started` (with `retryIn`) when it starts skipping and INFO `crowdsec ratelimit backoff ended` when a probe succeeds, once per transition and per client.
+
+When the client is created with a gate, it SHALL log one WARN when `rateLimitBackOffAction` ranks below `rateLimitFailureAction` (passthrough < captcha < ban): `crowdsec bouncer backoff action laxer than failure action` with `failureAction`, `backOffAction`, `backOffPeriodSecs` and a hint naming `rateLimitBackOffAction` and `rateLimitUnhealthyBackOffPeriodSecs: 0`; and one WARN `crowdsec bouncer backoff action stricter than failure action` when it ranks above. Neither SHALL fail `New`, and a client without a gate SHALL log neither.
+
+`rateLimitUnhealthyBackOffPeriodSecs` `0` SHALL build no gate. The buffered sliding window SHALL build no gate whatever the cooldown: it answers an outage from local counts and already skips Redis for one sync rate after a failure. The cooldown SHALL be part of the client's ownership key.
+
+#### Scenario: A dead Redis in exact mode trips the gate and the backoff action answers
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitFailureAction` is `ban`, `rateLimitBackOffAction` is `passthrough`, `rateLimitUnhealthyBackOffPeriodSecs` is `10`, and Redis is unreachable
+- **THEN** the first 5 requests are answered with `ban:ratelimit-failure`
+- **AND** the next requests reach the backend without calling Redis, until the cooldown ends
+- **AND** WARN `crowdsec ratelimit backoff started` is logged once and ERROR `crowdsec ratelimit redis unavailable` at most once per 5 seconds
+
+#### Scenario: Backoff action ban answers ban:ratelimit-backoff
+- **WHEN** the gate is backing off and `rateLimitBackOffAction` is `ban`
+- **THEN** the response is the ban page with remediation header `ban:ratelimit-backoff` and drop origin `plugin:ratelimit_failure`
+
+#### Scenario: A probe that succeeds ends the backoff
+- **WHEN** the gate is backing off, the cooldown has elapsed, and Redis answers again
+- **THEN** the next take calls Redis and INFO `crowdsec ratelimit backoff ended` is logged once
+
+#### Scenario: A rejected password does not trip the gate
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitUnhealthyBackOffPeriodSecs` is `10`, and Redis rejects the password
+- **THEN** every request gets `rateLimitFailureAction`, after more than 5 requests too
+- **AND** WARN `crowdsec ratelimit backoff started` is not logged
+
+#### Scenario: A laxer backoff action warns at load
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitUnhealthyBackOffPeriodSecs` is `10`, `rateLimitFailureAction` is `ban`, and `rateLimitBackOffAction` is `passthrough`
+- **THEN** `New` returns a handler
+- **AND** the client logs WARN `crowdsec bouncer backoff action laxer than failure action` once, when it is created
+
+#### Scenario: Buffered mode and a zero cooldown build no gate
+- **WHEN** `rateLimitSyncRate` is `200ms` with `slidingWindow`, or `rateLimitUnhealthyBackOffPeriodSecs` is `0`
+- **THEN** the client has no gate and every take reaches the counter
 
 ### Requirement: A subscriber logs the loss and return of its rate-limit owner
 A rate-limit subscriber SHALL log WARN `crowdsec bouncer rate limit owner unavailable` (`traefikName`, `instanceName`) once each time it moves to no published rate-limit client. It SHALL log INFO `crowdsec bouncer rate limit owner available` (`traefikName`, `instanceName`, the bound client's `incarnation`) once, on the first bind after that WARN. Neither line SHALL be logged per request, on a repeated delivery of the same state, or when one client replaces another.

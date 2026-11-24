@@ -3,6 +3,7 @@ package ratelimit
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash/fnv"
 	"log/slog"
@@ -10,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 	"github.com/david-garcia-garcia/traefik-middleware-utilities/windowcounter"
@@ -27,7 +30,24 @@ const (
 	redisPoolSize = 8
 	// redisIdleTimeout is how long an idle socket may be reused.
 	redisIdleTimeout = 30 * time.Second
+	// gateKey is the admission leg name and gate key.
+	gateKey = "ratelimit"
+	// redisUnavailableInterval is how often MsgRedisUnavailable may repeat, as for ModSec's MsgUnavailable.
+	redisUnavailableInterval = 5 * time.Second
 )
+
+const (
+	// MsgBackoffStarted is the WARN line when the admission gate starts skipping the rate-limit Redis.
+	MsgBackoffStarted = "crowdsec ratelimit backoff started"
+	// MsgBackoffEnded is the INFO line when a Redis probe succeeds after a backoff.
+	MsgBackoffEnded = "crowdsec ratelimit backoff ended"
+	// MsgRedisUnavailable is the debounced ERROR line when a counter error reaches the plugin.
+	MsgRedisUnavailable = "crowdsec ratelimit redis unavailable"
+)
+
+// ErrGateSkip means the admission gate is backing off and Redis was not called. The subscriber answers
+// with the owner's BackOffAction, not its FailureAction.
+var ErrGateSkip = errors.New("ratelimit:unhealthySkip")
 
 // Log messages of the Client lifecycle, matching the other legs.
 const (
@@ -35,6 +55,22 @@ const (
 	msgInstanceSleeping = "crowdsec ratelimit instance sleeping"
 	msgInstanceWaking   = "crowdsec ratelimit instance waking"
 	msgInstanceClosed   = "crowdsec ratelimit instance closed"
+	// msgFailureActionBuffered is the WARN line of an owner whose blocking failure or backoff action a
+	// Redis outage cannot reach.
+	msgFailureActionBuffered = "crowdsec ratelimit failure action does not apply to a redis outage"
+	// msgBackOffLaxerThanFailure is the WARN line of an owner with a gate whose backoff action lets through
+	// more than its failure action: after the trip, an outage gets the laxer answer.
+	msgBackOffLaxerThanFailure = "crowdsec bouncer backoff action laxer than failure action"
+	// msgBackOffStricterThanFailure is the WARN line of an owner with a gate whose backoff action is stricter
+	// than its failure action, the text the other gated legs log (pkg/bouncer).
+	msgBackOffStricterThanFailure = "crowdsec bouncer backoff action stricter than failure action"
+)
+
+// The actions warnBufferedFailureAction reads (configuration.FailureAction*; configuration imports this
+// package).
+const (
+	failureActionBan     = "ban"
+	failureActionCaptcha = "captcha"
 )
 
 // RedisSettings are the Redis server, the resolved password, the database, and the sync rate the
@@ -47,22 +83,26 @@ type RedisSettings struct {
 }
 
 // Policy is how every subscriber of the owner's Client answers: the failure action when the counter
-// errors, the status of a rate-limited request, and whether it carries Retry-After.
+// errors, the backoff action while the gate skips Redis, the status of a rate-limited request, and whether
+// it carries Retry-After.
 type Policy struct {
+	BackOffAction   string `json:"backOffAction"`
 	FailureAction   string `json:"failureAction"`
 	ResponseHeaders bool   `json:"responseHeaders"`
 	StatusCode      int    `json:"statusCode"`
 }
 
 // Settings are everything the owner (rateLimitEnabled) puts on its Client: the counting algorithm
-// (empty means AlgorithmSlidingWindow), the Redis counter, the bucket rows, the policy, and the instance
-// name it is published under (logs only, not the key).
+// (empty means AlgorithmSlidingWindow), the Redis counter, the bucket rows, the policy, the cooldown of the
+// Redis admission gate (0 or less builds none), and the instance name it is published under (logs only,
+// not the key).
 type Settings struct {
-	Algorithm    string
-	Buckets      []BucketRule
-	InstanceName string
-	Policy       Policy
-	Redis        RedisSettings
+	Algorithm         string
+	BackOffPeriodSecs int64
+	Buckets           []BucketRule
+	InstanceName      string
+	Policy            Policy
+	Redis             RedisSettings
 }
 
 // Client is the reclaim value of the rate-limit leg: the counter of the owner's algorithm (a sliding
@@ -72,7 +112,9 @@ type Settings struct {
 type Client struct {
 	buckets     *BucketSet
 	closed      bool
-	counter     Counter // what Take charges: the algorithm's counter, or a fake on a NewTestClient
+	counter     Counter         // what Take charges: the algorithm's counter, or a fake on a NewTestClient
+	gate        *admission.Gate // skips Redis after repeated failures; nil when off, buffered, or a NewTestClient
+	host        string          // the Redis host, for MsgRedisUnavailable
 	incarnation string
 	limiter     *windowcounter.Limiter // the sliding window's limiter (flush lifecycle); nil for the token bucket
 	log         *slog.Logger
@@ -86,17 +128,19 @@ type Client struct {
 // An empty algorithm keys as AlgorithmSlidingWindow, its default.
 func OwnershipKey(middlewareName string, settings Settings) string {
 	payload := struct {
-		Algorithm      string        `json:"algorithm"`
-		Buckets        []BucketRule  `json:"buckets"`
-		MiddlewareName string        `json:"middlewareName"`
-		Policy         Policy        `json:"policy"`
-		Redis          RedisSettings `json:"redis"`
+		Algorithm         string        `json:"algorithm"`
+		BackOffPeriodSecs int64         `json:"backOffPeriodSecs"`
+		Buckets           []BucketRule  `json:"buckets"`
+		MiddlewareName    string        `json:"middlewareName"`
+		Policy            Policy        `json:"policy"`
+		Redis             RedisSettings `json:"redis"`
 	}{
-		Algorithm:      EffectiveAlgorithm(settings.Algorithm),
-		Buckets:        settings.Buckets,
-		MiddlewareName: middlewareName,
-		Policy:         settings.Policy,
-		Redis:          settings.Redis,
+		Algorithm:         EffectiveAlgorithm(settings.Algorithm),
+		BackOffPeriodSecs: settings.BackOffPeriodSecs,
+		Buckets:           settings.Buckets,
+		MiddlewareName:    middlewareName,
+		Policy:            settings.Policy,
+		Redis:             settings.Redis,
 	}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
@@ -119,11 +163,13 @@ func Open(ctx context.Context, middlewareName string, settings Settings, log *sl
 			return nil, reclaim.Hooks{}, fmt.Errorf("ratelimit: buckets: %w", err)
 		}
 		clientLog := log.With("traefikName", middlewareName, "leg", "ratelimit", "instanceName", settings.InstanceName, "sessionKey", key)
-		client, err := newClient(settings.Redis, EffectiveAlgorithm(settings.Algorithm), buckets, clientLog)
+		client, err := newClient(settings.Redis, EffectiveAlgorithm(settings.Algorithm), settings.BackOffPeriodSecs, buckets, clientLog)
 		if err != nil {
 			return nil, reclaim.Hooks{}, err
 		}
 		client.policy = settings.Policy
+		warnBufferedFailureAction(clientLog, settings)
+		warnBackOffActionRank(clientLog, settings, client.gate != nil)
 		return client, reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 	})
 	if err != nil {
@@ -137,8 +183,9 @@ func Open(ctx context.Context, middlewareName string, settings Settings, log *sl
 }
 
 // newClient builds the Redis client and, on it, the counter of algorithm for buckets: the sliding-window
-// limiter with the sync rate, or one token bucket per bucket. It does not dial.
-func newClient(settings RedisSettings, algorithm string, buckets *BucketSet, log *slog.Logger) (*Client, error) {
+// limiter with the sync rate, or one token bucket per bucket. When gateApplies, it also builds the
+// admission gate with backOffPeriodSecs (0 or less builds none). It does not dial.
+func newClient(settings RedisSettings, algorithm string, backOffPeriodSecs int64, buckets *BucketSet, log *slog.Logger) (*Client, error) {
 	redis, err := simpleredis.New(simpleredis.Config{
 		Host:           settings.Host,
 		Pass:           settings.Password,
@@ -153,12 +200,26 @@ func newClient(settings RedisSettings, algorithm string, buckets *BucketSet, log
 	if err != nil {
 		return nil, fmt.Errorf("ratelimit: redis: %w", err)
 	}
-	client := &Client{buckets: buckets, log: log, redis: redis}
+	client := &Client{buckets: buckets, host: settings.Host, log: log, redis: redis}
+	if gateApplies(algorithm, settings.SyncRate) {
+		gate, gateErr := admission.New(admission.Config{
+			Leg:        gateKey,
+			PeriodSecs: backOffPeriodSecs,
+			MsgStarted: MsgBackoffStarted,
+			MsgEnded:   MsgBackoffEnded,
+		}, log)
+		if gateErr != nil {
+			redis.Close()
+			return nil, gateErr
+		}
+		client.gate = gate
+	}
 	// The counter of the owner's algorithm, on the one Redis client.
 	switch algorithm {
 	case AlgorithmSlidingWindow:
 		limiter, limiterErr := windowcounter.New(redis, settings.SyncRate)
 		if limiterErr != nil {
+			client.gate.Close()
 			redis.Close()
 			return nil, fmt.Errorf("ratelimit: %w", limiterErr)
 		}
@@ -167,17 +228,94 @@ func newClient(settings RedisSettings, algorithm string, buckets *BucketSet, log
 	case AlgorithmTokenBucket:
 		counter, counterErr := newTokenBucketCounter(redis, buckets)
 		if counterErr != nil {
+			client.gate.Close()
 			redis.Close()
 			return nil, fmt.Errorf("ratelimit: %w", counterErr)
 		}
 		client.counter = counter
 	default:
+		client.gate.Close()
 		redis.Close()
 		return nil, fmt.Errorf("ratelimit: unknown algorithm %q", algorithm)
 	}
 	client.incarnation = fmt.Sprintf("%p", client)
-	log.Info(msgInstanceStarted, "incarnation", client.incarnation, "reason", "started", "algorithm", algorithm, "syncRate", settings.SyncRate.String())
+	log.Info(msgInstanceStarted, "incarnation", client.incarnation, "reason", "started", "algorithm", algorithm,
+		"syncRate", settings.SyncRate.String(), "backOffPeriodSecs", backOffPeriodSecs, "gate", client.gate != nil)
 	return client, nil
+}
+
+// gateApplies reports whether a counter of algorithm with syncRate calls Redis before answering, so a
+// success proves Redis answered and the admission gate can end a backoff on it: the token bucket and the
+// exact sliding window (syncRate 0). The buffered sliding window answers an outage from each replica's
+// local count with no error and already skips Redis for one sync interval after a failure: a gate there
+// would see no outage and could end a backoff on a local count.
+func gateApplies(algorithm string, syncRate time.Duration) bool {
+	return algorithm == AlgorithmTokenBucket || syncRate <= 0
+}
+
+// warnBufferedFailureAction logs WARN msgFailureActionBuffered once, when the Client is created, for a
+// failure or backoff action that blocks (ban or captcha) on the buffered sliding window: that limiter
+// answers a Redis outage from each replica's local count with no error, so the failure action applies
+// only to a bucket reached after StepBudget, and there is no gate for the backoff action (gateApplies).
+// The configuration is accepted.
+func warnBufferedFailureAction(log *slog.Logger, settings Settings) {
+	if gateApplies(EffectiveAlgorithm(settings.Algorithm), settings.Redis.SyncRate) {
+		return
+	}
+	if !blocks(settings.Policy.FailureAction) && !blocks(settings.Policy.BackOffAction) {
+		return
+	}
+	log.Warn(msgFailureActionBuffered, "failureAction", settings.Policy.FailureAction,
+		"backOffAction", settings.Policy.BackOffAction,
+		"algorithm", AlgorithmSlidingWindow, "syncRate", settings.Redis.SyncRate.String(),
+		"detail", "while Redis is down each replica counts locally; the failure action applies only to a bucket reached after the 250ms budget, and the backoff action never applies",
+		"hint", "set rateLimitSyncRate: 0 or rateLimitAlgorithm: tokenBucket to apply them")
+}
+
+// blocks reports whether action answers instead of letting the request through.
+func blocks(action string) bool {
+	return action == failureActionBan || action == failureActionCaptcha
+}
+
+// warnBackOffActionRank logs one WARN, when the Client is created with a gate, when the backoff action
+// ranks below the failure action (laxer: after the trip an outage gets the laxer answer, for example a
+// failure action ban becomes passthrough) or above it (stricter, as the other gated legs warn). The
+// configuration is accepted.
+func warnBackOffActionRank(log *slog.Logger, settings Settings, hasGate bool) {
+	if !hasGate {
+		return
+	}
+	failure, backOff := actionSeverity(settings.Policy.FailureAction), actionSeverity(settings.Policy.BackOffAction)
+	switch {
+	case backOff < failure:
+		log.Warn(msgBackOffLaxerThanFailure, "failureAction", settings.Policy.FailureAction,
+			"backOffAction", settings.Policy.BackOffAction, "backOffPeriodSecs", settings.BackOffPeriodSecs,
+			"detail", "after 5 Redis failures in a row the backoff action answers instead of the failure action, for the cooldown",
+			"hint", "set rateLimitBackOffAction to "+settings.Policy.FailureAction+" to keep that answer, or rateLimitUnhealthyBackOffPeriodSecs: 0 to turn the gate off")
+	case backOff > failure:
+		log.Warn(msgBackOffStricterThanFailure, "failureAction", settings.Policy.FailureAction,
+			"backOffAction", settings.Policy.BackOffAction)
+	}
+}
+
+// actionSeverity ranks a failure or backoff action: passthrough 0, captcha 1, ban 2 (pkg/bouncer ranks
+// them the same way).
+func actionSeverity(action string) int {
+	switch action {
+	case failureActionBan:
+		return 2
+	case failureActionCaptcha:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// reportsAsHealthy reports whether a counter error still proves that Redis answered, so the gate counts it as
+// a success: a rejected password (simpleredis.ErrNoAuth) is a configuration to fix, not an outage, and
+// tripping the gate on it would swap the failure action for the backoff action, as AppSec treats a 401.
+func reportsAsHealthy(err error) bool {
+	return err == nil || errors.Is(err, simpleredis.ErrNoAuth)
 }
 
 // Buckets is the owner's compiled bucket list every subscriber charges.
@@ -199,9 +337,31 @@ func (c *Client) Incarnation() string {
 }
 
 // Take counts one hit on key with the owner's algorithm and returns whether it is within limit, with
-// RetryAfter on a deny (Counter).
+// RetryAfter on a deny (Counter). While the admission gate backs off it calls no Redis and returns
+// ErrGateSkip. A counter error is reported to the gate as a failure (except a rejected password,
+// reportsAsHealthy) and logs MsgRedisUnavailable, debounced; a canceled request is neither reported nor logged.
 func (c *Client) Take(ctx context.Context, key string, limit Limit) (Status, error) {
-	return c.counter.Take(ctx, key, limit)
+	ticket, err := c.gate.Admit(ctx)
+	if err != nil {
+		return Status{}, err
+	}
+	if !ticket.Admitted {
+		return Status{}, ErrGateSkip
+	}
+	status, err := c.counter.Take(ctx, key, limit)
+	if err != nil && (errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled)) {
+		return status, err
+	}
+	c.gate.Record(ticket, reportsAsHealthy(err))
+	if err != nil && c.log != nil {
+		logger.Debounced(c.log, slog.LevelError, redisUnavailableInterval, MsgRedisUnavailable, "host", c.host, "error", err)
+	}
+	return status, err
+}
+
+// GateForTest is the admission gate, or nil when there is none.
+func (c *Client) GateForTest() *admission.Gate {
+	return c.gate
 }
 
 // Sleep flushes buffered sliding-window hits and stops the flush timer when the last holder leaves.
@@ -234,6 +394,7 @@ func (c *Client) Close() {
 	if c.limiter != nil {
 		c.limiter.Close()
 	}
+	c.gate.Close()
 	c.redis.Close()
 	c.log.Info(msgInstanceClosed, "incarnation", c.incarnation, "reason", "closed")
 }

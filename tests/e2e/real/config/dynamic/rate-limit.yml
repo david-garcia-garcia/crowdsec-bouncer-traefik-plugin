@@ -1,10 +1,12 @@
-# The Redis rate limit on five routers, against the stack's Dragonfly (rate_limit.Tests.ps1).
+# The Redis rate limit on six routers, against the stack's Dragonfly (rate_limit.Tests.ps1).
 # File provider only: the bucket list is a list of objects with a nested key list.
 # /rate-limit/ owns a LAPI client with its own key and a 10s metrics interval, so a ratelimit answer
 # reaches cscli as a drop; a bypassRateLimit rule exempts /rate-limit/health.
 # Sync rate 0 (exact mode) so each hit is counted in Dragonfly before the verdict.
-# /rate-limit-log/ only logs. The three -down- routers point at a port where nothing listens:
-# -down-pass and -down-ban run in exact mode, where an outage reaches the failure action;
+# /rate-limit-log/ only logs. The four -down- routers point at a port where nothing listens:
+# -down-pass and -down-ban run in exact mode with the backoff gate off (period 0), so every request
+# reaches the failure action; -down-backoff runs in exact mode with the gate on (period 10) and
+# backoff action ban, so after 5 failures it answers ban:ratelimit-backoff without calling Redis;
 # -down-local keeps the default buffered sync rate, where an outage keeps the replica's local limit.
 # /rate-limit-token-bucket/ owns a tokenBucket policy (burst 3, one token per 5s) and keeps the default
 # sync rate, which the token bucket does not read. /rate-limit-bad-row/ sets algorithm on a bucket, so its
@@ -30,6 +32,11 @@ http:
       rule: PathPrefix(`/rate-limit-down-ban/`)
       entryPoints: [web]
       middlewares: [bouncer-rate-limit-down-ban]
+      service: whoami@docker
+    rate-limit-down-backoff:
+      rule: PathPrefix(`/rate-limit-down-backoff/`)
+      entryPoints: [web]
+      middlewares: [bouncer-rate-limit-down-backoff]
       service: whoami@docker
     rate-limit-down-local:
       rule: PathPrefix(`/rate-limit-down-local/`)
@@ -120,6 +127,7 @@ http:
           rateLimitFailureAction: passthrough
           rateLimitRedisHost: dragonfly:1
           rateLimitSyncRate: "0"
+          rateLimitUnhealthyBackOffPeriodSecs: "0"
           reclaimGraceSeconds: "2"
     bouncer-rate-limit-down-ban:
       plugin:
@@ -141,6 +149,30 @@ http:
           rateLimitFailureAction: ban
           rateLimitRedisHost: dragonfly:1
           rateLimitSyncRate: "0"
+          rateLimitUnhealthyBackOffPeriodSecs: "0"
+          reclaimGraceSeconds: "2"
+    bouncer-rate-limit-down-backoff:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          logFormat: json
+          logLevel: DEBUG
+          rateLimitBackOffAction: ban
+          rateLimitBuckets:
+            - name: per-ip
+              requests: 1
+              window: 1m
+              key:
+                - from: ip
+          rateLimitEnabled: "true"
+          rateLimitFailureAction: ban
+          rateLimitRedisHost: dragonfly:1
+          rateLimitSyncRate: "0"
+          rateLimitUnhealthyBackOffPeriodSecs: "10"
           reclaimGraceSeconds: "2"
     bouncer-rate-limit-down-local:
       plugin:
