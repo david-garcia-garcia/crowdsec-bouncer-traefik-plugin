@@ -198,6 +198,104 @@ func TestGate_staleTicketAfterAdmittedProbeDoesNotLogEnded(t *testing.T) {
 	}
 }
 
+// utilitiesIdleTTL is the utilities gate's default idle TTL: a leg without an Allow or an applied
+// Report for that long is dropped.
+const utilitiesIdleTTL = time.Minute
+
+// The utilities gate forgets a leg idle for utilitiesIdleTTL. Its next outage is a new trip, so it logs
+// started again, even though no probe ever succeeded to log ended.
+func TestGate_forgottenLegLogsStartedOnTheNextTrip(t *testing.T) {
+	gate, buf, now := newTestGate(t)
+	trip(t, gate)
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the trip")
+	}
+	if got := strings.Count(buf.String(), testStarted); got != 1 {
+		t.Fatalf("started lines=%d want 1\n%s", got, buf.String())
+	}
+	*now = now.Add(utilitiesIdleTTL)
+	if gate.BackingOff() {
+		t.Fatal("a leg idle for utilitiesIdleTTL is forgotten: it must not report backing off")
+	}
+	for i := range TripFailures {
+		ticket := admit(t, gate)
+		if !ticket.Admitted {
+			t.Fatalf("request %d: a forgotten leg starts closed with a full budget", i)
+		}
+		report(t, gate, ticket, false)
+	}
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the second trip")
+	}
+	if got := strings.Count(buf.String(), testStarted); got != 2 {
+		t.Fatalf("started lines=%d want 2\n%s", got, buf.String())
+	}
+	if strings.Contains(buf.String(), testEnded) {
+		t.Fatalf("no probe succeeded, ended must not be logged\n%s", buf.String())
+	}
+	if !gate.BackingOff() {
+		t.Fatal("gate must report backing off after the second trip")
+	}
+}
+
+// Admit alone notices the dropped leg: the first admission after utilitiesIdleTTL is not a probe, so
+// the next trip logs started again even when nothing called BackingOff in between.
+func TestGate_forgottenLegSeenByAdmitAlone(t *testing.T) {
+	gate, buf, now := newTestGate(t)
+	trip(t, gate)
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the trip")
+	}
+	*now = now.Add(utilitiesIdleTTL)
+	trip(t, gate)
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the second trip")
+	}
+	if got := strings.Count(buf.String(), testStarted); got != 2 {
+		t.Fatalf("started lines=%d want 2\n%s", got, buf.String())
+	}
+	if strings.Contains(buf.String(), testEnded) {
+		t.Fatalf("no probe succeeded, ended must not be logged\n%s", buf.String())
+	}
+}
+
+// Each admission restarts utilitiesIdleTTL: an outage that outlasts it with failed probes in between is still
+// one outage and one started line.
+func TestGate_outageWithinIdleTTLLogsStartedOnce(t *testing.T) {
+	gate, buf, now := newTestGate(t)
+	trip(t, gate)
+	if admit(t, gate).Admitted {
+		t.Fatal("must skip after the trip")
+	}
+	*now = now.Add(utilitiesIdleTTL - time.Second)
+	probe := admit(t, gate)
+	if !probe.Admitted {
+		t.Fatal("cooldown elapsed: the probe must be admitted")
+	}
+	report(t, gate, probe, false)
+	if admit(t, gate).Admitted {
+		t.Fatal("a failed probe must reopen the backoff")
+	}
+	*now = now.Add(utilitiesIdleTTL - time.Second)
+	if !gate.BackingOff() {
+		t.Fatal("the failed probe was within utilitiesIdleTTL: the gate must still be backing off")
+	}
+	probe = admit(t, gate)
+	if !probe.Admitted {
+		t.Fatal("cooldown elapsed: the second probe must be admitted")
+	}
+	report(t, gate, probe, false)
+	if admit(t, gate).Admitted {
+		t.Fatal("a failed probe must reopen the backoff")
+	}
+	if got := strings.Count(buf.String(), testStarted); got != 1 {
+		t.Fatalf("started lines=%d want 1\n%s", got, buf.String())
+	}
+	if strings.Contains(buf.String(), testEnded) {
+		t.Fatal("failed probes must not log ended")
+	}
+}
+
 func TestGate_inFlightSuccessDoesNotEndBackoff(t *testing.T) {
 	gate, buf, _ := newTestGate(t)
 	inFlight := admit(t, gate)

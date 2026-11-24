@@ -1,5 +1,7 @@
-// Package admission wraps the utilities backoff Gate for one backend leg (AppSec or ModSec).
-// It logs once when the leg enters backoff and once when it leaves it, never per request.
+// Package admission wraps the utilities backoff Gate for one backend leg (LAPI, AppSec or ModSec).
+// It logs once when the leg enters backoff and once when a probe shows it healthy again, never per
+// request. When the utilities gate drops an idle leg, the wrapper clears its backoff state without a
+// log line, so the next trip logs entering backoff again.
 package admission
 
 import (
@@ -22,7 +24,7 @@ const (
 
 // Config is the cooldown for one leg plus its two transition log lines.
 type Config struct {
-	// Leg names the backend in errors and is the gate key ("appsec", "modsec").
+	// Leg names the backend in errors and is the gate key ("lapi", "appsec", "modsec").
 	Leg string
 	// PeriodSecs is the cooldown after a trip. 0 or less builds no gate.
 	PeriodSecs int64
@@ -40,6 +42,7 @@ type Gate struct {
 	msgStarted string
 	msgEnded   string
 
+	// mu also serializes the calls into inner, so backingOff changes in the order inner saw them.
 	mu         sync.Mutex
 	backingOff bool
 }
@@ -48,15 +51,13 @@ type Gate struct {
 type Ticket struct {
 	// Admitted means the caller may call the backend.
 	Admitted bool
-	// probe marks an admission granted while the leg was backing off.
-	probe bool
 	// permit is the utilities generation for this admission. Report counts only when it still matches.
 	permit backendbackoff.Permit
 }
 
 // New builds a Gate when cfg.PeriodSecs is greater than zero, else returns nil.
-// The cooldown is fixed (no exponential growth). Jitter and TTL stay unset so a partial
-// utilities Config disables jitter.
+// The cooldown is fixed (no exponential growth). Jitter and TTL stay unset so a partial utilities
+// Config disables jitter and keeps the utilities idle TTL.
 func New(cfg Config, log *slog.Logger) (*Gate, error) {
 	if cfg.PeriodSecs <= 0 {
 		return nil, nil //nolint:nilnil // omitted backoff means no gate
@@ -81,7 +82,8 @@ func New(cfg Config, log *slog.Logger) (*Gate, error) {
 }
 
 // Admit asks the gate whether this request may call the backend.
-// The first denied admission logs MsgStarted. Later denials stay silent.
+// The first denied admission logs MsgStarted. Later denials stay silent until a probe succeeds or
+// the utilities gate drops the idle leg.
 func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 	if g == nil {
 		return Ticket{Admitted: true}, nil
@@ -90,12 +92,12 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 	if err := ctx.Err(); err != nil {
 		return Ticket{}, err
 	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	permit, wait, err := g.inner.Allow(g.key)
 	if err != nil {
 		return Ticket{}, err
 	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	if !permit.Allowed() {
 		if !g.backingOff {
 			g.backingOff = true
@@ -103,8 +105,12 @@ func (g *Gate) Admit(ctx context.Context) (Ticket, error) {
 		}
 		return Ticket{}, nil
 	}
-	// Admitted while backing off: the gate let a probe through (or forgot the key).
-	return Ticket{Admitted: true, probe: g.backingOff, permit: permit}, nil
+	if !permit.Probe() {
+		// The leg is closed. If it was backing off, the utilities gate dropped it idle: no probe
+		// showed the backend healthy, so nothing is logged.
+		g.backingOff = false
+	}
+	return Ticket{Admitted: true, permit: permit}, nil
 }
 
 // Report records a real backend attempt. MsgEnded is logged only when a probe's report is applied.
@@ -113,15 +119,15 @@ func (g *Gate) Report(ticket Ticket, success bool) error {
 	if g == nil || !ticket.Admitted {
 		return nil
 	}
+	g.mu.Lock()
+	defer g.mu.Unlock()
 	applied, err := g.inner.Report(ticket.permit, success)
 	if err != nil {
 		return err
 	}
-	if !success || !ticket.probe || !applied {
+	if !success || !ticket.permit.Probe() || !applied {
 		return nil
 	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
 	if g.backingOff {
 		g.backingOff = false
 		g.log.Info(g.msgEnded, "reason", "healthy")
@@ -136,13 +142,20 @@ func (g *Gate) Record(ticket Ticket, success bool) {
 	}
 }
 
-// BackingOff reports whether the last transition logged was MsgStarted.
+// BackingOff reports whether the leg is backing off: MsgStarted was logged, no probe has succeeded
+// since, and the utilities gate still holds the leg tripped.
 func (g *Gate) BackingOff() bool {
 	if g == nil {
 		return false
 	}
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	if g.backingOff {
+		// A leg the utilities gate dropped idle is not tripped; clear it as Admit would, silently.
+		if tripped, err := g.inner.Tripped(g.key); err == nil && !tripped {
+			g.backingOff = false
+		}
+	}
 	return g.backingOff
 }
 
