@@ -42,6 +42,8 @@ func testModsecBouncer(t *testing.T, failureAction string, rules []httprule.Acti
 		trustedClients:           &ip.PoolStrategy{Checker: clientChecker},
 		log:                      log,
 		modsecFailureAction:      configuration.EffectiveModsecFailureAction(failureAction),
+		modsecBackOffAction:      configuration.EffectiveModsecBackOffAction(""),
+		appsecBackOffAction:      configuration.EffectiveAppsecBackOffAction(""),
 		remediationCustomHeader:  "X-Remediation",
 		remediationStatusCode:    http.StatusForbidden,
 		banTemplate:              banTemplate,
@@ -172,8 +174,9 @@ func TestServeHTTP_modsecSidecarDownUsesFailureAction(t *testing.T) {
 	assertModsecFailureBan(t, banRW, *banPassed)
 }
 
-// After the gate trips, ModSec is skipped like AppSec: no sidecar call and no failure action.
-func TestServeHTTP_modsecGateSkipPassesWithoutFailureAction(t *testing.T) {
+// After the gate trips, ModSec is skipped like AppSec: no sidecar call and no failure action. The
+// default backoff action passthrough lets the request through.
+func TestServeHTTP_modsecGateSkipUsesDefaultBackOffPassthrough(t *testing.T) {
 	hits := 0
 	b, passed := testModsecBouncer(t, configuration.FailureActionBan, nil)
 	bindTestModSec(b, failingModsec(t, 30, &hits))

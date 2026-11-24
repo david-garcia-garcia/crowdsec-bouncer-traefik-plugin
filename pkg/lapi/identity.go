@@ -50,6 +50,7 @@ type ownership struct {
 	UpdateMaxFailure             int64       `json:"updateMaxFailure"`
 	CapiScenarios                []string    `json:"capiScenarios"`
 	DefaultDecisionSeconds       int64       `json:"defaultDecisionSeconds"`
+	UnhealthyBackOffPeriodSecs   int64       `json:"unhealthyBackOffPeriodSecs"` // live/none gate cooldown; 0 in stream/alone
 }
 
 func identityFrom(cfg *configuration.Config) identity {
@@ -103,7 +104,17 @@ func ownershipFrom(cfg *configuration.Config, middlewareName string) ownership {
 		UpdateMaxFailure:             cfg.LapiUpdateMaxFailure,
 		CapiScenarios:                append([]string(nil), cfg.LapiCapiScenarios...),
 		DefaultDecisionSeconds:       cfg.LapiDefaultDecisionSeconds,
+		UnhealthyBackOffPeriodSecs:   liveGatePeriodSecs(cfg),
 	}
+}
+
+// liveGatePeriodSecs is the cooldown of the gate lapi.New builds: the configured value in live and
+// none, 0 in stream and alone, so a Client does not reopen for a knob its mode ignores.
+func liveGatePeriodSecs(cfg *configuration.Config) int64 {
+	if cfg.LapiMode != configuration.LiveMode && cfg.LapiMode != configuration.NoneMode {
+		return 0
+	}
+	return cfg.LapiUnhealthyBackOffPeriodSecs
 }
 
 func sortedCopy(values []string) []string {

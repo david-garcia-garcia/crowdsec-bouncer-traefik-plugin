@@ -1,0 +1,32 @@
+# LAPI live-mode admission gate (backoff).
+#
+# lapi-cycle: a live LAPI connection through lapi-flaky (nginx proxy to crowdsec:8080), with its
+#   own bouncer key, a 10 s cooldown, a 2 s LAPI timeout, and the default actions
+#   (bouncerLapiFailureAction ban, bouncerLapiBackOffAction ban). lapi_backoff.Tests.ps1 stops
+#   and starts lapi-flaky-test. Metrics reporting is off so only lookups reach LAPI.
+http:
+  routers:
+    lapi-cycle:
+      rule: PathPrefix(`/lapi-cycle`)
+      entryPoints: [web]
+      middlewares: [bouncer-lapi-cycle]
+      service: whoami@docker
+  middlewares:
+    bouncer-lapi-cycle:
+      plugin:
+        bouncer:
+          bouncerEnabled: "true"
+          bouncerForwardedHeadersCustomName: X-Forwarded-For
+          bouncerForwardedHeadersTrustedIps:
+            - "172.28.0.1/32"
+          bouncerRemediationHeadersCustomName: X-Crowdsec-Remediation
+          lapiEnabled: "true"
+          lapiHost: lapi-flaky:80
+          lapiHttpTimeoutSeconds: "2"
+          lapiKey: c51a1c7000000000000000000000001f
+          lapiMetricsUpdateIntervalSeconds: "0"
+          lapiMode: live
+          lapiUnhealthyBackOffPeriodSecs: "10"
+          logFormat: json
+          logLevel: DEBUG
+          reclaimGraceSeconds: "2"

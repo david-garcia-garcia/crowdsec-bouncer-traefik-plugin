@@ -23,9 +23,12 @@ On a matching request, each of these lets the request through:
 | ---------------------------------------- | ---------------------------- |
 | A CrowdSec decision of type `captcha` matches the client (its IP, range, country, AS, or a custom scope). | `captcha:lapi`, `captcha:lapi:<origin>` |
 | LAPI is unreachable, or decisions could not be refreshed, and `bouncerLapiFailureAction` is `captcha`. | `captcha:lapi-failure`, `captcha:stream-unhealthy` |
+| The LAPI backoff gate skips LAPI and `bouncerLapiBackOffAction` is `captcha`. | `captcha:lapi-backoff` |
 | AppSec answered `captcha`. | `captcha:appsec` |
 | AppSec is unreachable and `bouncerAppsecFailureAction` is `captcha`. | `captcha:appsec-failure` |
+| The AppSec backoff gate skips AppSec and `bouncerAppsecBackOffAction` is `captcha`. | `captcha:appsec-backoff` |
 | The ModSecurity sidecar gave no verdict and `bouncerModsecFailureAction` is `captcha`. | `captcha:modsec-failure` |
+| The ModSec backoff gate skips the sidecar and `bouncerModsecBackOffAction` is `captcha`. | `captcha:modsec-backoff` |
 | Another matching rule has the `captcha` action. | `captcha:rules` |
 | A captcha was due and this router has no captcha configured, so a ban would have been served. | `ban:captcha-downgrade` |
 
@@ -35,7 +38,7 @@ These are unchanged on a matching request:
 
 | Case | What happens |
 | ---- | ------------ |
-| Any ban: a CrowdSec `ban` decision, an AppSec block, a `ban` rule, a failure action `ban`, Redis unreachable. | The request is banned. |
+| Any ban: a CrowdSec `ban` decision, an AppSec block, a `ban` rule, a failure or backoff action `ban`, Redis unreachable. | The request is banned. |
 | A ban that `bouncerOriginBasedDecisionRemap` softens to a captcha (`ban: captcha`). | It stays a ban on these requests. Otherwise a ban would end as a pass. A remap `ban: pass` still lets the request through. |
 | The AppSec bot-detection challenge (`captcha:challenge`). | It is still served. It is AppSec's own page, not this router's captcha, although its header value starts with `captcha:`. |
 | A request the rule does not match. | It gets the captcha as before. |
@@ -47,7 +50,7 @@ Match on what the client cannot choose for another resource: the path, the host,
 
 ## What you give up
 
-On the matching requests a captcha no longer slows anyone down. A client that CrowdSec wanted to challenge can call those routes freely, and during a LAPI, AppSec or ModSecurity outage with failure action `captcha` they are let through as with `passthrough`. Only bans stop a client there. If one known integration is the reason for the rule and it has a fixed address, [`bouncerClientTrustedIps`](trusted-ips.md) for that address is the narrower setting.
+On the matching requests a captcha no longer slows anyone down. A client that CrowdSec wanted to challenge can call those routes freely, and during a LAPI, AppSec or ModSecurity outage with failure or backoff action `captcha` they are let through as with `passthrough`. Only bans stop a client there. If one known integration is the reason for the rule and it has a fixed address, [`bouncerClientTrustedIps`](trusted-ips.md) for that address is the narrower setting.
 
 ## How the path is matched
 

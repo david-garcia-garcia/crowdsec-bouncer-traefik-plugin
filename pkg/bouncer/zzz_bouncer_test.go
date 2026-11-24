@@ -880,7 +880,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 		t.Fatal("both bouncers must share one Client")
 	}
 	passReq := testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
-	if passthrough.applyLapiFailureAction(httptest.NewRecorder(), passReq, httprule.ActionMatch{}, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail) {
+	if passthrough.applyLapiFailureAction(httptest.NewRecorder(), passReq, httprule.ActionMatch{}, configuration.ReasonTECH, headerReasonStreamUnhealthy, lapi.OriginPluginTechStreamFail) {
 		t.Fatal("passthrough must leave the request unfinished")
 	}
 	passthrough.next.ServeHTTP(httptest.NewRecorder(), passReq.Request)
@@ -888,7 +888,7 @@ func TestTwoBouncersDistinctLapiFailureActions(t *testing.T) {
 		t.Fatal("passthrough bouncer must use the pass path")
 	}
 	recorder := httptest.NewRecorder()
-	if !ban.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), httprule.ActionMatch{}, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure) {
+	if !ban.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), httprule.ActionMatch{}, configuration.ReasonLAPI, headerReasonLAPIFailure, lapi.OriginPluginLapiFailure) {
 		t.Fatal("ban must finish the request")
 	}
 	if recorder.Code != http.StatusForbidden {
@@ -907,7 +907,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			lapiFailureAction: configuration.FailureActionPassthrough,
 		}
 		passReq := testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10")
-		if b.applyLapiFailureAction(httptest.NewRecorder(), passReq, httprule.ActionMatch{}, configuration.ReasonTECH, lapi.OriginPluginTechStreamFail) {
+		if b.applyLapiFailureAction(httptest.NewRecorder(), passReq, httprule.ActionMatch{}, configuration.ReasonTECH, headerReasonStreamUnhealthy, lapi.OriginPluginTechStreamFail) {
 			t.Fatal("passthrough must leave the request unfinished")
 		}
 		b.next.ServeHTTP(httptest.NewRecorder(), passReq.Request)
@@ -925,7 +925,7 @@ func TestApplyLapiFailureAction(t *testing.T) {
 			lapiFailureAction:     configuration.FailureActionBan,
 		}
 		recorder := httptest.NewRecorder()
-		if !b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), httprule.ActionMatch{}, configuration.ReasonLAPI, lapi.OriginPluginLapiFailure) {
+		if !b.applyLapiFailureAction(recorder, testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/", nil), "192.0.2.10"), httprule.ActionMatch{}, configuration.ReasonLAPI, headerReasonLAPIFailure, lapi.OriginPluginLapiFailure) {
 			t.Fatal("ban must finish the request")
 		}
 		if recorder.Code != http.StatusForbidden {

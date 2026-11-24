@@ -1116,7 +1116,7 @@ func TestForwardedHeadersInsecure(t *testing.T) {
 	})
 }
 
-// TestNew_ModsecAndAppsecBackoffDefaults pins CreateConfig values for the ModSec leg and AppSec gate.
+// TestNew_ModsecAndAppsecBackoffDefaults pins CreateConfig values for the ModSec leg and the AppSec and ModSec gates.
 func TestNew_ModsecAndAppsecBackoffDefaults(t *testing.T) {
 	cfg := New()
 	if cfg.ModsecEnabled {
@@ -1128,14 +1128,14 @@ func TestNew_ModsecAndAppsecBackoffDefaults(t *testing.T) {
 	if cfg.ModsecHTTPTimeoutSeconds != 10 {
 		t.Fatalf("ModsecHTTPTimeoutSeconds=%d want 10", cfg.ModsecHTTPTimeoutSeconds)
 	}
-	if cfg.ModsecUnhealthyBackOffPeriodSecs != 0 {
-		t.Fatalf("Modsec backoff=%d want 0", cfg.ModsecUnhealthyBackOffPeriodSecs)
+	if cfg.ModsecUnhealthyBackOffPeriodSecs != 10 {
+		t.Fatalf("Modsec backoff=%d want 10", cfg.ModsecUnhealthyBackOffPeriodSecs)
 	}
 	if cfg.BouncerModsecFailureAction != FailureActionPassthrough {
 		t.Fatalf("BouncerModsecFailureAction=%q want %q", cfg.BouncerModsecFailureAction, FailureActionPassthrough)
 	}
-	if cfg.AppsecUnhealthyBackOffPeriodSecs != DefaultAppsecUnhealthyBackOffPeriodSecs {
-		t.Fatalf("Appsec backoff=%d want %d", cfg.AppsecUnhealthyBackOffPeriodSecs, DefaultAppsecUnhealthyBackOffPeriodSecs)
+	if cfg.AppsecUnhealthyBackOffPeriodSecs != 10 {
+		t.Fatalf("Appsec backoff=%d want 10", cfg.AppsecUnhealthyBackOffPeriodSecs)
 	}
 }
 

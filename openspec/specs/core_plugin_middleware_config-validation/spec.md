@@ -444,21 +444,6 @@ Public config `bouncerModsecFailureAction` SHALL be validated by the same rule a
 - **WHEN** `bouncerModsecFailureAction` is `captcha` and the router has no captcha instance name after owner-fill
 - **THEN** `ValidateParams` returns an error naming `BouncerModsecFailureAction`
 
-### Requirement: WAF backoff periods are the only gate knobs
-`appsecUnhealthyBackOffPeriodSecs` SHALL default to 30 and `modsecUnhealthyBackOffPeriodSecs` SHALL default to 0. `0` SHALL disable that leg's gate. Both SHALL be in the `requiredInt0` check: a negative period SHALL fail `ValidateParams` with `<Field>: cannot be less than 0`. There SHALL be no ratio, threshold, or max-period knob for either leg: the trip rule is fixed in `pkg/admission` (`TripFailures` 5, `FailureRatio` 0.30) and the cooldown does not grow.
-
-#### Scenario: Default AppSec backoff is 30
-- **WHEN** the operator omits `appsecUnhealthyBackOffPeriodSecs`
-- **THEN** the AppSec Client builds a gate with cooldown 30 seconds
-
-#### Scenario: Zero disables the AppSec gate
-- **WHEN** `appsecUnhealthyBackOffPeriodSecs` is 0
-- **THEN** the AppSec Client holds no gate
-
-#### Scenario: Negative ModSec backoff fails
-- **WHEN** `modsecUnhealthyBackOffPeriodSecs` is -1
-- **THEN** `ValidateParams` returns an error naming `ModsecUnhealthyBackOffPeriodSecs`
-
 ### Requirement: Rate-limit settings are validated only on the owner
 `rateLimitEnabled` SHALL default to false. Only a router with `rateLimitEnabled` true (the owner) SHALL have its `rateLimit*` settings validated, failing with an error that names the setting when a value is invalid; on any other router a leftover invalid bucket, duration, status, or password file SHALL NOT fail startup. `rateLimitFailureAction: captcha` SHALL pass whether or not the owner has a captcha instance name.
 
@@ -521,3 +506,57 @@ A row with no predicate SHALL pass (it matches every request). `ValidateParams` 
 - **WHEN** `rateLimitEnabled` is true and `rateLimitRedisPasswordFile` points at a missing file
 - **THEN** `ValidateParams` fails
 - **AND** `New` returns a nil handler and that error
+
+### Requirement: Backoff periods are the only gate knobs
+`lapiUnhealthyBackOffPeriodSecs`, `appsecUnhealthyBackOffPeriodSecs`, and `modsecUnhealthyBackOffPeriodSecs` SHALL each default to 10. `0` SHALL disable that leg's gate. All three SHALL be in the `requiredInt0` check: a negative period SHALL fail `ValidateParams` with `<Field>: cannot be less than 0`. No leg SHALL have a ratio, threshold, or max-period knob. In `stream` and `alone` the LAPI period SHALL be accepted and ignored.
+
+#### Scenario: Default periods are 10
+- **WHEN** the operator omits all three backoff periods
+- **THEN** each period is 10 seconds
+
+#### Scenario: Zero disables the AppSec gate
+- **WHEN** `appsecUnhealthyBackOffPeriodSecs` is 0
+- **THEN** the AppSec Client holds no gate
+
+#### Scenario: Negative ModSec backoff fails
+- **WHEN** `modsecUnhealthyBackOffPeriodSecs` is -1
+- **THEN** `ValidateParams` returns an error naming `ModsecUnhealthyBackOffPeriodSecs`
+
+#### Scenario: Negative LAPI backoff fails
+- **WHEN** `lapiUnhealthyBackOffPeriodSecs` is -1
+- **THEN** `ValidateParams` returns an error naming `LapiUnhealthyBackOffPeriodSecs`
+
+#### Scenario: Stream accepts the LAPI period
+- **WHEN** `lapiMode` is `stream` and `lapiUnhealthyBackOffPeriodSecs` is 30
+- **THEN** `ValidateParams` returns nil
+
+### Requirement: Backoff actions are validated like failure actions
+`bouncerLapiBackOffAction`, `bouncerAppsecBackOffAction`, and `bouncerModsecBackOffAction` SHALL accept empty, `passthrough`, `ban`, or `captcha`. `captcha` SHALL need a captcha instance name after owner-fill. Any other value SHALL fail `ValidateParams` with an error naming the Go field. Each key SHALL be per-router and MUST NOT enter any Client ownership key.
+
+#### Scenario: Unknown backoff action fails
+- **WHEN** `bouncerAppsecBackOffAction` is `open`
+- **THEN** `ValidateParams` returns an error naming `BouncerAppsecBackOffAction`
+
+#### Scenario: Captcha backoff without a captcha instance fails
+- **WHEN** `bouncerLapiBackOffAction` is `captcha` and the router has no captcha instance name after owner-fill
+- **THEN** `ValidateParams` returns an error naming `BouncerLapiBackOffAction`
+
+#### Scenario: Captcha backoff with an owned captcha passes
+- **WHEN** `captchaEnabled` is true, `captchaInstanceName` is omitted, and `bouncerModsecBackOffAction` is `captcha`
+- **THEN** `ValidateParams` accepts the action
+
+### Requirement: Failure and backoff actions resolve per leg
+An empty or omitted action SHALL resolve per leg, never through one shared default. Failure action: LAPI `ban`, AppSec `passthrough`, ModSec `passthrough`, rate limit `passthrough`. Backoff action: LAPI `ban`, AppSec `passthrough`, ModSec `passthrough`. `New()` defaults SHALL be the same values.
+
+#### Scenario: Shipped defaults
+- **WHEN** the operator sets none of the failure or backoff action keys
+- **THEN** LAPI failure and backoff actions are `ban`
+- **AND** AppSec and ModSec failure and backoff actions are `passthrough`
+
+#### Scenario: Empty AppSec failure action is passthrough
+- **WHEN** `bouncerAppsecFailureAction` is an empty string
+- **THEN** the effective AppSec failure action is `passthrough`
+
+#### Scenario: Empty LAPI failure action is ban
+- **WHEN** `bouncerLapiFailureAction` is an empty string
+- **THEN** the effective LAPI failure action is `ban`
