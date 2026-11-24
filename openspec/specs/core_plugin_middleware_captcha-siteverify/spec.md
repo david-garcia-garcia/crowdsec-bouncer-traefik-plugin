@@ -1,6 +1,6 @@
 ## Purpose
 
-Owns how a captcha provider siteverify request is encoded (form or custom JSON) and posted (including `remoteip` from the already-resolved client address when non-empty), how the response is classified as JSON, and whether a successful solve issues the gate cookie and redirect. Transport failures, unusable answers (non-2xx status or non-JSON Content-Type) and JSON-decode failures re-render the challenge at 200 and are logged at INFO. Cookie format stays on `core_plugin_middleware_captcha-gate`. Routing after the cookie stays on `core_plugin_middleware_captcha-routing`.
+Owns how a captcha provider siteverify request is encoded (form or custom JSON) and posted (including `remoteip` from the already-resolved client address when non-empty), how the response is classified as JSON, and whether a successful solve issues the gate cookie and redirect. Transport failures, unusable answers (a status outside 2xx and 4xx, or a non-JSON Content-Type) and JSON-decode failures re-render the challenge at 200 and are logged at WARN, debounced. A 4xx JSON answer is a reject. Cookie format stays on `core_plugin_middleware_captcha-gate`. Routing after the cookie stays on `core_plugin_middleware_captcha-routing`.
 
 ## Requirements
 
@@ -56,7 +56,7 @@ When the captcha challenge handler posts a solver token to the provider validate
 - **THEN** captcha does not read `X-Forwarded-For`, `X-Real-Ip`, or `RemoteAddr` to build `remoteip`
 
 ### Requirement: Transport, unusable answer, and JSON decode failures re-render the challenge
-When siteverify transport fails, the provider answers a status outside 2xx, the answer Content-Type is not JSON, or JSON decode fails, the siteverify verifier SHALL return `(false, err)` and `Validate` SHALL surface that error return so the failure stays classified. A non-2xx status SHALL be an error even when the body is JSON with `success` true. For a received answer, the error SHALL name the HTTP status and the `Content-Type` header value (`siteverify: status <code>, content type "<type>"`); a decode failure SHALL be `siteverify: decode response: <cause>`. The error MUST NOT contain the secret, the token, or the response body. The challenge handler SHALL log the error at INFO as `captcha:ServeHTTP:validate` and SHALL write the captcha HTML at HTTP 200 with the boot script. It MUST NOT write HTTP 400 or 5xx. Empty token SHALL be `Validate` `None` and MUST NOT POST siteverify. A 2xx JSON `success:false` SHALL stay verifier Pass-false with no error and the same 200 challenge with boot. Cookie format stays on `core_plugin_middleware_captcha-gate`. Outcome names stay on `core_plugin_middleware_captcha-widget`.
+When siteverify transport fails, the provider answers a status outside 2xx and 4xx, the answer Content-Type is not JSON, or JSON decode fails, the siteverify verifier SHALL return `(false, err)` and `Validate` SHALL surface that error return so the failure stays classified. A 5xx status SHALL be an error even when the body is JSON with `success` true. For a received answer, the error SHALL name the HTTP status and the `Content-Type` header value (`siteverify: status <code>, content type "<type>"`); a decode failure SHALL be `siteverify: decode response: <cause>`. The error MUST NOT contain the secret, the token, or the response body. The challenge handler SHALL log the error at WARN as `captcha:ServeHTTP:validate`, at most once every 5 seconds across the process, and SHALL write the captcha HTML at HTTP 200 with the boot script. It MUST NOT write HTTP 400 or 5xx. Empty token SHALL be `Validate` `None` and MUST NOT POST siteverify. A 2xx JSON `success:false` SHALL stay verifier Pass-false with no error and the same 200 challenge with boot. A 4xx JSON answer that decodes SHALL be verifier Pass-false with no error whatever `success` says, and SHALL NOT log `captcha:ServeHTTP:validate`. Cookie format stays on `core_plugin_middleware_captcha-gate`. Outcome names stay on `core_plugin_middleware_captcha-widget`.
 
 #### Scenario: Transport error re-renders challenge at 200
 - **WHEN** a solver POST reaches siteverify
@@ -72,13 +72,24 @@ When siteverify transport fails, the provider answers a status outside 2xx, the 
 - **AND** no `crowdsec_captcha_gate` cookie is set
 - **AND** the response is not HTTP 400
 
-#### Scenario: Error page or non-JSON answer is logged at INFO
+#### Scenario: Error page or non-JSON answer is logged at WARN
 - **WHEN** a solver POST reaches siteverify
-- **AND** the provider responds with HTTP 500 `text/html`, HTTP 404, or HTTP 200 with a media type other than `application/json`
+- **AND** the provider responds with HTTP 500 `text/html`, HTTP 404 `text/plain`, HTTP 503 JSON, or HTTP 200 with a media type other than `application/json`
 - **THEN** the solver receives the captcha challenge at 200
 - **AND** no `crowdsec_captcha_gate` cookie is set
-- **AND** an INFO `captcha:ServeHTTP:validate` line carries the status and Content-Type in `error`
+- **AND** a WARN `captcha:ServeHTTP:validate` line carries the status and Content-Type in `error`
 - **AND** the line does not contain the secret, the token, or the response body
+
+#### Scenario: Repeated provider failures log one WARN per 5 seconds
+- **WHEN** three solver POSTs reach a siteverify that answers HTTP 502 `text/html` within 5 seconds
+- **THEN** one WARN `captcha:ServeHTTP:validate` line is logged
+
+#### Scenario: 4xx JSON answer is a reject
+- **WHEN** a solver POST reaches siteverify
+- **AND** the provider responds with HTTP 400 or 403, `application/json`, and a decodable body
+- **THEN** `Validate` returns `Reject` with no error, even when the body has `success` true
+- **AND** the solver receives the captcha challenge at 200 with no `crowdsec_captcha_gate` cookie
+- **AND** no `captcha:ServeHTTP:validate` line is logged
 
 #### Scenario: Empty token and success false stay 200 challenge
 - **WHEN** a solver POST has an empty token, or siteverify JSON has `success` false

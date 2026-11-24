@@ -205,7 +205,8 @@ When the provider does not answer, answers with an error page, or answers someth
 
 - Visitors who already solved a captcha keep passing for [`captchaGracePeriodSeconds`](configuration.md#captchagraceperiodseconds): their pass is a signed cookie, checked without the provider.
 - A failure action set to `captcha` therefore blocks during a provider outage too: the visitor can see the captcha but cannot solve it.
-- Each failed submit logs INFO `captcha:ServeHTTP:validate` with the reason in `error`: the transport error for an unreachable provider or a timeout; `siteverify: status <code>, content type "<type>"` when the provider answers a non-2xx status or a body that is not `application/json`; `siteverify: decode response: ...` when a JSON answer cannot be decoded. The secret, the token and the response body are not logged. Those `siteverify:` reasons apply to hCaptcha, reCAPTCHA, Turnstile and `custom`; reCAPTCHA Enterprise and EU CAPTCHA log the same line with their own reasons (for example `enterprise: status 500`, `eucaptcha: empty body`).
+- A submit the provider cannot decide logs WARN `captcha:ServeHTTP:validate` with the reason in `error`, at most once every 5 seconds: the transport error for an unreachable provider or a timeout; `siteverify: status <code>, content type "<type>"` when the provider answers a body that is not `application/json`, or a status outside 2xx and 4xx; `siteverify: decode response: ...` when a JSON answer cannot be decoded. The secret, the token and the response body are not logged. Those `siteverify:` reasons apply to hCaptcha, reCAPTCHA, Turnstile and `custom`; reCAPTCHA Enterprise and EU CAPTCHA log the same line with their own reasons (for example `enterprise: status 500`, `eucaptcha: empty body`).
+- A 4xx JSON answer is a wrong solve, not a failure: the visitor gets the captcha page again and nothing is logged, whatever `success` says.
 
 ## The connection is not there
 
@@ -233,7 +234,7 @@ A misspelled `lapiInstanceName` bans every request of that router with the defau
 | AppSec | ERROR `appsecQuery:unreachable` per unreachable call, with the transport error in `error`; INFO `appsecQuery:failure` at most every 5 seconds for a 500 (`statusCode`), and per response-body read error (`error`); WARN `crowdsec appsec backoff started` and INFO `crowdsec appsec backoff ended` per trip | `appsec-failure`, `appsec-backoff` | `plugin:appsec_failure` |
 | ModSec | ERROR `crowdsec modsec sidecar unavailable`, debounced, with `reason` plus the transport error in `error` or the `statusCode`; WARN `crowdsec modsec backoff started` and INFO `crowdsec modsec backoff ended` per trip | `modsec-failure`, `modsec-backoff` | `plugin:modsec_failure` |
 | Rate-limit Redis | None (DEBUG `serveRateLimit`) | `ratelimit-failure` | `plugin:ratelimit_failure` |
-| Captcha provider | INFO `captcha:ServeHTTP:validate` per failed submit (unreachable, non-2xx, non-JSON, undecodable JSON), with the reason in `error` | None | None |
+| Captcha provider | WARN `captcha:ServeHTTP:validate` at most every 5 seconds while submits fail (unreachable, 5xx, non-JSON, undecodable JSON), with the reason in `error` | None | None |
 
 - The verdict header is only sent when [`bouncerRemediationHeadersCustomName`](configuration.md#bouncerremediationheaderscustomname) is set, and only when the failure or backoff action is `ban` or `captcha`. A `passthrough` carries no header. See [See the verdict in access logs](how-to/verdict-in-access-logs.md).
 - A backoff answer counts under its leg's failure origin (`plugin:lapi_failure`, `plugin:appsec_failure`, `plugin:modsec_failure`); only the verdict header tells `-backoff` from `-failure`.

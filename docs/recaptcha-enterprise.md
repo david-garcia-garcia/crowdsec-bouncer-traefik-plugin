@@ -27,8 +27,8 @@ The `custom` provider cannot stand in. Its JSON body is fixed as `secret`, `resp
 | --- | --- |
 | None | The request is not a POST, or the token field is empty. |
 | Pass | `verifier.Pass` returns true. |
-| Reject | A token was posted and `verifier.Pass` returns false with no error. |
-| Error | Transport failed, the provider answered a non-2xx status, or the body was not decodable JSON. Siteverify returns `(false, err)` from `Pass` for transport, a non-2xx status, a Content-Type that is not `application/json`, and JSON `Decode`. Assessment missing or non-JSON body is Error. |
+| Reject | A token was posted and `verifier.Pass` returns false with no error. Siteverify also rejects a 4xx JSON answer, whatever `success` says. |
+| Error | Transport failed, the provider answered a status outside 2xx and 4xx, or the body was not decodable JSON. Siteverify returns `(false, err)` from `Pass` for transport, a status outside 2xx and 4xx, a Content-Type that is not `application/json`, and JSON `Decode`. Assessment missing or non-JSON body is Error. `ServeHTTP` logs an Error as WARN `captcha:ServeHTTP:validate`, at most once every 5 seconds. |
 
 `ServeHTTP`:
 
