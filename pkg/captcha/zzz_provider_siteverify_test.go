@@ -131,6 +131,66 @@ func Test_ServeHTTP_jsonDecodeErrorRendersChallenge(t *testing.T) {
 	}
 }
 
+// Test_ServeHTTP_unusableSiteverifyAnswerLogsInfo proves a provider error page or
+// non-JSON answer re-renders the challenge at 200 and logs INFO with status and type.
+func Test_ServeHTTP_unusableSiteverifyAnswerLogsInfo(t *testing.T) {
+	cases := []struct {
+		name        string
+		status      int
+		contentType string
+		body        string
+		wantInLog   string
+	}{
+		{"500 html", http.StatusInternalServerError, "text/html", "<html>oops</html>", `siteverify: status 500, content type \"text/html\"`},
+		{"404 plain", http.StatusNotFound, "text/plain; charset=utf-8", "404 page not found", `siteverify: status 404, content type \"text/plain; charset=utf-8\"`},
+		{"503 json success", http.StatusServiceUnavailable, "application/json", `{"success":true}`, `siteverify: status 503, content type \"application/json\"`},
+		{"200 html", http.StatusOK, "text/html", "<html>login</html>", `siteverify: status 200, content type \"text/html\"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			siteverify := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Content-Type", tc.contentType)
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(siteverify.Close)
+
+			client := newTestSiteverifyClient(t, siteverify.URL, siteverify.Client())
+			log, sink := newTestLogSink(slog.LevelInfo)
+			client.log = log
+
+			outcome, err := client.Validate(testCaptchaRequest(solverPOST(), "1.2.3.4"))
+			if err == nil || outcome == Pass {
+				t.Fatalf("Validate = (%v, %v), want not-passed with an error", outcome, err)
+			}
+
+			solveRW := httptest.NewRecorder()
+			client.ServeHTTP(solveRW, testCaptchaRequest(solverPOST(), "1.2.3.4"), "", "")
+			if solveRW.Code != http.StatusOK {
+				t.Fatalf("want 200 challenge, got %d", solveRW.Code)
+			}
+			if !strings.Contains(solveRW.Body.String(), siteverifyChallengeMarker) {
+				t.Fatalf("want captcha HTML, got %q", solveRW.Body.String())
+			}
+			if cookie := solveRW.Result().Header.Get("Set-Cookie"); strings.Contains(cookie, gateCookieName+"=") {
+				t.Fatalf("must not mint gate cookie: %s", cookie)
+			}
+			logs := sink.String()
+			if !strings.Contains(logs, `"level":"INFO"`) || !strings.Contains(logs, `"msg":"captcha:ServeHTTP:validate"`) {
+				t.Fatalf("want INFO captcha:ServeHTTP:validate, got %s", logs)
+			}
+			if !strings.Contains(logs, tc.wantInLog) {
+				t.Fatalf("want %s in log, got %s", tc.wantInLog, logs)
+			}
+			for _, secret := range []string{"e2e-dummy-secret", "ok-token", tc.body} {
+				if strings.Contains(logs, secret) {
+					t.Fatalf("log leaks %q: %s", secret, logs)
+				}
+			}
+		})
+	}
+}
+
 // Test_New_warnsWhenCaptchaTemplateUnavailable leaves Valid false and returns nil.
 func Test_New_warnsWhenCaptchaTemplateUnavailable(t *testing.T) {
 	t.Run("empty path", func(t *testing.T) {

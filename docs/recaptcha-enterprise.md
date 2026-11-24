@@ -28,7 +28,7 @@ The `custom` provider cannot stand in. Its JSON body is fixed as `secret`, `resp
 | None | The request is not a POST, or the token field is empty. |
 | Pass | `verifier.Pass` returns true. |
 | Reject | A token was posted and `verifier.Pass` returns false with no error. |
-| Error | Transport failed, or the body was not decodable JSON. Siteverify still returns `(false, err)` from `Pass` for transport and JSON `Decode` only. A siteverify Content-Type miss stays Pass-false with no error. Assessment missing or non-JSON body is Error. |
+| Error | Transport failed, the provider answered a non-2xx status, or the body was not decodable JSON. Siteverify returns `(false, err)` from `Pass` for transport, a non-2xx status, a Content-Type that is not `application/json`, and JSON `Decode`. Assessment missing or non-JSON body is Error. |
 
 `ServeHTTP`:
 
