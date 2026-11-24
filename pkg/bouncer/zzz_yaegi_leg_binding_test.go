@@ -105,7 +105,7 @@ type openedOwner struct {
 func openOwner(variant string) openedOwner {
 	ctx := context.Background()
 	config := ownerConfig(variant)
-	quiet := logger.New("ERROR", "")
+	quiet := logger.New("ERROR")
 	lapiClient, err := lapi.Open(ctx, config, quiet, "yaegi-owner", "test")
 	if err != nil {
 		exitWithFailure("lapi.Open: " + err.Error())
@@ -146,7 +146,14 @@ func main() {
 	routeConfig.RateLimitInstanceName = "shared"
 	next := http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
 	subscriptions := bouncer.Subscriptions{LAPI: true, AppSec: true, Captcha: true, ModSec: true, RateLimit: true}
-	route, err := bouncer.New(next, "yaegi-route", routeConfig, subscriptions, logger.NewWithFormat("TRACE", logPath, "json"))
+	logFile, err := os.Create(logPath)
+	if err != nil {
+		exitWithFailure("create log: " + err.Error())
+	}
+	restoreOutput := logger.SetOutputForTest(logFile)
+	routeLog := logger.NewWithFormat("TRACE", "json")
+	restoreOutput()
+	route, err := bouncer.New(next, "yaegi-route", routeConfig, subscriptions, routeLog)
 	if err != nil {
 		exitWithFailure("bouncer.New: " + err.Error())
 	}

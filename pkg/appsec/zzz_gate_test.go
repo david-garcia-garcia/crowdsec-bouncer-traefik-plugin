@@ -22,7 +22,7 @@ func gatedAppsecClient(t *testing.T, host string, period int64) *Client {
 	t.Helper()
 	cfg := testAppsecConfig(host)
 	cfg.AppsecUnhealthyBackOffPeriodSecs = period
-	client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+	client, err := New(cfg, logger.New("ERROR"), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,7 +36,7 @@ func TestNew_defaultBackoffBuildsGate(t *testing.T) {
 	cfg.AppsecHost = "127.0.0.1:1"
 	cfg.AppsecScheme = "http"
 	cfg.AppsecTLSInsecureVerify = true
-	client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+	client, err := New(cfg, logger.New("ERROR"), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func Test_appsecQuery_hopCancelDoesNotTripGate(t *testing.T) {
 	cfg := testAppsecConfig(u.Host)
 	cfg.AppsecHTTPTimeoutSeconds = 30
 	cfg.AppsecUnhealthyBackOffPeriodSecs = 30
-	client, err := New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+	client, err := New(cfg, logger.New("ERROR"), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}

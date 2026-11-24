@@ -21,7 +21,7 @@ func TestElapsedNowStaysAboveSkipSentinel(t *testing.T) {
 func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
 	for _, durationSec := range []int64{0, -1} {
 		t.Run(strconv.FormatInt(durationSec, 10), func(t *testing.T) {
-			store := NewMemory(logger.New("ERROR", ""))
+			store := NewMemory(logger.New("ERROR"))
 			store.BeginTick()
 			store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: durationSec})
 			store.PublishTick(ElapsedNow())
@@ -35,7 +35,7 @@ func TestMemoryDurationZeroMissesAfterPublish(t *testing.T) {
 }
 
 func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
+	store := NewMemory(logger.New("ERROR"))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	kind, origin, originID, err := store.LookupRemediation("203.0.113.10", net.ParseIP("203.0.113.10"), nil)
@@ -53,7 +53,7 @@ func TestMemoryTickPutHiddenUntilPublish(t *testing.T) {
 }
 
 func TestMemoryTickDeleteOnlyMissesAfterPublish(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
+	store := NewMemory(logger.New("ERROR"))
 	store.BeginTick()
 	store.Put(Decision{Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue, DurationSec: 60})
 	store.PublishTick(0)
@@ -119,7 +119,7 @@ func TestMemoryOriginPackSaturatesAt12Bits(t *testing.T) {
 }
 
 func TestMemoryListsInternTwice(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
+	store := NewMemory(logger.New("ERROR"))
 	store.BeginTick()
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue,
@@ -165,7 +165,7 @@ func TestMemoryScenarioInternOverflowPacksZero(t *testing.T) {
 
 func TestRedisPutHasNoInternId(t *testing.T) {
 	server := startTestStoreRedis(t)
-	store := NewRedis(logger.New("ERROR", ""), server.addr(), nil, "", "", "sess")
+	store := NewRedis(logger.New("ERROR"), server.addr(), nil, "", "", "sess")
 	t.Cleanup(store.Close)
 	store.Put(Decision{
 		Scope: decisionscope.ScopeIP, Value: "203.0.113.10", Kind: decisionscope.BannedValue,
@@ -188,14 +188,14 @@ func TestRedisPutHasNoInternId(t *testing.T) {
 }
 
 func TestHydrateRangeKeepsLastOnUnreachable(t *testing.T) {
-	store := NewMemory(logger.New("ERROR", ""))
+	store := NewMemory(logger.New("ERROR"))
 	if err := store.ApplyRangeBatch(map[string]string{"10.0.0.0/8": decisionscope.BannedValue}, nil); err != nil {
 		t.Fatal(err)
 	}
 	if got := store.RangeMembership().Remediation(net.ParseIP("10.1.2.3")); got != decisionscope.BannedValue {
 		t.Fatalf("seed got %q, want ban", got)
 	}
-	red := newRedis(logger.New("ERROR", ""), "127.0.0.1:1", nil, "", "", "p")
+	red := newRedis(logger.New("ERROR"), "127.0.0.1:1", nil, "", "", "p")
 	store.engine = redisEngine(red)
 	store.red = red
 	store.mem = nil

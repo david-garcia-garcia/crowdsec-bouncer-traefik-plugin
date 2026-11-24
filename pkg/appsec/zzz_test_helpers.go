@@ -40,7 +40,7 @@ func withTestAddress(httpReq *http.Request) clientrequest.Request {
 }
 
 func newQueryClient(appsecURL *url.URL, client *http.Client) *Client {
-	return NewTestClient(appsecURL, client, logger.New("INFO", ""))
+	return NewTestClient(appsecURL, client, logger.New("INFO"))
 }
 
 type blockingBody struct {
@@ -216,5 +216,5 @@ func (rt *forwardCaptureRoundTripper) RoundTrip(req *http.Request) (*http.Respon
 
 // newForwardCaptureClient returns a Client whose AppSec round-trip is captured instead of sent.
 func newForwardCaptureClient(capture *forwardCaptureRoundTripper) *Client {
-	return NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: capture}, logger.New("INFO", ""))
+	return NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: capture}, logger.New("INFO"))
 }

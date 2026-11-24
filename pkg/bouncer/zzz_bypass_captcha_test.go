@@ -31,7 +31,7 @@ func apiBypassCaptchaRules(t *testing.T) *httprule.ActionSet {
 // captcha client, an optional origin remap, and one stored decision for testBypassCaptchaClientIP.
 func testBypassCaptchaLapiBouncer(t *testing.T, captchaClient *captcha.Client, remap map[string]map[string]string, kind, origin string) (*Bouncer, *bool, *lapi.Client) {
 	t.Helper()
-	lapiClient, store := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapiClient, store := lapi.NewTestClient(logger.New("ERROR"))
 	lapi.AttachTestMetricsReporter(lapiClient)
 	lapiClient.SetStreamHealthyForTest(true)
 	b, passed := testRemapStreamBouncer(t, lapiClient, remap)
@@ -296,7 +296,7 @@ func TestBypassCaptcha_pathRegexAppliesAsWritten(t *testing.T) {
 // every per-IP query with one decision of decisionType and origin, so the first request takes the live lookup.
 func testBypassCaptchaLiveBouncer(t *testing.T, remap map[string]map[string]string, decisionType, origin string) (*Bouncer, *bool) {
 	t.Helper()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	lapiServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Query().Get("ip") == "" {
 			_, _ = w.Write([]byte("null"))

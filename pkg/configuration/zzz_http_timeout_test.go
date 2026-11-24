@@ -16,7 +16,7 @@ func TestNew_TimeoutDefaultsAreTen(t *testing.T) {
 }
 
 func TestValidateParams_HTTPTimeoutKnobs(t *testing.T) {
-	log := logger.New("INFO", "")
+	log := logger.New("INFO")
 	ok := getMinimalConfig()
 	if err := ValidateParams(ok, log); err != nil {
 		t.Fatalf("defaults: %v", err)

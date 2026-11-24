@@ -114,7 +114,7 @@ func main() {
 	cfg.CaptchaEnterpriseKeyType = %q
 	cfg.CaptchaEnterpriseMinScore = %q
 	cfg.CaptchaEnterpriseProjectID = %q
-	_, err := captcha.Open(context.Background(), cfg, logger.New("ERROR", ""), "crowdsec", "test")
+	_, err := captcha.Open(context.Background(), cfg, logger.New("ERROR"), "crowdsec", "test")
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
