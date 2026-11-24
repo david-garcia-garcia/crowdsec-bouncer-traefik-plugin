@@ -75,7 +75,17 @@ jobs:
         run: make lint
 
       - name: Tests
-        run: make test
+        id: tests
+        run: |
+          set -o pipefail
+          make test 2>&1 | tee /tmp/test.log
+
+      - name: Surface test failures
+        # go test -v prints a test's t.Log and t.Fatalf lines before its "--- FAIL" line.
+        # Keep each failing test's lines since its last "=== RUN" so the annotation names the cause.
+        if: failure() && steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::$(awk '/^=== (RUN|CONT)/{buf=""} {buf=buf $0 "\n"} /--- FAIL|^panic:/{printf "%s", buf; buf=""}' /tmp/test.log | tr '\n' ' ' | head -c 3500)"
 
       # Yaegi v0.16 resolves imports from GOPATH/src, not vendor, for a test-only
       # module path. Copy published utilities so traefikemulator is findable.
@@ -138,5 +148,6 @@ jobs:
           if grep -q "DATA RACE" /tmp/race.log; then
             echo "::error::$(awk '/WARNING: DATA RACE/,/^==================$/' /tmp/race.log | tr '\n' ' ' | head -c 3500)"
           else
-            echo "::error::$(grep -E 'FAIL\s+|panic:|--- FAIL' /tmp/race.log | tr '\n' ' ' | head -c 3500)"
+            # Without -v, a failing test's t.Fatalf lines follow its "--- FAIL" line.
+            echo "::error::$(grep -E -A8 -- '--- FAIL|^panic:' /tmp/race.log | tr '\n' ' ' | head -c 3500)"
           fi
