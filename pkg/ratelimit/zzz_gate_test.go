@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
+	"github.com/david-garcia-garcia/traefik-middleware-utilities/simpleredis"
 )
 
 // errTestRedisDown is the counter error switchCounter returns while it is down.
@@ -163,6 +165,81 @@ func TestTake_canceledRequestDoesNotTripTheGate(t *testing.T) {
 	}
 	if logs := sink.String(); countTestLogLines(t, logs, "ERROR", MsgRedisUnavailable) != 0 {
 		t.Fatalf("a canceled request must not log the outage:\n%s", logs)
+	}
+}
+
+// noAuthCounter fails every take with a rejected password, wrapped as the Redis client wraps it.
+type noAuthCounter struct{}
+
+func (noAuthCounter) Take(context.Context, string, Limit) (Status, error) {
+	return Status{}, fmt.Errorf("dial: %w", simpleredis.ErrNoAuth)
+}
+
+// TestTake_rejectedPasswordDoesNotTripTheGate proves a rejected password is reported to the gate as an
+// answer, so the gate never backs off and every take keeps returning the counter error (the failure action),
+// while the outage ERROR is still logged.
+func TestTake_rejectedPasswordDoesNotTripTheGate(t *testing.T) {
+	client, sink := newGateTestClient(t, noAuthCounter{}, 10)
+	for range 2 * admission.TripFailures {
+		if err := gateTestTake(client); !errors.Is(err, simpleredis.ErrNoAuth) {
+			t.Fatalf("error %v, want %v", err, simpleredis.ErrNoAuth)
+		}
+	}
+	logs := sink.String()
+	if client.GateForTest().BackingOff() || countTestLogLines(t, logs, "WARN", MsgBackoffStarted) != 0 {
+		t.Fatalf("a rejected password must not trip the gate:\n%s", logs)
+	}
+	if got := countTestLogLines(t, logs, "ERROR", MsgRedisUnavailable); got != 1 {
+		t.Fatalf("%d ERROR %q, want 1\n%s", got, MsgRedisUnavailable, logs)
+	}
+}
+
+// TestOpen_warnsWhenTheBackOffActionRanksAwayFromTheFailureAction proves the owner logs one WARN at creation,
+// only when it has a gate, when its backoff action is laxer or stricter than its failure action.
+func TestOpen_warnsWhenTheBackOffActionRanksAwayFromTheFailureAction(t *testing.T) {
+	cases := []struct {
+		name          string
+		syncRate      time.Duration
+		period        int64
+		failureAction string
+		backOffAction string
+		wantLaxer     int
+		wantStricter  int
+	}{
+		{"ban then passthrough", 0, 10, "ban", "passthrough", 1, 0},
+		{"captcha then passthrough", 0, 10, "captcha", "passthrough", 1, 0},
+		{"ban then captcha", 0, 10, "ban", "captcha", 1, 0},
+		{"passthrough then ban", 0, 10, "passthrough", "ban", 0, 1},
+		{"same action", 0, 10, "ban", "ban", 0, 0},
+		{"no gate: period 0", 0, 0, "ban", "passthrough", 0, 0},
+		{"no gate: buffered", 200 * time.Millisecond, 10, "ban", "passthrough", 0, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			reclaim.ResetForTestWith(0)
+			t.Cleanup(func() { reclaim.ResetForTest() })
+			sink := &lockedLogSink{}
+			log := slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelInfo}))
+			settings := deadRedisTestSettings(tc.syncRate)
+			settings.BackOffPeriodSecs = tc.period
+			settings.Policy.FailureAction = tc.failureAction
+			settings.Policy.BackOffAction = tc.backOffAction
+			client, err := Open(context.Background(), "edge", settings, log)
+			if err != nil {
+				t.Fatalf("the configuration must be accepted: %v", err)
+			}
+			defer client.Close()
+			logs := sink.String()
+			if got := countTestLogLines(t, logs, "WARN", msgBackOffLaxerThanFailure); got != tc.wantLaxer {
+				t.Fatalf("%d WARN %q, want %d\n%s", got, msgBackOffLaxerThanFailure, tc.wantLaxer, logs)
+			}
+			if got := countTestLogLines(t, logs, "WARN", msgBackOffStricterThanFailure); got != tc.wantStricter {
+				t.Fatalf("%d WARN %q, want %d\n%s", got, msgBackOffStricterThanFailure, tc.wantStricter, logs)
+			}
+			if tc.wantLaxer == 1 && !strings.Contains(logs, "set rateLimitBackOffAction to "+tc.failureAction) {
+				t.Fatalf("the laxer WARN must name the fix:\n%s", logs)
+			}
+		})
 	}
 }
 

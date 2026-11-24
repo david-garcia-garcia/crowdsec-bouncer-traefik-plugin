@@ -436,13 +436,13 @@ func TestNew_RateLimitOwnerUnavailableWarnsOnTransitions(t *testing.T) {
 	}
 }
 
-// countRateLimitClientLines is how many lines of logFilePath carry msg at level for owner traefikName.
-func countRateLimitClientLines(t *testing.T, logFilePath, msg, level, traefikName string) int {
+// countRateLimitClientWarns is how many WARN lines of logFilePath carry msg for owner traefikName.
+func countRateLimitClientWarns(t *testing.T, logFilePath, msg, traefikName string) int {
 	t.Helper()
 	total := 0
 	for _, entry := range readLogEntries(t, logFilePath, msg) {
 		// fmt.Sprint, not comma-ok assertions: yaegi runs this file.
-		if fmt.Sprint(entry["level"]) == level && fmt.Sprint(entry["traefikName"]) == traefikName {
+		if fmt.Sprint(entry["level"]) == "WARN" && fmt.Sprint(entry["traefikName"]) == traefikName {
 			total++
 		}
 	}
@@ -454,7 +454,8 @@ func countRateLimitClientLines(t *testing.T, logFilePath, msg, level, traefikNam
 // and is not rejected; and that in exact mode, with the default rateLimitUnhealthyBackOffPeriodSecs (10), a
 // dead Redis answers the failure action for the first admission.TripFailures requests, then the backoff
 // action: the default passthrough, or ban with header ban:ratelimit-backoff. The outage logs one debounced
-// ERROR "crowdsec ratelimit redis unavailable" and, per owner, one WARN "crowdsec ratelimit backoff started".
+// ERROR "crowdsec ratelimit redis unavailable" and, per owner, one WARN "crowdsec ratelimit backoff started";
+// the owner whose backoff action is laxer than its failure action logs one WARN at load.
 func TestNew_RateLimitRedisOutageBacksOffAtDefaultLevel(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
@@ -473,7 +474,7 @@ func TestNew_RateLimitRedisOutageBacksOffAtDefaultLevel(t *testing.T) {
 	if _, err := New(context.Background(), testNextOK(), withLog(cfgRateLimitDeadRedis()), "rl-buffered-ban"); err != nil {
 		t.Fatalf("buffered ban must load: %v", err)
 	}
-	if got := countRateLimitClientLines(t, logFilePath, loadWarn, "WARN", "rl-buffered-ban"); got != 1 {
+	if got := countRateLimitClientWarns(t, logFilePath, loadWarn, "rl-buffered-ban"); got != 1 {
 		t.Fatalf("buffered ban: %d load WARN lines, want 1", got)
 	}
 
@@ -483,7 +484,7 @@ func TestNew_RateLimitRedisOutageBacksOffAtDefaultLevel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := countRateLimitClientLines(t, logFilePath, loadWarn, "WARN", "rl-exact-ban"); got != 0 {
+	if got := countRateLimitClientWarns(t, logFilePath, loadWarn, "rl-exact-ban"); got != 0 {
 		t.Fatalf("exact ban: %d load WARN lines, want 0", got)
 	}
 	assertRateLimitTripThenBackoff(t, exact, "203.0.113.48", http.StatusOK, "")
@@ -498,9 +499,16 @@ func TestNew_RateLimitRedisOutageBacksOffAtDefaultLevel(t *testing.T) {
 	assertRateLimitTripThenBackoff(t, backOffBan, "203.0.113.49", http.StatusForbidden, "ban:ratelimit-backoff")
 
 	for _, name := range []string{"rl-exact-ban", "rl-exact-backoff-ban"} {
-		if got := countRateLimitClientLines(t, logFilePath, ratelimit.MsgBackoffStarted, "WARN", name); got != 1 {
+		if got := countRateLimitClientWarns(t, logFilePath, ratelimit.MsgBackoffStarted, name); got != 1 {
 			t.Fatalf("%s: %d WARN %q lines, want 1", name, got, ratelimit.MsgBackoffStarted)
 		}
+	}
+	const laxerWarn = "crowdsec bouncer backoff action laxer than failure action"
+	if got := countRateLimitClientWarns(t, logFilePath, laxerWarn, "rl-exact-ban"); got != 1 {
+		t.Fatalf("exact ban with the default backoff passthrough: %d laxer WARN lines, want 1", got)
+	}
+	if got := countRateLimitClientWarns(t, logFilePath, laxerWarn, "rl-exact-backoff-ban"); got != 0 {
+		t.Fatalf("exact ban with backoff ban: %d laxer WARN lines, want 0", got)
 	}
 	entries := readLogEntries(t, logFilePath, ratelimit.MsgRedisUnavailable)
 	if len(entries) != 1 || fmt.Sprint(entries[0]["level"]) != "ERROR" || fmt.Sprint(entries[0]["traefikName"]) != "rl-exact-ban" ||

@@ -58,6 +58,12 @@ const (
 	// msgFailureActionBuffered is the WARN line of an owner whose blocking failure or backoff action a
 	// Redis outage cannot reach.
 	msgFailureActionBuffered = "crowdsec ratelimit failure action does not apply to a redis outage"
+	// msgBackOffLaxerThanFailure is the WARN line of an owner with a gate whose backoff action lets through
+	// more than its failure action: after the trip, an outage gets the laxer answer.
+	msgBackOffLaxerThanFailure = "crowdsec bouncer backoff action laxer than failure action"
+	// msgBackOffStricterThanFailure is the WARN line of an owner with a gate whose backoff action is stricter
+	// than its failure action, the text the other gated legs log (pkg/bouncer).
+	msgBackOffStricterThanFailure = "crowdsec bouncer backoff action stricter than failure action"
 )
 
 // The actions warnBufferedFailureAction reads (configuration.FailureAction*; configuration imports this
@@ -163,6 +169,7 @@ func Open(ctx context.Context, middlewareName string, settings Settings, log *sl
 		}
 		client.policy = settings.Policy
 		warnBufferedFailureAction(clientLog, settings)
+		warnBackOffActionRank(clientLog, settings, client.gate != nil)
 		return client, reclaim.Hooks{Sleep: client.Sleep, Wake: client.Wake, Close: client.Close}, nil
 	})
 	if err != nil {
@@ -270,6 +277,47 @@ func blocks(action string) bool {
 	return action == failureActionBan || action == failureActionCaptcha
 }
 
+// warnBackOffActionRank logs one WARN, when the Client is created with a gate, when the backoff action
+// ranks below the failure action (laxer: after the trip an outage gets the laxer answer, for example a
+// failure action ban becomes passthrough) or above it (stricter, as the other gated legs warn). The
+// configuration is accepted.
+func warnBackOffActionRank(log *slog.Logger, settings Settings, hasGate bool) {
+	if !hasGate {
+		return
+	}
+	failure, backOff := actionSeverity(settings.Policy.FailureAction), actionSeverity(settings.Policy.BackOffAction)
+	switch {
+	case backOff < failure:
+		log.Warn(msgBackOffLaxerThanFailure, "failureAction", settings.Policy.FailureAction,
+			"backOffAction", settings.Policy.BackOffAction, "backOffPeriodSecs", settings.BackOffPeriodSecs,
+			"detail", "after 5 Redis failures in a row the backoff action answers instead of the failure action, for the cooldown",
+			"hint", "set rateLimitBackOffAction to "+settings.Policy.FailureAction+" to keep that answer, or rateLimitUnhealthyBackOffPeriodSecs: 0 to turn the gate off")
+	case backOff > failure:
+		log.Warn(msgBackOffStricterThanFailure, "failureAction", settings.Policy.FailureAction,
+			"backOffAction", settings.Policy.BackOffAction)
+	}
+}
+
+// actionSeverity ranks a failure or backoff action: passthrough 0, captcha 1, ban 2 (pkg/bouncer ranks
+// them the same way).
+func actionSeverity(action string) int {
+	switch action {
+	case failureActionBan:
+		return 2
+	case failureActionCaptcha:
+		return 1
+	default:
+		return 0
+	}
+}
+
+// reportsAsHealthy reports whether a counter error still proves that Redis answered, so the gate counts it as
+// a success: a rejected password (simpleredis.ErrNoAuth) is a configuration to fix, not an outage, and
+// tripping the gate on it would swap the failure action for the backoff action, as AppSec treats a 401.
+func reportsAsHealthy(err error) bool {
+	return err == nil || errors.Is(err, simpleredis.ErrNoAuth)
+}
+
 // Buckets is the owner's compiled bucket list every subscriber charges.
 func (c *Client) Buckets() *BucketSet {
 	return c.buckets
@@ -290,8 +338,8 @@ func (c *Client) Incarnation() string {
 
 // Take counts one hit on key with the owner's algorithm and returns whether it is within limit, with
 // RetryAfter on a deny (Counter). While the admission gate backs off it calls no Redis and returns
-// ErrGateSkip. A counter error is reported to the gate and logs MsgRedisUnavailable, debounced; a canceled
-// request is neither reported nor logged.
+// ErrGateSkip. A counter error is reported to the gate as a failure (except a rejected password,
+// reportsAsHealthy) and logs MsgRedisUnavailable, debounced; a canceled request is neither reported nor logged.
 func (c *Client) Take(ctx context.Context, key string, limit Limit) (Status, error) {
 	ticket, err := c.gate.Admit(ctx)
 	if err != nil {
@@ -304,7 +352,7 @@ func (c *Client) Take(ctx context.Context, key string, limit Limit) (Status, err
 	if err != nil && (errors.Is(err, context.Canceled) || errors.Is(ctx.Err(), context.Canceled)) {
 		return status, err
 	}
-	c.gate.Record(ticket, err == nil)
+	c.gate.Record(ticket, reportsAsHealthy(err))
 	if err != nil && c.log != nil {
 		logger.Debounced(c.log, slog.LevelError, redisUnavailableInterval, MsgRedisUnavailable, "host", c.host, "error", err)
 	}

@@ -735,13 +735,13 @@ What to do when the rate-limit Redis cannot answer: `passthrough`, `ban`, or `ca
 
 `string` · default `passthrough`
 
-What to do while the backoff gate skips the rate-limit Redis: `passthrough`, `ban`, or `captcha`, with the same rules as `rateLimitFailureAction`. The verdict header is `ban:ratelimit-backoff` or `captcha:ratelimit-backoff`, and the drop counts under `plugin:ratelimit_failure`. Read only on the middleware with `rateLimitEnabled`. Never applies with the buffered sliding window, which has no gate; `ban` or `captcha` there logs the same load WARN as `rateLimitFailureAction`. See [Rate limit › When Redis is down](rate-limit.md).
+What to do while the backoff gate skips the rate-limit Redis: `passthrough`, `ban`, or `captcha`, with the same rules as `rateLimitFailureAction`. The verdict header is `ban:ratelimit-backoff` or `captcha:ratelimit-backoff`, and the drop counts under `plugin:ratelimit_failure`. Read only on the middleware with `rateLimitEnabled`. Never applies with the buffered sliding window, which has no gate; `ban` or `captcha` there logs the same load WARN as `rateLimitFailureAction`. With a gate, a backoff action laxer than `rateLimitFailureAction` (for example `passthrough` with a failure action `ban`) logs WARN `crowdsec bouncer backoff action laxer than failure action` once at load, and a stricter one WARN `crowdsec bouncer backoff action stricter than failure action`. See [Rate limit › When Redis is down](rate-limit.md).
 
 #### `rateLimitUnhealthyBackOffPeriodSecs`
 
 `int64` · default `10`
 
-Cooldown in seconds of the rate-limit Redis backoff gate, same rule as [`appsecUnhealthyBackOffPeriodSecs`](#appsecunhealthybackoffperiodsecs): after 5 Redis failures in a row (or failures above about 30% of counted buckets), Redis is not called for this long and `rateLimitBackOffAction` applies; then one request probes Redis. `0` turns the gate off, so every counted bucket calls Redis and every failure gets `rateLimitFailureAction`, after waiting up to 250ms. Only with `rateLimitSyncRate: 0` or `rateLimitAlgorithm: tokenBucket`: the buffered sliding window already stops calling Redis for one sync interval after a failure. Read only on the middleware with `rateLimitEnabled`.
+Cooldown in seconds of the rate-limit Redis backoff gate, same rule as [`appsecUnhealthyBackOffPeriodSecs`](#appsecunhealthybackoffperiodsecs): after 5 Redis failures in a row (or failures above about 30% of counted buckets), Redis is not called for this long and `rateLimitBackOffAction` applies; then one request probes Redis. `0` turns the gate off, so every counted bucket calls Redis and every failure gets `rateLimitFailureAction`, after waiting up to 250ms. A Redis that rejects the password does not trip the gate: it is a setting to fix, and `rateLimitFailureAction` keeps answering. Only with `rateLimitSyncRate: 0` or `rateLimitAlgorithm: tokenBucket`: the buffered sliding window already stops calling Redis for one sync interval after a failure. Read only on the middleware with `rateLimitEnabled`.
 
 #### `rateLimitStatusCode`
 

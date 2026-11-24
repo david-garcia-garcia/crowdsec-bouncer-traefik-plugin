@@ -161,11 +161,13 @@ Each failing request SHALL log at DEBUG with the client address and the error. T
 - **AND** in exact mode it applies `rateLimitFailureAction`
 
 ### Requirement: A Redis that keeps failing is skipped by the owner's backoff gate
-In exact mode (`rateLimitSyncRate` `0`) and with `tokenBucket`, where a successful take proves that Redis answered, the owner's client SHALL hold one `pkg/admission` gate (key `ratelimit`) with cooldown `rateLimitUnhealthyBackOffPeriodSecs` (default `10`), shared by every subscriber of that client. Every take SHALL be admitted by the gate before it calls Redis and reported after it: success when the counter answered, failure on a counter error. A take whose request context was canceled SHALL NOT be reported. The trip rule, the probe, and the fixed cooldown SHALL be the AppSec and ModSec gate's (`admission.TripFailures`, `admission.FailureRatio`).
+In exact mode (`rateLimitSyncRate` `0`) and with `tokenBucket`, where a successful take proves that Redis answered, the owner's client SHALL hold one `pkg/admission` gate (key `ratelimit`) with cooldown `rateLimitUnhealthyBackOffPeriodSecs` (default `10`), shared by every subscriber of that client. Every take SHALL be admitted by the gate before it calls Redis and reported after it: success when the counter answered or Redis rejected the password (`simpleredis.ErrNoAuth`, a setting to fix, as AppSec reports a 401), failure on any other counter error. A take whose request context was canceled SHALL NOT be reported. The trip rule, the probe, and the fixed cooldown SHALL be the AppSec and ModSec gate's (`admission.TripFailures`, `admission.FailureRatio`).
 
 While the gate backs off, a take SHALL NOT call Redis and SHALL return `ratelimit.ErrGateSkip`. The subscribing router SHALL then stop evaluating buckets and apply the owner's `rateLimitBackOffAction` instead of `rateLimitFailureAction`, with the same three answers and remediation headers `ban:ratelimit-backoff` / `captcha:ratelimit-backoff`, drop origin `plugin:ratelimit_failure`. `passthrough` (default) continues to the AppSec step with no header and no drop.
 
 The gate SHALL log WARN `crowdsec ratelimit backoff started` (with `retryIn`) when it starts skipping and INFO `crowdsec ratelimit backoff ended` when a probe succeeds, once per transition and per client.
+
+When the client is created with a gate, it SHALL log one WARN when `rateLimitBackOffAction` ranks below `rateLimitFailureAction` (passthrough < captcha < ban): `crowdsec bouncer backoff action laxer than failure action` with `failureAction`, `backOffAction`, `backOffPeriodSecs` and a hint naming `rateLimitBackOffAction` and `rateLimitUnhealthyBackOffPeriodSecs: 0`; and one WARN `crowdsec bouncer backoff action stricter than failure action` when it ranks above. Neither SHALL fail `New`, and a client without a gate SHALL log neither.
 
 `rateLimitUnhealthyBackOffPeriodSecs` `0` SHALL build no gate. The buffered sliding window SHALL build no gate whatever the cooldown: it answers an outage from local counts and already skips Redis for one sync rate after a failure. The cooldown SHALL be part of the client's ownership key.
 
@@ -182,6 +184,16 @@ The gate SHALL log WARN `crowdsec ratelimit backoff started` (with `retryIn`) wh
 #### Scenario: A probe that succeeds ends the backoff
 - **WHEN** the gate is backing off, the cooldown has elapsed, and Redis answers again
 - **THEN** the next take calls Redis and INFO `crowdsec ratelimit backoff ended` is logged once
+
+#### Scenario: A rejected password does not trip the gate
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitUnhealthyBackOffPeriodSecs` is `10`, and Redis rejects the password
+- **THEN** every request gets `rateLimitFailureAction`, after more than 5 requests too
+- **AND** WARN `crowdsec ratelimit backoff started` is not logged
+
+#### Scenario: A laxer backoff action warns at load
+- **WHEN** `rateLimitSyncRate` is `0`, `rateLimitUnhealthyBackOffPeriodSecs` is `10`, `rateLimitFailureAction` is `ban`, and `rateLimitBackOffAction` is `passthrough`
+- **THEN** `New` returns a handler
+- **AND** the client logs WARN `crowdsec bouncer backoff action laxer than failure action` once, when it is created
 
 #### Scenario: Buffered mode and a zero cooldown build no gate
 - **WHEN** `rateLimitSyncRate` is `200ms` with `slidingWindow`, or `rateLimitUnhealthyBackOffPeriodSecs` is `0`

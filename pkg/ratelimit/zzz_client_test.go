@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/admission"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/logger"
 	"github.com/david-garcia-garcia/crowdsec-bouncer-traefik-plugin/pkg/reclaim"
 )
@@ -311,7 +312,9 @@ func assertTakeFailsWithinBudget(t *testing.T, client *Client) {
 
 // TestClient_wrongPasswordLogsLibraryLinesAtDebug proves a Redis that rejects AUTH costs DEBUG lines from
 // the library: the simpleredis WARN and ERROR lines of each failed dial are capped at DEBUG, and the only
-// line above DEBUG is the Client's debounced ERROR MsgRedisUnavailable, however many takes fail.
+// line above DEBUG is the Client's debounced ERROR MsgRedisUnavailable, however many takes fail. A rejected
+// password does not trip the gate either (no WARN MsgBackoffStarted): it is a configuration to fix, so the
+// failure action keeps answering.
 func TestClient_wrongPasswordLogsLibraryLinesAtDebug(t *testing.T) {
 	reclaim.ResetForTestWith(0)
 	t.Cleanup(func() { reclaim.ResetForTest() })
@@ -344,13 +347,22 @@ func TestClient_wrongPasswordLogsLibraryLinesAtDebug(t *testing.T) {
 	}()
 	sink := &lockedLogSink{}
 	log := slog.New(slog.NewJSONHandler(sink, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	client, err := Open(context.Background(), "edge", redisOnlyTestSettings(RedisSettings{Host: listener.Addr().String(), Password: "wrong"}), log)
+	settings := redisOnlyTestSettings(RedisSettings{Host: listener.Addr().String(), Password: "wrong"})
+	settings.BackOffPeriodSecs = 10
+	client, err := Open(context.Background(), "edge", settings, log)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer client.Close()
-	assertTakeFailsWithinBudget(t, client)
-	assertTakeFailsWithinBudget(t, client)
+	if client.GateForTest() == nil {
+		t.Fatal("exact mode with a period must build the gate")
+	}
+	for range admission.TripFailures + 2 {
+		assertTakeFailsWithinBudget(t, client)
+	}
+	if client.GateForTest().BackingOff() {
+		t.Fatal("a rejected password must not trip the gate")
+	}
 	logs := sink.String()
 	if strings.Contains(logs, `"level":"WARN"`) || strings.Count(logs, `"level":"ERROR"`) != 1 ||
 		countTestLogLines(t, logs, "ERROR", MsgRedisUnavailable) != 1 {
