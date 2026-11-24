@@ -45,12 +45,12 @@ func countingAppsec(t *testing.T, hits *atomic.Int32) *appsec.Client {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return appsec.NewTestClient(u, srv.Client(), logger.New("ERROR", ""))
+	return appsec.NewTestClient(u, srv.Client(), logger.New("ERROR"))
 }
 
 // withTestMetrics binds a LAPI client that only counts drops. continueAfterLAPIForTest never queries it.
 func withTestMetrics(b *Bouncer) *lapi.Client {
-	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	lapiClient, _ := lapi.NewTestClient(logger.New("ERROR"))
 	lapi.AttachTestMetricsReporter(lapiClient)
 	bindTestLAPI(b, lapiClient)
 	return lapiClient

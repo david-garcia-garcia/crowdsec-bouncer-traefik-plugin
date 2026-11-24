@@ -75,17 +75,6 @@ The configuration package SHALL include unit tests covering: custom captcha prov
 - **WHEN** `bouncerAppsecFailureAction` is `captcha` and `captchaInstanceName` is empty after owner-fill rules
 - **THEN** `ValidateParams` returns an error
 
-### Requirement: Writable log path check does not retain its descriptor
-When `LogFilePath` is non-empty, `ValidateParams` SHALL still reject an unwritable path. After a successful writability check it MUST NOT retain a file descriptor that exists only for that check. It MUST still perform the check even when a process-lifetime logger file is already open for the same path.
-
-#### Scenario: Successful writable path leaves no check descriptor
-- **WHEN** `ValidateParams` succeeds with a non-empty writable `LogFilePath` and no process-lifetime logger file is held for that path
-- **THEN** the process has no open descriptor that names that path
-
-#### Scenario: Unwritable path still fails
-- **WHEN** `LogFilePath` is non-empty and not writable
-- **THEN** `ValidateParams` returns an error
-
 ### Requirement: Redis password file resolved only when Redis is enabled
 `ValidateParams` SHALL resolve `LapiRedisPassword` and `LapiRedisPasswordFile` only when `lapiRedisEnabled` is true. When `lapiRedisEnabled` is false, a missing, directory, or unreadable `lapiRedisPasswordFile` MUST NOT fail startup. When `lapiRedisEnabled` is true, a non-empty `lapiRedisPasswordFile` that is missing, a directory, or unreadable SHALL fail startup. An empty password with an empty file path SHALL still be accepted when Redis is enabled.
 
@@ -259,7 +248,7 @@ When `BouncerBanFilePath` is empty or `GetTemplate` fails for that path, `Valida
 - **THEN** `ValidateParams` returns no error
 
 ### Requirement: Public Config keys use domain prefixes
-`Config` SHALL expose flat public JSON keys whose first syllable is the piece that reads them (`lapi`, `appsec`, `bouncer`, `captcha`, `modsec`). Own-axis captcha keys SHALL be `captchaEnabled` and `captchaInstanceName`. Owner-read captcha settings SHALL be `captcha*` (`Captcha*` Go fields). Own-axis ModSec keys SHALL be `modsecEnabled` and `modsecInstanceName`. Owner-read ModSec settings SHALL be `modsec*` (`Modsec*` Go fields). Per-router ModSec failure action SHALL be `bouncerModsecFailureAction`. The plugin MUST NOT accept old `bouncerCaptcha*` keys as aliases. Logging keys (`logLevel`, `logFormat`, `logFilePath`) and `reclaimGraceSeconds` SHALL stay unprefixed. The plugin MUST NOT accept old `crowdsec*` keys, source-plugin `modSecurityUrl` camelCase, or unprefixed router knobs as aliases, and MUST NOT nest those maps. `GetVariable` lookup strings SHALL be the Go field names (`LapiKey`, `LapiTLSClientCertificate`, `AppsecKey`, `CaptchaSiteKey`). TLS prefix helpers SHALL be `Lapi` / `Appsec` plus `TLSCertificateAuthority`, `TLSClientCertificate`, and `TLSClientKey`. Validation errors SHALL name the Go field.
+`Config` SHALL expose flat public JSON keys whose first syllable is the piece that reads them (`lapi`, `appsec`, `bouncer`, `captcha`, `modsec`). Own-axis captcha keys SHALL be `captchaEnabled` and `captchaInstanceName`. Owner-read captcha settings SHALL be `captcha*` (`Captcha*` Go fields). Own-axis ModSec keys SHALL be `modsecEnabled` and `modsecInstanceName`. Owner-read ModSec settings SHALL be `modsec*` (`Modsec*` Go fields). Per-router ModSec failure action SHALL be `bouncerModsecFailureAction`. The plugin MUST NOT accept old `bouncerCaptcha*` keys as aliases. Logging keys (`logLevel`, `logFormat`) and `reclaimGraceSeconds` SHALL stay unprefixed. The plugin MUST NOT accept old `crowdsec*` keys, source-plugin `modSecurityUrl` camelCase, or unprefixed router knobs as aliases, and MUST NOT nest those maps. `GetVariable` lookup strings SHALL be the Go field names (`LapiKey`, `LapiTLSClientCertificate`, `AppsecKey`, `CaptchaSiteKey`). TLS prefix helpers SHALL be `Lapi` / `Appsec` plus `TLSCertificateAuthority`, `TLSClientCertificate`, and `TLSClientKey`. Validation errors SHALL name the Go field.
 
 #### Scenario: Old crowdsec key is ignored
 - **WHEN** operator YAML sets only `crowdsecLapiHost` and omits `lapiHost`

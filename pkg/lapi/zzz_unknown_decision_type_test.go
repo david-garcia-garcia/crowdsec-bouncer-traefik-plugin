@@ -14,7 +14,7 @@ import (
 
 // TestStreamPutItemUnknownTypeStoresBan proves challenge and allow store as ban, not skip.
 func TestStreamPutItemUnknownTypeStoresBan(t *testing.T) {
-	client, _ := NewTestClient(logger.New("ERROR", ""))
+	client, _ := NewTestClient(logger.New("ERROR"))
 	for _, decisionType := range []string{"challenge", "allow"} {
 		stored, ok := client.streamPutItem(Decision{
 			Type: decisionType, Scope: "ip", Value: "203.0.113.50", Origin: "crowdsec",

@@ -390,7 +390,7 @@ func Test_appsecQuery_zeroBodyLimitForwardsPost(t *testing.T) {
 func Test_appsecQuery_rebuildsContentLengthFromForwardedBytes(t *testing.T) {
 	const forwarded = "abcd"
 	capture := &captureRoundTripper{}
-	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: capture}, logger.New("INFO", ""))
+	client := NewTestClient(&url.URL{Scheme: "http", Host: "appsec.example"}, &http.Client{Transport: capture}, logger.New("INFO"))
 	req := httptest.NewRequest(http.MethodPost, "http://localhost/", strings.NewReader(forwarded))
 	req.Header.Set("Content-Length", "999")
 	req.Header.Set("Transfer-Encoding", "chunked")

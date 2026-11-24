@@ -59,7 +59,7 @@ func TestOpen_SiteverifyTimeoutHonorsOverride(t *testing.T) {
 	for _, seconds := range []int64{1, 10} {
 		t.Run(strconv.FormatInt(seconds, 10), func(t *testing.T) {
 			cfg := testOwnerConfig(t, seconds)
-			client, err := Open(context.Background(), cfg, logger.New("ERROR", ""), "cs-owner", "")
+			client, err := Open(context.Background(), cfg, logger.New("ERROR"), "cs-owner", "")
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -100,7 +100,7 @@ func TestOwnershipKey_EnterpriseKnobChangeReclaims(t *testing.T) {
 	}
 }
 
-// TestOwnershipKey_LogConfigChangeReclaims proves OwnershipKey forks when logLevel, logFilePath, or logFormat changes.
+// TestOwnershipKey_LogConfigChangeReclaims proves OwnershipKey forks when logLevel or logFormat changes.
 func TestOwnershipKey_LogConfigChangeReclaims(t *testing.T) {
 	left := testOwnerConfig(t, 10)
 	// logLevel-only Config change must change OwnershipKey.
@@ -108,12 +108,6 @@ func TestOwnershipKey_LogConfigChangeReclaims(t *testing.T) {
 	rightLevel.LogLevel = "DEBUG"
 	if OwnershipKey(left, "mw") == OwnershipKey(&rightLevel, "mw") {
 		t.Fatal("logLevel change must change the ownership key")
-	}
-	// logFilePath-only Config change must change OwnershipKey.
-	rightPath := *left
-	rightPath.LogFilePath = "/tmp/bouncer.log"
-	if OwnershipKey(left, "mw") == OwnershipKey(&rightPath, "mw") {
-		t.Fatal("logFilePath change must change the ownership key")
 	}
 	// logFormat-only Config change must change OwnershipKey.
 	rightFormat := *left

@@ -20,7 +20,7 @@ func newEucaptchaConfig(t *testing.T) *Config {
 }
 
 func TestValidateParams_Eucaptcha(t *testing.T) {
-	log := logger.New("INFO", "")
+	log := logger.New("INFO")
 	tests := []struct {
 		name            string
 		config          *Config

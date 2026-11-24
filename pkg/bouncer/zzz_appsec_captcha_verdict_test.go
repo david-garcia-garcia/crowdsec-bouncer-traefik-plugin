@@ -47,13 +47,13 @@ func testAppsecVerdictBouncer(t *testing.T, verdict http.HandlerFunc, captchaCli
 				next.body = string(body)
 			}
 		}),
-		log:                     logger.New("ERROR", ""),
+		log:                     logger.New("ERROR"),
 		remediationStatusCode:   http.StatusForbidden,
 		remediationCustomHeader: "X-Remediation",
 		banTemplate:             banTemplate,
 		banTemplateContentType:  "text/html; charset=utf-8",
 	}
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	bindTestCaptcha(b, captchaClient)
 	lapiClient, _ := lapi.NewTestClient(b.log)
 	lapi.AttachTestMetricsReporter(lapiClient)

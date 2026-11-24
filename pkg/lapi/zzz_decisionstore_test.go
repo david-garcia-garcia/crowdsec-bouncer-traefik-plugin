@@ -71,7 +71,7 @@ func TestOpenDecisionStore_DifferentRedisHostsShare(t *testing.T) {
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	redisA := testStreamConfig("lapi.example:8080", 1)
 	redisB := testStreamConfig("lapi.example:8080", 1)
 	redisA.LapiRedisEnabled = true
@@ -97,7 +97,7 @@ func TestOpenDecisionStore_LiveRedisPrefixIsSessionHexNotIdentityHex(t *testing.
 
 	redisServer := startTestLeaseRedis(t)
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := testLiveConfig(1)
 	other := testLiveConfig(60)
 	cfg.LapiRedisEnabled = true
@@ -136,7 +136,7 @@ func TestOpenDecisionStore_LiveIntervalSplitSharesStore(t *testing.T) {
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
 	first, err := OpenDecisionStore(ctx, fast, log, "test")
@@ -162,7 +162,7 @@ func TestOpenDecisionStore_HeaderMismatchStillShares(t *testing.T) {
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	base := testStreamConfig("lapi.example:8080", 1)
 	withHeaders := testStreamConfig("lapi.example:8080", 1)
 	withHeaders.BouncerDecisionScopeHeaders = map[string]string{"username": "X-User"}
@@ -184,7 +184,7 @@ func TestOpenLive_TwoClientsShareOneStore(t *testing.T) {
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
 	first, err := Open(ctx, fast, log, "shared", "test")
@@ -213,7 +213,7 @@ func TestClientClose_LeavesSiblingCacheLive(t *testing.T) {
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
 	first, err := Open(ctx, fast, log, "shared", "test")
@@ -238,7 +238,7 @@ func TestClientClose_LeavesSiblingRedisPoolLive(t *testing.T) {
 
 	redisServer := startTestLeaseRedis(t)
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	fast := testLiveConfig(1)
 	slow := testLiveConfig(60)
 	fast.LapiRedisEnabled = true
@@ -267,7 +267,7 @@ func TestOpenDecisionStore_LastHolderGraceClosesRedisPool(t *testing.T) {
 
 	redisServer := startTestLeaseRedis(t)
 	ctx, cancel := context.WithCancel(context.Background())
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	cfg := testLiveConfig(1)
 	cfg.LapiRedisEnabled = true
 	cfg.LapiRedisHost = redisServer.addr()
@@ -294,7 +294,7 @@ func TestOpenDecisionStore_StreamPublishTickCounts(t *testing.T) {
 	t.Cleanup(func() { reclaim.ResetForTest() })
 
 	ctx := context.Background()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	stream, err := OpenDecisionStore(ctx, testStreamConfig("lapi.example:8080", 0), log, "stream")
 	if err != nil {
 		t.Fatal(err)

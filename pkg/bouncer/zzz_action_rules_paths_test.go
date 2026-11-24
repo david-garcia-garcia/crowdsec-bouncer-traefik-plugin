@@ -15,7 +15,7 @@ import (
 // TestFoldActionRulesChallengePathKeepsAppsec proves a bypass rule that also matches the
 // challenge prefix (here a static-asset rule) keeps its LAPI skip but not its AppSec skip there.
 func TestFoldActionRulesChallengePathKeepsAppsec(t *testing.T) {
-	b := &Bouncer{log: logger.New("ERROR", "")}
+	b := &Bouncer{log: logger.New("ERROR")}
 	b.actionRules = mustPathAction(t, "static", `\.js$`, httprule.ActionBypass)
 
 	challenge := b.foldActionRules(testClientRequest(httptest.NewRequest(http.MethodGet, "http://example.com/crowdsec-internal/challenge/fpscanner.js", nil), "192.0.2.10"))
@@ -44,9 +44,9 @@ func TestServeAppSecAmbiguousPathStillQueriesAppsec(t *testing.T) {
 	}
 	b := &Bouncer{
 		next: http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}),
-		log:  logger.New("ERROR", ""),
+		log:  logger.New("ERROR"),
 	}
-	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR", "")))
+	bindTestAppSec(b, appsec.NewTestClient(appsecURL, appsecServer.Client(), logger.New("ERROR")))
 	b.actionRules = mustPathAction(t, "healthz", "^/healthz(/|$)", httprule.ActionBypassAppsec)
 
 	for _, tc := range []struct {

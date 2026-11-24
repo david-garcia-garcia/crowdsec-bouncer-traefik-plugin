@@ -102,7 +102,7 @@ func TestApplyOriginBasedDecisionRemap_OneHopDoesNotChain(t *testing.T) {
 
 func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[string]map[string]string) (*Bouncer, *bool) {
 	t.Helper()
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	if lapiClient == nil {
 		t.Fatal("lapiClient is required")
 	}
@@ -132,7 +132,7 @@ func testRemapStreamBouncer(t *testing.T, lapiClient *lapi.Client, remap map[str
 }
 
 func TestServeHTTP_OriginBasedDecisionRemapIsPerBouncer(t *testing.T) {
-	log := logger.New("ERROR", "")
+	log := logger.New("ERROR")
 	lapiClient, store := lapi.NewTestClient(log)
 	lapi.AttachTestMetricsReporter(lapiClient)
 	lapiClient.SetStreamHealthyForTest(true)

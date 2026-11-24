@@ -73,8 +73,8 @@ func trippedLiveLAPI(t *testing.T) (*lapi.Client, *int64) {
 	cfg.LapiHost = serverURL.Host
 	cfg.LapiKey = "test-key"
 	cfg.LapiMetricsUpdateIntervalSeconds = 0
-	store := decisionstore.NewMemory(logger.New("ERROR", ""))
-	client, err := lapi.New(cfg, logger.New("ERROR", ""), "test", store, "owner", "bind")
+	store := decisionstore.NewMemory(logger.New("ERROR"))
+	client, err := lapi.New(cfg, logger.New("ERROR"), "test", store, "owner", "bind")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func bindLiveTestLAPI(b *Bouncer, client *lapi.Client) {
 // metricsTestLAPI is a healthy stream client with no decision, bound so a WAF backoff answer has a
 // connection to count its drop on.
 func metricsTestLAPI(b *Bouncer) *lapi.Client {
-	client, _ := lapi.NewTestClient(logger.New("ERROR", ""))
+	client, _ := lapi.NewTestClient(logger.New("ERROR"))
 	lapi.AttachTestMetricsReporter(client)
 	client.SetStreamHealthyForTest(true)
 	bindTestLAPI(b, client)
@@ -116,7 +116,7 @@ func trippedAppSec(t *testing.T) (*appsec.Client, *int64) {
 	cfg.AppsecEnabled = true
 	cfg.AppsecHost = serverURL.Host
 	cfg.AppsecScheme = "http"
-	client, err := appsec.New(cfg, logger.New("ERROR", ""), "test", "n", "k")
+	client, err := appsec.New(cfg, logger.New("ERROR"), "test", "n", "k")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func assertBackOffPassthrough(t *testing.T, leg backoffLeg) {
 	t.Helper()
 	cfg := testBackoffRouterConfig()
 	leg.setBackOff(cfg, configuration.FailureActionPassthrough)
-	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR", ""))
+	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR"))
 	_, hits := leg.bind(t, b)
 	before := hits()
 	rw := serveBackoffRequest(b, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
@@ -236,7 +236,7 @@ func assertBackOffBan(t *testing.T, leg backoffLeg) {
 	t.Helper()
 	cfg := testBackoffRouterConfig()
 	leg.setBackOff(cfg, configuration.FailureActionBan)
-	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR", ""))
+	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR"))
 	metrics, hits := leg.bind(t, b)
 	before := hits()
 	rw := serveBackoffRequest(b, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
@@ -262,7 +262,7 @@ func assertBackOffCaptcha(t *testing.T, leg backoffLeg) {
 	t.Helper()
 	cfg := testBackoffRouterConfig()
 	leg.setBackOff(cfg, configuration.FailureActionCaptcha)
-	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR", ""))
+	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR"))
 	metrics, _ := leg.bind(t, b)
 	bindTestCaptcha(b, testCaptchaClient(t, "/fast.js", "", "", nil))
 	rw := serveBackoffRequest(b, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
@@ -282,7 +282,7 @@ func assertBackOffCaptchaDowngrade(t *testing.T, leg backoffLeg) {
 	t.Helper()
 	cfg := testBackoffRouterConfig()
 	leg.setBackOff(cfg, configuration.FailureActionCaptcha)
-	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR", ""))
+	b, passed := newTestBackoffRouter(t, cfg, leg.subscriptions, logger.New("ERROR"))
 	leg.bind(t, b)
 	rw := serveBackoffRequest(b, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
 	if *passed || rw.Code != http.StatusForbidden || rw.Header().Get("X-Remediation") != "ban:captcha-downgrade" {
@@ -298,7 +298,7 @@ func assertBackOffCaptchaDowngrade(t *testing.T, leg backoffLeg) {
 func TestServeHTTP_lapiBackOffCaptchaIsBypassed(t *testing.T) {
 	cfg := testBackoffRouterConfig()
 	cfg.BouncerLapiBackOffAction = configuration.FailureActionCaptcha
-	b, passed := newTestBackoffRouter(t, cfg, Subscriptions{LAPI: true, Captcha: true}, logger.New("ERROR", ""))
+	b, passed := newTestBackoffRouter(t, cfg, Subscriptions{LAPI: true, Captcha: true}, logger.New("ERROR"))
 	b.actionRules = apiBypassCaptchaRules(t)
 	client, _ := trippedLiveLAPI(t)
 	bindLiveTestLAPI(b, client)
@@ -339,9 +339,9 @@ func TestServeHTTP_twoRoutersOnOneAppsecGate(t *testing.T) {
 	before := atomic.LoadInt64(hits)
 	strictCfg := testBackoffRouterConfig()
 	strictCfg.BouncerAppsecBackOffAction = configuration.FailureActionBan
-	strict, strictPassed := newTestBackoffRouter(t, strictCfg, Subscriptions{AppSec: true}, logger.New("ERROR", ""))
+	strict, strictPassed := newTestBackoffRouter(t, strictCfg, Subscriptions{AppSec: true}, logger.New("ERROR"))
 	bindTestAppSec(strict, client)
-	lenient, lenientPassed := newTestBackoffRouter(t, testBackoffRouterConfig(), Subscriptions{AppSec: true}, logger.New("ERROR", ""))
+	lenient, lenientPassed := newTestBackoffRouter(t, testBackoffRouterConfig(), Subscriptions{AppSec: true}, logger.New("ERROR"))
 	bindTestAppSec(lenient, client)
 
 	rw := serveBackoffRequest(strict, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
@@ -362,11 +362,11 @@ func TestServeHTTP_twoRoutersOnOneAppsecGate(t *testing.T) {
 func TestServeHTTP_twoRoutersOnOneLapiGate(t *testing.T) {
 	client, hits := trippedLiveLAPI(t)
 	before := atomic.LoadInt64(hits)
-	strict, strictPassed := newTestBackoffRouter(t, testBackoffRouterConfig(), Subscriptions{LAPI: true}, logger.New("ERROR", ""))
+	strict, strictPassed := newTestBackoffRouter(t, testBackoffRouterConfig(), Subscriptions{LAPI: true}, logger.New("ERROR"))
 	bindLiveTestLAPI(strict, client)
 	lenientCfg := testBackoffRouterConfig()
 	lenientCfg.BouncerLapiBackOffAction = configuration.FailureActionPassthrough
-	lenient, lenientPassed := newTestBackoffRouter(t, lenientCfg, Subscriptions{LAPI: true}, logger.New("ERROR", ""))
+	lenient, lenientPassed := newTestBackoffRouter(t, lenientCfg, Subscriptions{LAPI: true}, logger.New("ERROR"))
 	bindLiveTestLAPI(lenient, client)
 
 	rw := serveBackoffRequest(strict, httptest.NewRequest(http.MethodGet, "http://example.com/", nil))
@@ -396,7 +396,7 @@ func TestServeHTTP_unreadableBodyWhileBackingOffUsesBackOffAction(t *testing.T) 
 		cfg := testBackoffRouterConfig()
 		cfg.BouncerAppsecFailureAction = configuration.FailureActionCaptcha
 		cfg.BouncerAppsecBackOffAction = configuration.FailureActionBan
-		b, _ := newTestBackoffRouter(t, cfg, Subscriptions{AppSec: true}, logger.New("ERROR", ""))
+		b, _ := newTestBackoffRouter(t, cfg, Subscriptions{AppSec: true}, logger.New("ERROR"))
 		client, hits := trippedAppSec(t)
 		before := atomic.LoadInt64(hits)
 		bindTestAppSec(b, client)
@@ -412,7 +412,7 @@ func TestServeHTTP_unreadableBodyWhileBackingOffUsesBackOffAction(t *testing.T) 
 		cfg := testBackoffRouterConfig()
 		cfg.BouncerModsecFailureAction = configuration.FailureActionCaptcha
 		cfg.BouncerModsecBackOffAction = configuration.FailureActionBan
-		b, _ := newTestBackoffRouter(t, cfg, Subscriptions{ModSec: true}, logger.New("ERROR", ""))
+		b, _ := newTestBackoffRouter(t, cfg, Subscriptions{ModSec: true}, logger.New("ERROR"))
 		client, hits := trippedModSec(t)
 		before := *hits
 		bindTestModSec(b, client)
@@ -430,7 +430,7 @@ func TestServeHTTP_unreadableBodyWhileBackingOffUsesBackOffAction(t *testing.T) 
 func TestServeHTTP_modsecOverLimitIs413WhileBackingOff(t *testing.T) {
 	cfg := testBackoffRouterConfig()
 	cfg.BouncerModsecBackOffAction = configuration.FailureActionBan
-	b, passed := newTestBackoffRouter(t, cfg, Subscriptions{ModSec: true}, logger.New("ERROR", ""))
+	b, passed := newTestBackoffRouter(t, cfg, Subscriptions{ModSec: true}, logger.New("ERROR"))
 	client, _ := trippedModSec(t)
 	bindTestModSec(b, client)
 	rw := serveBackoffRequest(b, httptest.NewRequest(http.MethodPost, "http://example.com/", strings.NewReader("123456789")))

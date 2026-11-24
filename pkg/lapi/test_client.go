@@ -34,14 +34,14 @@ func (c *Client) SetCrowdsecModeForTest(mode string) {
 // newTestRangeClient is a stream-mode memory Client plus its DecisionStore.
 func newTestRangeClient(t *testing.T) (*Client, *decisionstore.Store) {
 	t.Helper()
-	client, store := NewTestClient(logger.New("ERROR", ""))
+	client, store := NewTestClient(logger.New("ERROR"))
 	client.crowdsecMode = configuration.StreamMode
 	return client, store
 }
 
 func newTestRedisStore(t *testing.T, host string, readHosts []string, prefix string) *decisionstore.Store {
 	t.Helper()
-	store := decisionstore.NewRedis(logger.New("ERROR", ""), host, readHosts, "", "", prefix)
+	store := decisionstore.NewRedis(logger.New("ERROR"), host, readHosts, "", "", prefix)
 	t.Cleanup(store.Close)
 	return store
 }
