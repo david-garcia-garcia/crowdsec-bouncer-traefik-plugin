@@ -32,7 +32,7 @@ _Avoid_: solved-captcha, single-token `ban`/`captcha`, copying raw AppSec `actio
 
 **Failure action**:
 The operator enum (`passthrough` | `ban` | `captcha`) this plugin applies when an admitted LAPI, AppSec, or ModSec hop does not return a usable verdict. Each is per-router on Bouncer (`bouncerLapiFailureAction`, `bouncerLapiRedisFailureAction`, `bouncerAppsecFailureAction`, `bouncerModsecFailureAction`). The rate limit's `rateLimitFailureAction` is not: it is the owner's policy on the published rate-limit Client, and every subscriber applies it (`core_plugin_ratelimit.md`). Default is `ban` for LAPI, the LAPI Redis cache, and AppSec, and `passthrough` for ModSec. A Gate skip on either WAF leg is not this enum (`core_plugin_appsec.md`, `core_plugin_modsecurity_inspect.md`).
-_Avoid_: fail mode, `bouncerModsecFailMode`, `bouncerRedisUnreachableBlock`, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
+_Avoid_: fail mode, `bouncerModsecFailMode`, the three removed AppSec block bools, AppSec JSON `action: captcha`, LAPI Client identity
 
 **Action rule**:
 One authoring row on `bouncerActionRules` (unique `name`, `action` tokens, plus httprule predicates). All matching rows contribute. Ban remediates immediately; otherwise OR skipLapi / skipAppsec / skipModsec / skipRateLimit / captchaFlag. Not a trusted-IP skip, not CrowdSec identity, not the outgoing remediation header.

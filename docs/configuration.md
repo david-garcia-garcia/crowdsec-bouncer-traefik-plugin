@@ -407,7 +407,7 @@ What to do when LAPI cannot give an answer: `ban`, `passthrough`, or `captcha`. 
 
 `string` · default `ban`
 
-What to do when the LAPI Redis cache cannot be read: `ban`, `passthrough`, or `captcha`. Every failure counts: Redis cannot be reached, answers in more than about 1 second, or answers with an error (TLS rejected, wrong or missing password). `passthrough` skips the LAPI check and the request goes on to the next checks. `bouncerLapiFailureAction` does not apply. Replaces `bouncerRedisUnreachableBlock`: `true` is `ban`, `false` is `passthrough`. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
+What to do when the LAPI Redis cache cannot be read: `ban`, `passthrough`, or `captcha`. Every failure counts: Redis cannot be reached, answers in more than about 1 second, or answers with an error (TLS rejected, wrong or missing password). `passthrough` skips the LAPI check and the request goes on to the next checks. `bouncerLapiFailureAction` does not apply. See [The LAPI Redis cache](failure-modes.md#the-lapi-redis-cache).
 
 #### `bouncerModsecFailureAction`
 

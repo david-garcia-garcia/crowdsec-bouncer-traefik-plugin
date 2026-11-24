@@ -456,7 +456,7 @@ Public config `bouncerModsecFailureAction` SHALL be validated by the same rule a
 - **THEN** `ValidateParams` returns an error naming `BouncerModsecFailureAction`
 
 ### Requirement: bouncerLapiRedisFailureAction is passthrough, ban, or captcha
-Public config `bouncerLapiRedisFailureAction` SHALL be validated by the same rule as `bouncerLapiFailureAction`: empty, `passthrough`, `ban`, or `captcha`; `captcha` SHALL need a captcha instance name after owner-fill. Empty or omitted SHALL be `ban` at runtime (`configuration.EffectiveFailureAction`). This key SHALL be per-router (not on LAPI Client identity). It SHALL apply to every failed LAPI Redis cache read (unreachable, timeout, NOAUTH, TLS, protocol error). `passthrough` SHALL skip the LAPI leg without falling through to LiveLookup. `bouncerRedisUnreachableBlock` SHALL NOT be a Config field.
+Public config `bouncerLapiRedisFailureAction` SHALL be validated by the same rule as `bouncerLapiFailureAction`: empty, `passthrough`, `ban`, or `captcha`; `captcha` SHALL need a captcha instance name after owner-fill. Empty or omitted SHALL be `ban` at runtime (`configuration.EffectiveFailureAction`). This key SHALL be per-router (not on LAPI Client identity). It SHALL apply to every failed LAPI Redis cache read (unreachable, timeout, NOAUTH, TLS, protocol error). `passthrough` SHALL skip the LAPI leg without falling through to LiveLookup.
 
 #### Scenario: Default is ban
 - **WHEN** the operator omits `bouncerLapiRedisFailureAction`
